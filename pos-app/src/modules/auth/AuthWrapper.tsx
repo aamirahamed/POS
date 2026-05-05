@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface AuthWrapperProps {
     children: React.ReactNode;
@@ -9,9 +10,12 @@ interface AuthWrapperProps {
 const AuthWrapper = ({ children }: AuthWrapperProps) => {
     const [session, setSession] = useState<Session | null>(null);
     const [isConfigured, setIsConfigured] = useState(true);
-    const [loading, setLoading] = useState(false);
     const [checkingSession, setCheckingSession] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -36,19 +40,20 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
         return () => subscription.unsubscribe();
     }, []);
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setMessage(null);
+
         try {
-            const { error } = await supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    emailRedirectTo: window.location.origin,
-                },
-            });
-            if (error) throw error;
-            setMessage({ type: 'success', text: 'Check your email for the login link!' });
+            if (isSignUp) {
+                const { error } = await supabase.auth.signUp({ email, password });
+                if (error) throw error;
+                setMessage({ type: 'success', text: 'Account created! You are now logged in.' });
+            } else {
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+            }
         } catch (error: unknown) {
             const authError = error as AuthError;
             setMessage({ type: 'error', text: authError.message || 'An error occurred' });
@@ -57,7 +62,7 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
         }
     };
 
-    // While checking for an existing session, show a minimal loader — not the login screen
+    // Loading — checking for existing session
     if (checkingSession) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-background">
@@ -71,53 +76,102 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
             <div className="flex flex-col items-center justify-center min-h-screen bg-background text-text-primary p-4 text-center">
                 <h2 className="text-xl font-bold mb-4 text-accent">Supabase Not Configured</h2>
                 <p>Please add your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.</p>
-                <div className="mt-8 border border-white/10 p-4 rounded bg-surface">
-                    <p className="text-sm font-mono text-left">
-                        VITE_SUPABASE_URL=...<br />
-                        VITE_SUPABASE_ANON_KEY=...
-                    </p>
-                </div>
             </div>
         );
     }
 
     if (!session) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-background text-text-primary">
-                <div className="w-full max-w-md p-8 bg-surface rounded-xl shadow-2xl border border-white/10">
-                    <h1 className="text-3xl font-bold mb-2 text-center bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                        Sign In
-                    </h1>
-                    <p className="text-center text-text-secondary mb-8">
-                        Enter your email to receive a magic link
-                    </p>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-background text-text-primary px-4">
+                <div className="w-full max-w-sm">
+                    {/* Header */}
+                    <div className="mb-8 text-center">
+                        <h1 className="text-3xl font-bold text-text-primary tracking-tight mb-1">POS</h1>
+                        <p className="text-text-secondary text-sm">
+                            {isSignUp ? 'Create your account' : 'Welcome back'}
+                        </p>
+                    </div>
 
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div>
-                            <input
-                                type="email"
-                                placeholder="name@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full bg-background border border-border rounded-lg px-4 py-3 text-text-primary focus:outline-none focus:border-accent transition-colors"
-                                required
-                            />
-                        </div>
-
-                        {message && (
-                            <div className={`p-3 rounded text-sm ${message.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                                {message.text}
+                    {/* Card */}
+                    <div className="bg-surface border border-border/60 rounded-2xl p-6 shadow-xl">
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Email */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                    Email
+                                </label>
+                                <input
+                                    type="email"
+                                    placeholder="you@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-[16px]"
+                                    required
+                                    autoComplete="email"
+                                />
                             </div>
-                        )}
 
+                            {/* Password */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+                                    Password
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full bg-background border border-border rounded-xl px-4 py-3 pr-11 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-[16px]"
+                                        required
+                                        minLength={6}
+                                        autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text-primary transition-colors p-1"
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Error / Success message */}
+                            {message && (
+                                <div className={`p-3 rounded-lg text-sm ${
+                                    message.type === 'success'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                }`}>
+                                    {message.text}
+                                </div>
+                            )}
+
+                            {/* Submit */}
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-gradient-to-r from-accent to-indigo-400 text-white font-semibold py-3 rounded-xl transition-all hover:from-accent-hover hover:to-indigo-500 hover:shadow-lg hover:-translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 mt-2"
+                            >
+                                {loading
+                                    ? (isSignUp ? 'Creating account...' : 'Signing in...')
+                                    : (isSignUp ? 'Create Account' : 'Sign In')
+                                }
+                            </button>
+                        </form>
+                    </div>
+
+                    {/* Toggle Sign up / Sign in */}
+                    <p className="text-center text-sm text-text-secondary mt-6">
+                        {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
                         <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-accent hover:bg-accent-hover text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            onClick={() => { setIsSignUp(!isSignUp); setMessage(null); }}
+                            className="text-accent hover:text-accent-hover font-medium transition-colors"
                         >
-                            {loading ? 'Sending link...' : 'Send Magic Link'}
+                            {isSignUp ? 'Sign in' : 'Create one'}
                         </button>
-                    </form>
+                    </p>
                 </div>
             </div>
         );
