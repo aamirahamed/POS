@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface AuthWrapperProps {
@@ -6,26 +7,30 @@ interface AuthWrapperProps {
 }
 
 const AuthWrapper = ({ children }: AuthWrapperProps) => {
-    const [session, setSession] = useState<any>(null);
+    const [session, setSession] = useState<Session | null>(null);
     const [isConfigured, setIsConfigured] = useState(true);
     const [loading, setLoading] = useState(false);
+    const [checkingSession, setCheckingSession] = useState(true);
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
         if (!isSupabaseConfigured()) {
             setIsConfigured(false);
+            setCheckingSession(false);
             return;
         }
 
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
+            setCheckingSession(false);
         });
 
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
+            setCheckingSession(false);
         });
 
         return () => subscription.unsubscribe();
@@ -44,12 +49,22 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
             });
             if (error) throw error;
             setMessage({ type: 'success', text: 'Check your email for the login link!' });
-        } catch (error: any) {
-            setMessage({ type: 'error', text: error.message || 'An error occurred' });
+        } catch (error: unknown) {
+            const authError = error as AuthError;
+            setMessage({ type: 'error', text: authError.message || 'An error occurred' });
         } finally {
             setLoading(false);
         }
     };
+
+    // While checking for an existing session, show a minimal loader — not the login screen
+    if (checkingSession) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-background">
+                <div className="w-8 h-8 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+            </div>
+        );
+    }
 
     if (!isConfigured) {
         return (
