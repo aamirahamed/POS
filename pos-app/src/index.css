@@ -1,22 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #09090b;
-  /* Zinc 950 */
-  --color-surface: #18181b;
-  /* Zinc 900 */
-  --color-surface-hover: #27272a;
-  /* Zinc 800 */
-  --color-border: #27272a;
-  /* Zinc 800 */
-  --color-text-primary: #fafafa;
-  /* Zinc 50 */
-  --color-text-secondary: #a1a1aa;
-  /* Zinc 400 */
+  --color-background: #0f1115;
+  --color-surface: #151821;
+  --color-surface-elevated: #1a1f2b;
+  --color-surface-hover: #202636;
+  
+  --color-border: #2a3143;
+  
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  
   --color-accent: #6366f1;
-  /* Indigo 500 */
-  --color-accent-hover: #4f46e5;
-  /* Indigo 600 */
+  --color-accent-hover: #818cf8;
 
   --font-sans: "Inter", sans-serif;
 

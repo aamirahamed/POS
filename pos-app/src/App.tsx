@@ -6,6 +6,7 @@ import Wishlist from '@/modules/wishlist/Wishlist';
 import AssignmentTracker from '@/modules/tracker/AssignmentTracker';
 import DashboardPage from '@/modules/dashboard/DashboardPage';
 import { JobTrackerPage } from '@/modules/job-tracker/JobTrackerPage';
+import ShoppingListPage from '@/modules/shopping/ShoppingListPage';
 import AuthWrapper from '@/modules/auth/AuthWrapper';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
             <Route path="wishlist" element={<Wishlist />} />
             <Route path="tracker" element={<AssignmentTracker />} />
             <Route path="jobs" element={<JobTrackerPage />} />
+            <Route path="shopping" element={<ShoppingListPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
