@@ -93,8 +93,11 @@ const Reminders: FC = () => {
         // Focus input back?
     };
 
+    const now = Date.now;
     const activeReminders = reminders.filter(r => !r.completed);
     const completedReminders = reminders.filter(r => r.completed);
+    // eslint-disable-next-line react-hooks/purity
+    const checkOverdue = (dueDate: number | undefined) => dueDate !== undefined && dueDate < now();
 
     const formatDateChip = (date: Date) => {
         const today = new Date();
@@ -107,24 +110,25 @@ const Reminders: FC = () => {
     };
 
     return (
-        <div className="h-full w-full bg-background p-8 flex flex-col items-center">
-            <div className="w-full max-w-2xl">
-                <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl font-bold text-text-primary">Reminders</h1>
+        <div className="h-full w-full bg-background flex flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-4 md:px-8 pt-6 md:pt-8 pb-32">
+            <div className="w-full max-w-2xl mx-auto">
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-2xl md:text-3xl font-bold text-text-primary">Reminders</h1>
                     <div className="text-xs text-text-secondary">
-                        {userId ? 'Syncing...' : 'Local Mode'}
+                        {userId ? '● Synced' : 'Local Mode'}
                     </div>
                 </div>
 
                 {/* Input Area */}
-                <form onSubmit={handleSubmit} className="relative mb-8 group bg-surface border border-border rounded-xl shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center px-4 py-3">
+                <form onSubmit={handleSubmit} className="relative mb-6 group bg-surface border border-border rounded-xl shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center px-4 py-3.5">
                         <input
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             placeholder="What needs to be done?"
-                            className="flex-1 bg-transparent text-lg text-text-primary placeholder:text-text-secondary focus:outline-none"
+                            className="flex-1 bg-transparent text-[16px] md:text-lg text-text-primary placeholder:text-text-secondary focus:outline-none min-w-0"
                         />
                         {selectedDate && (
                             <div className="flex items-center gap-2 mr-3 bg-accent/10 px-2 py-1 rounded text-xs text-accent whitespace-nowrap">
@@ -212,7 +216,7 @@ const Reminders: FC = () => {
                     <div className="space-y-2">
                         <AnimatePresence>
                             {activeReminders.map((reminder) => {
-                                const isOverdue = reminder.dueDate && reminder.dueDate < Date.now();
+                                const isOverdue = checkOverdue(reminder.dueDate);
                                 return (
                                     <motion.div
                                         key={reminder.id}
@@ -221,15 +225,15 @@ const Reminders: FC = () => {
                                         exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                                         className="group relative"
                                     >
-                                        <div className="flex items-center gap-4 p-4 bg-surface rounded-lg border border-border hover:border-text-secondary transition-colors">
+                                        <div className="flex items-center gap-3 p-4 bg-surface rounded-xl border border-border hover:border-text-secondary/50 transition-colors">
                                             <button
                                                 onClick={() => toggleReminder(reminder.id)}
-                                                className="text-text-secondary hover:text-accent transition-colors"
+                                                className="text-text-secondary hover:text-accent transition-colors shrink-0"
                                             >
-                                                <Circle size={22} />
+                                                <Circle size={24} />
                                             </button>
                                             <div className="flex-1 min-w-0">
-                                                <span className="text-lg text-text-primary block truncate">{reminder.text}</span>
+                                                <span className="text-base md:text-lg text-text-primary block truncate">{reminder.text}</span>
                                                 {reminder.dueDate && (
                                                     <div className={`flex items-center gap-1 text-xs mt-1 ${isOverdue ? 'text-red-400' : 'text-text-secondary'}`}>
                                                         <Clock size={12} />
@@ -238,9 +242,10 @@ const Reminders: FC = () => {
                                                     </div>
                                                 )}
                                             </div>
+                                            {/* Always visible on mobile, hover-reveal on desktop */}
                                             <button
                                                 onClick={() => deleteReminder(reminder.id)}
-                                                className="text-text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                className="text-text-secondary/50 hover:text-red-500 md:opacity-0 md:group-hover:opacity-100 transition-all p-1 shrink-0"
                                             >
                                                 <Trash2 size={18} />
                                             </button>
@@ -285,6 +290,7 @@ const Reminders: FC = () => {
                         </div>
                     )}
                 </div>
+            </div>
             </div>
         </div>
     );

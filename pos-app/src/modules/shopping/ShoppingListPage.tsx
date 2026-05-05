@@ -134,10 +134,10 @@ export default function ShoppingListPage() {
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden relative">
       {/* Mobile-first constraints container */}
-      <div className="w-full max-w-md mx-auto h-full flex flex-col relative sm:border-x sm:border-border/40 shadow-2xl bg-background">
+      <div className="w-full max-w-md mx-auto h-full flex flex-col relative bg-background">
         
         {/* Top Input Section (Sticky) */}
-        <div className="sticky top-0 z-20 pt-8 pb-4 px-4 bg-background/80 backdrop-blur-xl border-b border-border/30">
+        <div className="sticky top-0 z-20 pt-6 pb-4 px-4 bg-background/80 backdrop-blur-xl border-b border-border/30">
           <h1 className="text-2xl font-bold text-text-primary mb-4 tracking-tight">Shopping</h1>
           <form onSubmit={handleAddItem} className="relative group">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-text-secondary group-focus-within:text-accent transition-colors">
@@ -263,8 +263,8 @@ export default function ShoppingListPage() {
           )}
         </div>
         
-        {/* Fade Out Gradient at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+        {/* Fade Out Gradient + iOS home bar safe area */}
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent pointer-events-none pb-safe" />
       </div>
     </div>
   );
