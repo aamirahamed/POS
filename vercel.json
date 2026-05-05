@@ -1,8 +1,0 @@
-{
-  "buildCommand": "cd pos-app && npm install && npm run build",
-  "outputDirectory": "pos-app/dist",
-  "framework": "vite",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
