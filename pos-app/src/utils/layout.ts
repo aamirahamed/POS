@@ -2,116 +2,117 @@ import { LifeMapNode } from '@/types/lifemap';
 import { Edge } from '@xyflow/react';
 
 export const calculateRadialLayout = (nodes: LifeMapNode[], edges: Edge[]) => {
-    // NOTE: This function name is kept as 'calculateRadialLayout' to minimize refactoring in other files,
-    // but it now implements a TREE (Hierarchical) layout as per user request.
+    // This function implements a highly structured Top-Down Tree Layout
+    // (Name kept as 'calculateRadialLayout' to prevent breaking store imports)
 
     const centerNode = nodes.find((n) => n.type === 'center');
     if (!centerNode) return { nodes, edges };
 
-    // Hierarchy Configuration
-    const LEVEL_HEIGHT = 200;
-    const SIBLING_GAP = 50;
-    const SUB_NODE_WIDTH = 120; // Approx visual width of subnode
-    const THREAD_WIDTH = 160;   // Approx visual width of thread
-    const PILLAR_WIDTH = 200;   // Approx visual width of pillar
+    // Hierarchy Spacing Configuration
+    const LEVEL_HEIGHT = 280; // Vertical breathing room between L1, L2, L3, L4, L5
+    const SIBLING_GAP = 120; // Generous horizontal spacing to prevent overlap
 
-    // We need to calculate the "subtree width" for each node to position them correctly without overlap.
-    const getChildren = (nodeId: string) => {
+    // Visual dimensions mapping to prevent overlap
+    const NODE_WIDTHS: Record<string, number> = {
+        'center': 100,
+        'pillar': 160,
+        'thread': 140,
+        'initiative': 150,
+        'subnode': 300, // Execution Nodes are the widest (240-280px)
+    };
+
+    // Helper: Find active children (ignore hidden nodes if collapsed)
+    const getVisibleChildren = (nodeId: string, currentNodes: LifeMapNode[]) => {
         const childEdges = edges.filter(e => e.source === nodeId);
         const childIds = childEdges.map(e => e.target);
-        return nodes.filter(n => childIds.includes(n.id));
+        // Only return children that actually exist in the current visible node array and are not explicitly hidden
+        return currentNodes.filter(n => childIds.includes(n.id) && !n.hidden);
     };
 
-    // Recursive function to calculate subtree width
-    // Returns { width: number } and attaches width to a temporary map if strictly needed, 
-    // but we can just compute it on the fly or memoize.
-    const getNodeWidth = (node: LifeMapNode): number => {
-        const children = getChildren(node.id);
+    // Step 1: Calculate the exact bounding width required for each node's entire subtree
+    const subtreeWidths = new Map<string, number>();
+
+    const calculateSubtreeWidth = (node: LifeMapNode, currentNodes: LifeMapNode[]): number => {
+        const children = getVisibleChildren(node.id, currentNodes);
+        const selfWidth = NODE_WIDTHS[node.type] || 200;
+
         if (children.length === 0) {
-            if (node.type === 'subnode') return SUB_NODE_WIDTH;
-            if (node.type === 'thread') return THREAD_WIDTH;
-            return PILLAR_WIDTH;
+            subtreeWidths.set(node.id, selfWidth);
+            return selfWidth;
         }
 
-        let width = 0;
+        let totalChildrenWidth = 0;
         children.forEach(child => {
-            width += getNodeWidth(child);
+            totalChildrenWidth += calculateSubtreeWidth(child, currentNodes);
         });
 
-        // Add gaps between children
-        width += (children.length - 1) * SIBLING_GAP;
+        // Add the gaps between children
+        totalChildrenWidth += (children.length - 1) * SIBLING_GAP;
 
-        // Ensure parent is at least as wide as its own visual representation
-        let minWidth = PILLAR_WIDTH;
-        if (node.type === 'thread') minWidth = THREAD_WIDTH;
-        if (node.type === 'subnode') minWidth = SUB_NODE_WIDTH;
+        // The subtree width is whichever is larger: the parent itself, or all its children + gaps
+        const finalWidth = Math.max(selfWidth, totalChildrenWidth);
+        subtreeWidths.set(node.id, finalWidth);
 
-        return Math.max(width, minWidth);
+        return finalWidth;
     };
 
-    // Recursive function to set positions
-    // x, y are the center coordinates for the node
+    // Calculate subtree widths starting from center
+    calculateSubtreeWidth(centerNode, nodes);
+
+    // Step 2: Position nodes recursively using calculated widths
     const layoutNode = (node: LifeMapNode, x: number, y: number, newNodes: LifeMapNode[]) => {
-        // Update position
         const existingNode = newNodes.find(n => n.id === node.id);
         if (existingNode) {
             existingNode.position = { x, y };
         }
 
-        const children = getChildren(node.id);
+        const children = getVisibleChildren(node.id, newNodes);
         if (children.length === 0) return;
 
-        // let currentX = x - getNodeWidth(node) / 2;
-
-        // We actually want to center the children. 
-        // Logic: The center of the children group should align with X.
-        // Total Children Width = Sum(ChildWidths) + Gaps.
-        // StartX = X - TotalChildrenWidth / 2.
-
-        let totalChildrenWidth = 0;
-        const childWidths = children.map(c => getNodeWidth(c));
-        totalChildrenWidth = childWidths.reduce((a, b) => a + b, 0) + (children.length - 1) * SIBLING_GAP;
-
-        let startX = x - totalChildrenWidth / 2;
+        // Calculate starting X so that all children are perfectly centered below the parent
+        const childWidths = children.map(c => subtreeWidths.get(c.id) || (NODE_WIDTHS[c.type] || 200));
+        const totalChildrenWidth = childWidths.reduce((a, b) => a + b, 0) + (children.length - 1) * SIBLING_GAP;
+        
+        let currentX = x - (totalChildrenWidth / 2);
 
         children.forEach((child, index) => {
             const childW = childWidths[index];
-            const childCenterX = startX + childW / 2;
+            // The center of this child's subtree is currentX + half its width
+            const childCenterX = currentX + (childW / 2);
 
             layoutNode(child, childCenterX, y + LEVEL_HEIGHT, newNodes);
 
-            startX += childW + SIBLING_GAP;
+            // Move X pointer past this child's entire subtree block and add a gap for the next sibling
+            currentX += childW + SIBLING_GAP;
         });
     };
 
-    // Clone nodes to avoid mutation issues during calculation (though we mutate the clone)
+    // Deep clone to safely mutate positions
     const processedNodes = nodes.map(n => ({ ...n }));
 
-    // Start layout from Center
-    const center = processedNodes.find(n => n.type === 'center');
-    if (center) {
-        // We set Center at (0, 0)
-        layoutNode(center, 0, 0, processedNodes);
-    }
+    // Position center at absolute center
+    layoutNode(centerNode, 0, 0, processedNodes);
 
-    // 4. Assign zIndex and Sort
-    // Hierarchy: Center (Top) > Pillar > Thread > Subnode (Bottom)
+    // Step 3: Enforce strict Z-Index Hierarchy (L1 > L2 > L3 > L4 > L5)
+    // This ensures higher level nodes appear visually above lower ones and connectors tuck underneath
     const getZIndex = (type?: string) => {
         switch (type) {
             case 'center': return 100;
             case 'pillar': return 50;
-            case 'thread': return 25;
-            case 'subnode': return 10;
-            default: return 1;
+            case 'thread': return 40;
+            case 'initiative': return 30;
+            case 'subnode': return 20; // Execution Node
+            default: return 10;
         }
     };
 
-    const nodesWithZIndex = processedNodes.map(node => ({
+    const finalNodes = processedNodes.map(node => ({
         ...node,
         zIndex: getZIndex(node.type)
     }));
 
-    nodesWithZIndex.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+    // Sort to guarantee DOM rendering order
+    finalNodes.sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
-    return { nodes: nodesWithZIndex, edges };
+    return { nodes: finalNodes, edges };
 };

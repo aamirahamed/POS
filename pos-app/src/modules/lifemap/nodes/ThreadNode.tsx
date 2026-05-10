@@ -4,7 +4,7 @@ import { Plus, ChevronDown, ChevronUp, Trash2, CheckCircle, Circle } from 'lucid
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 
 const ThreadNode = ({ id, data, selected }: NodeProps) => {
-    const { addSubnode, toggleNodeExpansion, deleteNode, updateNode } = useLifeMapStore();
+    const { addInitiative, toggleNodeExpansion, deleteNode, updateNode } = useLifeMapStore();
     const [isHovered, setIsHovered] = useState(false);
     const [isEditing, setIsEditing] = useState(data.editing as boolean || false);
     const [editValue, setEditValue] = useState(data.label as string);
@@ -27,8 +27,8 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
         timeoutRef.current = setTimeout(() => setIsHovered(false), 300); // 300ms delay
     };
 
-    const handleAddSubnode = () => {
-        addSubnode(id, ""); // Empty string triggers editing mode in SubNode
+    const handleAddInitiative = () => {
+        addInitiative(id, ""); // Empty string triggers editing mode in InitiativeNode
     };
 
     const isExpanded = data.expanded as boolean;
@@ -66,7 +66,7 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
                 boxShadow: selected ? `0 0 15px hsla(${hue}, 70%, 40%, 0.2)` : 'none',
             }}
             className={`
-        relative px-4 py-2 rounded-lg min-w-[120px] text-center
+        relative px-4 py-3 rounded-lg min-w-[140px] text-center
         border transition-all duration-200 group
         ${selected
                     ? 'scale-105'
@@ -82,9 +82,9 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
         >
             <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
                 <button
-                    onClick={handleAddSubnode}
+                    onClick={handleAddInitiative}
                     className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors"
-                    title="Add Subnode"
+                    title="Add Initiative"
                 >
                     <Plus size={12} />
                 </button>
@@ -103,9 +103,7 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
                     {isCompleted ? <CheckCircle size={12} /> : <Circle size={12} />}
                 </button>
                 <button
-                    onClick={() => {
-                        if (confirm('Delete Thread?')) deleteNode(id);
-                    }}
+                    onClick={() => deleteNode(id)}
                     className="p-1 rounded-full bg-surface hover:bg-red-500 text-text-primary transition-colors"
                     title="Delete"
                 >
@@ -126,15 +124,24 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
                     onChange={(e) => setEditValue(e.target.value)}
                     onBlur={submitEdit}
                     onKeyDown={handleKeyDown}
-                    className="w-full bg-transparent text-xs font-medium text-text-primary text-center focus:outline-none border-b border-accent"
+                    className="w-full bg-transparent text-sm font-semibold text-text-primary text-center focus:outline-none border-b border-accent"
                 />
             ) : (
-                <div className={`text-xs font-medium text-text-primary ${isCompleted ? 'line-through text-text-secondary' : ''}`}>
+                <div className={`text-sm font-bold tracking-wide text-text-primary ${isCompleted ? 'line-through text-text-secondary' : ''}`}>
                     {data.label as string}
                 </div>
             )}
+            
+            {/* Persistent Add Initiative Button */}
+            <button 
+                onClick={(e) => { e.stopPropagation(); handleAddInitiative(); }}
+                className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-5 h-5 bg-surface hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
+                title="Add Initiative"
+            >
+                <Plus size={10} />
+            </button>
 
-            <Handle type="source" position={Position.Left} id="source-left" className="invisible" />
+            <Handle type="source" position={Position.Bottom} id="source-bottom" className="invisible" />
             <Handle type="source" position={Position.Right} id="source-right" className="invisible" />
             <Handle type="source" position={Position.Top} id="source-top" className="invisible" />
             <Handle type="source" position={Position.Bottom} id="source-bottom" className="invisible" />

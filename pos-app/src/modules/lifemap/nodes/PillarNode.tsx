@@ -59,7 +59,7 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
                 boxShadow: selected ? `0 0 20px hsla(${hue}, 70%, 50%, 0.3)` : 'none',
             }}
             className={`
-        relative px-6 py-3 rounded-xl min-w-[140px] text-center
+        relative px-6 py-4 rounded-xl min-w-[160px] text-center
         border-2 transition-all duration-200 shadow-lg group
         ${selected
                     ? 'scale-105'
@@ -89,9 +89,7 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
                 <button
-                    onClick={() => {
-                        if (confirm('Delete Pillar?')) deleteNode(id);
-                    }}
+                    onClick={() => deleteNode(id)}
                     className="p-1 rounded-full bg-surface-hover hover:bg-red-500 text-text-primary transition-colors"
                     title="Delete"
                 >
@@ -116,16 +114,25 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
                         className="w-full bg-transparent text-sm font-bold tracking-wide text-text-primary text-center focus:outline-none border-b border-white/20"
                     />
                 ) : (
-                    <div className="text-sm font-bold tracking-wide text-text-primary">
+                    <div className="text-base font-bold tracking-wide text-text-primary">
                         {data.label as string}
                     </div>
                 )}
                 {!isExpanded && (
-                    <div className="text-[10px] text-text-secondary uppercase tracking-widest">
+                    <div className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">
                         Collapsed
                     </div>
                 )}
             </div>
+
+            {/* Persistent Add Thread Button */}
+            <button 
+                onClick={(e) => { e.stopPropagation(); handleAddThread(); }}
+                className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-surface-hover hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
+                title="Add Thread"
+            >
+                <Plus size={12} />
+            </button>
 
             <Handle type="source" position={Position.Left} id="source-left" className="invisible" />
             <Handle type="source" position={Position.Right} id="source-right" className="invisible" />

@@ -70,6 +70,39 @@ export const useLifeMapStore = create<LifeMapState>()(
             return {
                 nodes: initNodes,
                 edges: initEdges,
+                inbox: [],
+
+                selectedExecutionNodeId: null,
+                setSelectedExecutionNodeId: (id) => set({ selectedExecutionNodeId: id }),
+
+                isCommandCenterOpen: false,
+                setCommandCenterOpen: (isOpen) => set({ isCommandCenterOpen: isOpen }),
+
+                nodeToDelete: null,
+                setNodeToDelete: (id) => set({ nodeToDelete: id }),
+                confirmDeleteNode: () => {
+                    const state = get();
+                    const id = state.nodeToDelete;
+                    if (!id) return;
+
+                    const edges = state.edges;
+                    const getAllDescendants = (nodeId: string): string[] => {
+                        const children = state.nodes.filter(n => n.data.parentId === nodeId).map(n => n.id);
+                        let descendants = [...children];
+                        children.forEach(childId => {
+                            descendants = descendants.concat(getAllDescendants(childId));
+                        });
+                        return descendants;
+                    };
+
+                    const nodesToDelete = [id, ...getAllDescendants(id)];
+                    
+                    const newNodes = state.nodes.filter((node) => !nodesToDelete.includes(node.id));
+                    const newEdges = state.edges.filter((edge) => !nodesToDelete.includes(edge.source) && !nodesToDelete.includes(edge.target));
+                    
+                    const layouted = calculateRadialLayout(newNodes, newEdges);
+                    set({ nodes: layouted.nodes, edges: newEdges, nodeToDelete: null });
+                },
 
                 addNode: (node) => {
                     const newNodes = [...get().nodes, node];
@@ -161,6 +194,45 @@ export const useLifeMapStore = create<LifeMapState>()(
                     set({ nodes: layouted.nodes, edges: newEdges });
                 },
 
+                addInitiative: (parentId, label) => {
+                    const id = `i-${Date.now()}`;
+                    const isNew = label === "";
+
+                    const parent = get().nodes.find(n => n.id === parentId);
+                    const hue = parent?.data.hue || 210;
+
+                    const newInitiative: LifeMapNode = {
+                        id,
+                        type: 'initiative',
+                        position: { x: 0, y: 0 },
+                        data: {
+                            label: isNew ? "New Initiative" : label,
+                            parentId,
+                            expanded: true,
+                            editing: isNew,
+                            hue,
+                            status: 'backlog'
+                        },
+                        zIndex: 15,
+                    };
+                    const newEdge = {
+                        id: `e-${parentId}-${id}`,
+                        source: parentId,
+                        target: id,
+                        type: 'smoothstep',
+                        animated: false,
+                        zIndex: 3,
+                        sourceHandle: 'source-bottom',
+                        targetHandle: 'target-top'
+                    };
+
+                    const newNodes = [...get().nodes, newInitiative];
+                    const newEdges = [...get().edges, newEdge];
+                    const layouted = calculateRadialLayout(newNodes, newEdges);
+
+                    set({ nodes: layouted.nodes, edges: newEdges });
+                },
+
                 addSubnode: (parentId, label) => {
                     const id = `s-${Date.now()}`;
                     const isNew = label === "";
@@ -173,11 +245,17 @@ export const useLifeMapStore = create<LifeMapState>()(
                         type: 'subnode',
                         position: { x: 0, y: 0 },
                         data: {
-                            label: isNew ? "New Item" : label,
+                            label: isNew ? "New Execution Node" : label,
                             parentId,
                             status: 'active',
                             editing: isNew,
-                            hue
+                            hue,
+                            priority: 'medium',
+                            tasks: [],
+                            notes: '',
+                            resources: [],
+                            lastUpdated: Date.now(),
+                            streak: 0,
                         },
                         zIndex: 10,
                     };
@@ -263,9 +341,16 @@ export const useLifeMapStore = create<LifeMapState>()(
                         n.id === id ? { ...n, data: { ...n.data, expanded: isExpanded } } : n
                     );
 
-                    // Find children to hide/show
-                    const childrenEdges = get().edges.filter(e => e.source === id);
-                    const childrenIds = childrenEdges.map(e => e.target);
+                    const getAllDescendants = (nodeId: string): string[] => {
+                        const children = nodes.filter(n => n.data.parentId === nodeId).map(n => n.id);
+                        let descendants = [...children];
+                        children.forEach(childId => {
+                            descendants = descendants.concat(getAllDescendants(childId));
+                        });
+                        return descendants;
+                    };
+
+                    const childrenIds = getAllDescendants(id);
 
                     const finalNodes = updatedNodes.map(n => {
                         if (childrenIds.includes(n.id)) {
@@ -274,15 +359,11 @@ export const useLifeMapStore = create<LifeMapState>()(
                         return n;
                     });
 
-                    set({ nodes: finalNodes });
+                    const layouted = calculateRadialLayout(finalNodes, get().edges);
+                    set({ nodes: layouted.nodes });
                 },
 
-                deleteNode: (id) => {
-                    const newNodes = get().nodes.filter((node) => node.id !== id);
-                    const newEdges = get().edges.filter((edge) => edge.source !== id && edge.target !== id);
-                    const layouted = calculateRadialLayout(newNodes, newEdges);
-                    set({ nodes: layouted.nodes, edges: newEdges });
-                },
+                deleteNode: (id) => set({ nodeToDelete: id }),
 
                 setNodes: (nodes) => set({ nodes }),
                 setEdges: (edges) => set({ edges }),
@@ -305,10 +386,18 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(get().nodes, newEdges);
                     set({ nodes: layouted.nodes });
                 },
+
+                addInboxItem: (text: string) => set({
+                    inbox: [{ id: `inbox-${Date.now()}`, text, createdAt: Date.now() }, ...get().inbox]
+                }),
+
+                removeInboxItem: (id: string) => set({
+                    inbox: get().inbox.filter(item => item.id !== id)
+                }),
             };
         },
         {
-            name: 'pos-lifemap-storage-v8', // Changed storage key to force reset
+            name: 'pos-lifemap-storage-v10', // Changed storage key to force reset
         }
     )
 );
