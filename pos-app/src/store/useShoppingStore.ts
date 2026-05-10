@@ -119,7 +119,7 @@ export const useShoppingStore = create<ShoppingState>((set, get) => ({
 
     deleteItem: async (id: string) => {
         // Optimistic update
-        const currentItems = get().items;
+        // const currentItems = get().items;
         set(state => ({
             items: state.items.filter(i => i.id !== id)
         }));

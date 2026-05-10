@@ -85,7 +85,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const id = state.nodeToDelete;
                     if (!id) return;
 
-                    const edges = state.edges;
+                    // const edges = state.edges;
                     const getAllDescendants = (nodeId: string): string[] => {
                         const children = state.nodes.filter(n => n.data.parentId === nodeId).map(n => n.id);
                         let descendants = [...children];

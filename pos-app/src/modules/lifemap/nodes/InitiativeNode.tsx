@@ -1,6 +1,7 @@
 import { memo, useState, useEffect, useRef } from 'react';
 import { Handle, Position, NodeProps, NodeToolbar } from '@xyflow/react';
-import { Plus, ChevronDown, ChevronUp, Trash2, CheckCircle, Circle, Play, Pause, Archive } from 'lucide-react';
+import { Plus, ChevronDown, ChevronUp, Trash2, CheckCircle, Play, Pause } from 'lucide-react';
+import { LifeMapNode } from '@/types/lifemap';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 
 const InitiativeNode = ({ id, data, selected }: NodeProps) => {
@@ -39,7 +40,7 @@ const InitiativeNode = ({ id, data, selected }: NodeProps) => {
     const status = (data.status as string) || 'active'; // active, backlog, paused, completed
 
     const setStatus = (newStatus: string) => {
-        updateNode(id, { status: newStatus });
+        updateNode(id, { status: newStatus as LifeMapNode['data']['status'] });
         setShowStateMenu(false);
     };
 

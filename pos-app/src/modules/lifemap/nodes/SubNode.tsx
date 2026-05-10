@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useEffect } from 'react';
 import { Handle, Position, NodeProps, NodeToolbar } from '@xyflow/react';
-import { Trash2, CheckCircle, Circle, Maximize2, ListTodo, BookOpen, Flame, Clock, Play } from 'lucide-react';
+import { Trash2, CheckCircle, Circle, Maximize2, BookOpen, Flame, Clock } from 'lucide-react';
+import { LifeMapNode } from '@/types/lifemap';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 
 const SubNode = ({ id, data, selected }: NodeProps) => {
@@ -50,7 +51,8 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
 
     const toggleStatus = (e: React.MouseEvent) => {
         e.stopPropagation();
-        updateNode(id, { status: isCompleted ? 'active' : 'completed', lastUpdated: Date.now() });
+        const newStatus = isCompleted ? 'active' : 'completed';
+        updateNode(id, { status: newStatus as LifeMapNode['data']['status'], lastUpdated: Date.now() });
     };
 
     const submitEdit = () => {

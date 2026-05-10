@@ -17,7 +17,7 @@ const ShoppingItemRow: FC<{
   const checkOpacity = useTransform(x, [0, 50], [0, 1]);
   const deleteOpacity = useTransform(x, [0, -50], [0, 1]);
 
-  const handleDragEnd = async (e: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number, y: number }, velocity: { x: number, y: number } }) => {
+  const handleDragEnd = async (_e: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number, y: number }, velocity: { x: number, y: number } }) => {
     const offset = info.offset.x;
     const velocity = info.velocity.x;
     

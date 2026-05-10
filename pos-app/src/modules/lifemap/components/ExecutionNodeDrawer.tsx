@@ -8,7 +8,7 @@ const ExecutionNodeDrawer: FC = () => {
     const { nodes, selectedExecutionNodeId, setSelectedExecutionNodeId, addTaskToNode, toggleNodeTask, updateNode, deleteNode } = useLifeMapStore();
     const [newTaskText, setNewTaskText] = useState('');
     const [newNoteText, setNewNoteText] = useState('');
-    const [showFullList, setShowFullList] = useState(false);
+    // const [showFullList, setShowFullList] = useState(false);
 
     const node = nodes.find(n => n.id === selectedExecutionNodeId);
 
@@ -20,7 +20,7 @@ const ExecutionNodeDrawer: FC = () => {
     const resources = (data.resources as any[]) || [];
     const priority = (data.priority as string) || 'medium';
     const status = data.status || 'active'; // active, completed, paused, backlog
-    const isCompleted = status === 'completed';
+    // const isCompleted = status === 'completed';
     const hue = (data.hue as number) || 210;
     const lastUpdated = data.lastUpdated as number || Date.now();
 
@@ -54,7 +54,7 @@ const ExecutionNodeDrawer: FC = () => {
     };
 
     const priorityColor = priority === 'high' ? 'text-red-400 border-red-400/20 bg-red-400/10' : priority === 'medium' ? 'text-amber-400 border-amber-400/20 bg-amber-400/10' : 'text-blue-400 border-blue-400/20 bg-blue-400/10';
-    const statusColor = status === 'active' ? 'text-green-400' : status === 'completed' ? 'text-indigo-400' : status === 'paused' ? 'text-orange-400' : 'text-gray-400';
+    // const statusColor = status === 'active' ? 'text-green-400' : status === 'completed' ? 'text-indigo-400' : status === 'paused' ? 'text-orange-400' : 'text-gray-400';
 
     return (
         <div className="absolute top-0 right-0 h-full w-[450px] bg-surface-elevated/95 backdrop-blur-2xl border-l border-white/5 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out">
@@ -162,7 +162,7 @@ const ExecutionNodeDrawer: FC = () => {
                     </div>
                     <div className="flex items-center justify-between mt-1 text-xs text-text-secondary">
                         <span>{completedTasksCount} / {totalTasksCount} completed</span>
-                        {data.streak > 0 && (
+                        {(data.streak ?? 0) > 0 && (
                             <span className="flex items-center gap-1 text-orange-400 font-bold bg-orange-400/10 px-2 py-0.5 rounded-full"><Flame size={10} /> {data.streak} Day Streak</span>
                         )}
                     </div>

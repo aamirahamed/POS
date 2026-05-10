@@ -1,69 +1,41 @@
 import { FC, useState, useEffect, useRef } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
-import { Command, Inbox, X, Sparkles, Plus, AlertCircle, ArrowRight, CornerDownLeft } from 'lucide-react';
-import { LifeMapNode } from '@/types/lifemap';
+import { useShoppingStore } from '@/store/useShoppingStore';
+import { useRemindersStore } from '@/store/useRemindersStore';
+import { X, Sparkles, ArrowRight, Bot, User, Loader2 } from 'lucide-react';
+import { processUserCommand } from '@/services/geminiService';
 
-type ParsedType = 'pillar' | 'thread' | 'initiative' | 'subnode' | 'task';
-
-interface ParsedCommand {
-    type?: ParsedType;
-    parentName?: string;
-    name: string;
+interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    text: string;
+    actionType?: 'shopping' | 'reminder' | 'lifemap' | 'inbox' | 'error';
 }
 
-const normalizeType = (t: string): ParsedType => {
-    const l = t.toLowerCase();
-    if (l.includes('pillar')) return 'pillar';
-    if (l.includes('thread')) return 'thread';
-    if (l.includes('initiative')) return 'initiative';
-    if (l.includes('execution') || l.includes('subnode')) return 'subnode';
-    return 'task';
-};
-
-const parseCommand = (input: string): ParsedCommand => {
-    let parsed: ParsedCommand = { name: input.trim() };
-    if (!input.trim()) return parsed;
-
-    // 1. Add [type] under [parent] called [name]
-    const r1 = /(?:create|add)\s+(?:a\s+|an\s+)?(pillar|thread|initiative|execution node|subnode|task)s?\s+(?:under|in|to|for)\s+(.+?)\s+(?:called|named|about)\s+(.+)$/i;
-    const m1 = input.match(r1);
-    if (m1) return { type: normalizeType(m1[1]), parentName: m1[2].trim(), name: m1[3].trim() };
-
-    // 2. Add [type] called [name] under [parent]
-    const r2 = /(?:create|add)\s+(?:a\s+|an\s+)?(pillar|thread|initiative|execution node|subnode|task)s?\s+(?:called|named|about)\s+(.+?)\s+(?:under|in|to|for)\s+(.+)$/i;
-    const m2 = input.match(r2);
-    if (m2) return { type: normalizeType(m2[1]), name: m2[2].trim(), parentName: m2[3].trim() };
-
-    // 3. Add [type] called [name] (No parent)
-    const r3 = /(?:create|add)\s+(?:a\s+|an\s+)?(pillar|thread|initiative|execution node|subnode|task)s?\s+(?:called|named|about)\s+(.+)$/i;
-    const m3 = input.match(r3);
-    if (m3) return { type: normalizeType(m3[1]), name: m3[2].trim() };
-
-    // 4. Add [name] to [parent]
-    const r4 = /(?:create|add)\s+(.+?)\s+(?:to|under|in|for)\s+(.+)$/i;
-    const m4 = input.match(r4);
-    if (m4) return { name: m4[1].trim(), parentName: m4[2].trim() };
-
-    return parsed;
-};
-
 const CommandCenter: FC = () => {
-    const { isCommandCenterOpen, setCommandCenterOpen, nodes, addPillar, addThread, addInitiative, addSubnode, addTaskToNode, inbox, addInboxItem, removeInboxItem } = useLifeMapStore();
+    const { isCommandCenterOpen, setCommandCenterOpen, nodes, addPillar, addThread, addInitiative, addSubnode, addTaskToNode, addInboxItem } = useLifeMapStore();
+    const { addItem: addShoppingItem } = useShoppingStore();
+    const { addReminder } = useRemindersStore();
+    
     const [input, setInput] = useState('');
-    const [parsed, setParsed] = useState<ParsedCommand | null>(null);
-    const [matchedParent, setMatchedParent] = useState<LifeMapNode | null>(null);
-    const [statusMessage, setStatusMessage] = useState<{text: string, type: 'success'|'error'} | null>(null);
+    const [history, setHistory] = useState<ChatMessage[]>([]);
+    const [isTyping, setIsTyping] = useState(false);
     
     const inputRef = useRef<HTMLInputElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
 
     // Auto focus and handle escape
     useEffect(() => {
         if (isCommandCenterOpen) {
             setTimeout(() => inputRef.current?.focus(), 50);
-            setInput('');
-            setStatusMessage(null);
         }
     }, [isCommandCenterOpen]);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [history]);
 
     useEffect(() => {
         const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -79,187 +51,180 @@ const CommandCenter: FC = () => {
         return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, [isCommandCenterOpen, setCommandCenterOpen]);
 
-    // Parse input continually
-    useEffect(() => {
-        if (!input.trim()) {
-            setParsed(null);
-            setMatchedParent(null);
-            return;
-        }
+    const handleProcessCommand = async (text: string) => {
+        const lower = text.toLowerCase().trim();
+        if (!lower) return;
 
-        const p = parseCommand(input);
-        setParsed(p);
+        try {
+            setIsTyping(true);
+            const action = await processUserCommand(text, nodes);
 
-        if (p.parentName) {
-            // Find parent using case-insensitive partial match
-            const query = p.parentName.toLowerCase();
-            const match = nodes.find(n => n.data.label?.toString().toLowerCase() === query) 
-                       || nodes.find(n => n.data.label?.toString().toLowerCase().includes(query));
-            setMatchedParent(match || null);
-        } else {
-            setMatchedParent(null);
-        }
-    }, [input, nodes]);
-
-    const handleSubmit = (e?: React.FormEvent) => {
-        e?.preventDefault();
-        if (!input.trim()) return;
-
-        if (parsed?.type === 'pillar') {
-            addPillar(parsed.name);
-            showSuccess(`Added Pillar: ${parsed.name}`);
-            return;
-        }
-
-        if (matchedParent) {
-            // Determine inferred type if not specified
-            let typeToCreate = parsed?.type;
-            if (!typeToCreate) {
-                if (matchedParent.type === 'center') typeToCreate = 'pillar';
-                else if (matchedParent.type === 'pillar') typeToCreate = 'thread';
-                else if (matchedParent.type === 'thread') typeToCreate = 'initiative';
-                else if (matchedParent.type === 'initiative') typeToCreate = 'subnode';
-                else if (matchedParent.type === 'subnode') typeToCreate = 'task';
+            if (action.actionType === 'shopping' && action.shoppingItem) {
+                await addShoppingItem(action.shoppingItem);
+            } else if (action.actionType === 'reminder' && action.reminderText) {
+                addReminder(action.reminderText);
+            } else if (action.actionType === 'lifemap' && action.lifeMapAction) {
+                const { typeToCreate, name, parentName } = action.lifeMapAction;
+                
+                if (typeToCreate === 'pillar') {
+                    addPillar(name);
+                } else if (parentName) {
+                    const query = parentName.toLowerCase();
+                    const match = nodes.find(n => n.data.label?.toString().toLowerCase() === query) 
+                               || nodes.find(n => n.data.label?.toString().toLowerCase().includes(query));
+                    
+                    if (match) {
+                        const normalizedType = typeToCreate.toLowerCase().trim();
+                        if (normalizedType === 'thread') addThread(match.id, name);
+                        else if (normalizedType === 'initiative') addInitiative(match.id, name);
+                        else if (normalizedType === 'subnode' || normalizedType === 'execution node') addSubnode(match.id, name);
+                        else if (normalizedType === 'task') addTaskToNode(match.id, name);
+                        else {
+                            // Fallback if AI invents a type
+                            addInitiative(match.id, name);
+                        }
+                    } else {
+                        // Parent not found, fallback to inbox
+                        addInboxItem(`[Orphaned ${typeToCreate}] ${name} (Intended for ${parentName})`);
+                        return { actionType: 'inbox', reply: `✓ Saved to Inbox (Couldn't find parent '${parentName}')` };
+                    }
+                }
+            } else if (action.actionType === 'inbox') {
+                addInboxItem(text);
             }
 
-            // Create based on actual or inferred type
-            if (typeToCreate === 'thread') addThread(matchedParent.id, parsed!.name);
-            else if (typeToCreate === 'initiative') addInitiative(matchedParent.id, parsed!.name);
-            else if (typeToCreate === 'subnode') addSubnode(matchedParent.id, parsed!.name);
-            else if (typeToCreate === 'task') addTaskToNode(matchedParent.id, parsed!.name);
-            else if (typeToCreate === 'pillar') addPillar(parsed!.name);
-            
-            showSuccess(`Added to Life Map: ${parsed!.name}`);
-        } else {
-            // Unsorted Inbox
-            addInboxItem(input.trim());
-            showSuccess(`Captured to Inbox`);
+            return { actionType: action.actionType, reply: action.reply };
+
+        } catch (error) {
+            console.error('AI Processing Error:', error);
+            // Fallback
+            addInboxItem(text);
+            return { actionType: 'error', reply: `Something went wrong. Saved to Inbox instead.` };
+        } finally {
+            setIsTyping(false);
         }
     };
 
-    const showSuccess = (msg: string) => {
-        setStatusMessage({ text: msg, type: 'success' });
+    const handleSubmit = async (e?: React.FormEvent) => {
+        e?.preventDefault();
+        const userText = input.trim();
+        if (!userText) return;
+
         setInput('');
-        setTimeout(() => {
-            setStatusMessage(null);
-            // Optionally auto-close after success to maintain speed:
-            setCommandCenterOpen(false);
-        }, 1200);
+        
+        const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', text: userText };
+        setHistory(prev => [...prev, userMsg]);
+
+        // AI Processing
+        const result = await handleProcessCommand(userText);
+        if (result) {
+            const assistantMsg: ChatMessage = { 
+                id: (Date.now() + 1).toString(), 
+                role: 'assistant', 
+                text: result.reply,
+                actionType: result.actionType as any
+            };
+            setHistory(prev => [...prev, assistantMsg]);
+        }
     };
 
     if (!isCommandCenterOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[200] flex md:items-start md:pt-[15vh] items-end justify-center bg-black/60 backdrop-blur-sm sm:p-4 pb-0">
+        <div className="fixed inset-0 z-[200] flex md:items-start md:pt-[10vh] items-end justify-center bg-black/60 backdrop-blur-md sm:p-4 pb-0">
             <div 
-                className="w-full max-w-2xl bg-[#121214] sm:rounded-2xl rounded-t-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-8 duration-200"
+                className="w-full max-w-2xl bg-[#121214]/95 backdrop-blur-2xl sm:rounded-2xl rounded-t-3xl border border-white/10 shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-8 duration-300 h-[85vh] sm:h-[70vh]"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="px-5 py-4 flex items-center justify-between border-b border-white/5 bg-white/[0.02]">
+                <div className="px-5 py-4 flex items-center justify-between border-b border-white/5 bg-white/[0.02] shrink-0">
                     <div className="flex items-center gap-2 text-sm font-bold text-text-primary tracking-wide">
-                        <Command size={16} className="text-accent" />
-                        Command Center
+                        <Sparkles size={16} className="text-accent" />
+                        OS Assistant
                     </div>
                     <button onClick={() => setCommandCenterOpen(false)} className="p-1.5 rounded-full hover:bg-white/10 text-text-secondary transition-colors">
                         <X size={16} />
                     </button>
                 </div>
 
-                {/* Input Area */}
-                <form onSubmit={handleSubmit} className="relative">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="What's on your mind?"
-                        className="w-full bg-transparent px-6 py-6 text-xl sm:text-2xl text-text-primary placeholder:text-text-secondary/40 focus:outline-none"
-                        autoComplete="off"
-                        spellCheck="false"
-                    />
-                    
-                    {/* Real-time parsing feedback overlay */}
-                    {input.trim() && !statusMessage && (
-                        <div className="absolute bottom-1 left-6 right-6 flex items-center justify-between text-xs pb-3 border-b border-white/5">
-                            <div className="flex items-center gap-1.5 text-text-secondary">
-                                {parsed?.type && <span className="bg-white/10 px-1.5 py-0.5 rounded text-white capitalize">{parsed.type}</span>}
-                                <span className="text-white">"{parsed?.name}"</span>
-                                {parsed?.parentName && (
-                                    <>
-                                        <ArrowRight size={12} className="mx-1" />
-                                        {matchedParent ? (
-                                            <span className="text-green-400 bg-green-400/10 px-1.5 py-0.5 rounded flex items-center gap-1"><Sparkles size={10} /> {matchedParent.data.label as string}</span>
-                                        ) : (
-                                            <span className="text-orange-400 bg-orange-400/10 px-1.5 py-0.5 rounded flex items-center gap-1"><AlertCircle size={10} /> Inbox (Parent not found)</span>
-                                        )}
-                                    </>
-                                )}
-                                {!parsed?.parentName && parsed?.type !== 'pillar' && (
-                                    <span className="text-orange-400 bg-orange-400/10 px-1.5 py-0.5 rounded ml-2 flex items-center gap-1"><Inbox size={10} /> Save to Inbox</span>
-                                )}
+                {/* Chat History */}
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar">
+                    {history.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center space-y-6 opacity-60">
+                            <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center border border-accent/30">
+                                <Bot size={32} className="text-accent" />
                             </div>
-                            <div className="flex items-center gap-1 text-white/40 hidden sm:flex">
-                                <span className="bg-white/10 px-1.5 py-0.5 rounded">↵</span> to capture
+                            <div>
+                                <h3 className="text-lg font-bold text-white mb-2">How can I help you?</h3>
+                                <p className="text-sm text-text-secondary max-w-xs mx-auto">
+                                    I can manage your Life Map, add to your Shopping List, or set Reminders.
+                                </p>
+                            </div>
+                            <div className="flex flex-col gap-2 w-full max-w-sm">
+                                <button onClick={() => setInput("Buy bananas")} className="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-sm text-left transition-colors text-text-secondary hover:text-white">
+                                    "Buy bananas"
+                                </button>
+                                <button onClick={() => setInput("Remind me to complete assignment")} className="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-sm text-left transition-colors text-text-secondary hover:text-white">
+                                    "Remind me to complete assignment"
+                                </button>
+                                <button onClick={() => setInput("Add an initiative to Career called Promotion")} className="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-sm text-left transition-colors text-text-secondary hover:text-white">
+                                    "Add an initiative to Career called Promotion"
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        history.map(msg => (
+                            <div key={msg.id} className={`flex items-start gap-3 max-w-[85%] ${msg.role === 'user' ? 'self-end flex-row-reverse' : 'self-start'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-surface-hover' : 'bg-accent/20 border border-accent/30'}`}>
+                                    {msg.role === 'user' ? <User size={14} className="text-text-secondary" /> : <Bot size={14} className="text-accent" />}
+                                </div>
+                                <div className={`p-3 rounded-2xl text-sm ${msg.role === 'user' ? 'bg-surface-hover text-text-primary rounded-tr-sm' : 'bg-transparent text-text-secondary border border-white/5 rounded-tl-sm'}`}>
+                                    {msg.role === 'assistant' && msg.actionType === 'shopping' && <span className="inline-block mr-1.5">🛒</span>}
+                                    {msg.role === 'assistant' && msg.actionType === 'reminder' && <span className="inline-block mr-1.5">⏰</span>}
+                                    {msg.role === 'assistant' && msg.actionType === 'lifemap' && <span className="inline-block mr-1.5">🗺️</span>}
+                                    {msg.role === 'assistant' && msg.actionType === 'inbox' && <span className="inline-block mr-1.5">📥</span>}
+                                    {msg.text}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    {isTyping && (
+                        <div className="flex items-start gap-3 self-start max-w-[85%]">
+                            <div className="w-8 h-8 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center shrink-0">
+                                <Bot size={14} className="text-accent" />
+                            </div>
+                            <div className="p-3 rounded-2xl rounded-tl-sm bg-transparent text-text-secondary border border-white/5 flex items-center gap-2">
+                                <Loader2 size={14} className="animate-spin" /> Thinking...
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Input Area */}
+                <form onSubmit={handleSubmit} className="shrink-0 p-4 bg-black/20 border-t border-white/5 relative">
+                    <div className="relative flex items-center">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            placeholder="Ask or command anything..."
+                            className="w-full bg-[#1e1e20] border border-white/10 rounded-2xl pl-5 pr-12 py-4 text-base sm:text-lg text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all shadow-inner"
+                            autoComplete="off"
+                            spellCheck="false"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={!input.trim()}
+                            className="absolute right-3 w-8 h-8 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:hover:bg-accent text-white rounded-xl flex items-center justify-center transition-colors"
+                        >
+                            <ArrowRight size={16} />
+                        </button>
+                    </div>
                 </form>
-
-                {/* Status Feedback */}
-                {statusMessage && (
-                    <div className="px-6 py-4 bg-green-500/10 border-t border-green-500/20 text-green-400 flex items-center gap-2 text-sm font-bold animate-in fade-in">
-                        <CheckCircle size={16} /> {statusMessage.text}
-                    </div>
-                )}
-
-                {/* Content Area: Examples & Inbox */}
-                {!input.trim() && !statusMessage && (
-                    <div className="bg-black/30 p-6 flex flex-col gap-6 max-h-[50vh] overflow-y-auto">
-                        
-                        <div className="flex flex-col gap-3">
-                            <div className="text-xs font-bold text-text-secondary uppercase tracking-widest">Natural Language Examples</div>
-                            <div className="flex flex-col gap-1.5">
-                                <div className="text-sm text-text-secondary bg-white/5 p-2 rounded-lg cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setInput("Add initiative under Career called AI Upskill")}>
-                                    "Add <span className="text-white font-medium">initiative</span> under <span className="text-accent font-medium">Career</span> called <span className="text-white font-medium">AI Upskill</span>"
-                                </div>
-                                <div className="text-sm text-text-secondary bg-white/5 p-2 rounded-lg cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setInput("Add task under AI Upskill to learn Python basics")}>
-                                    "Add <span className="text-white font-medium">task</span> under <span className="text-accent font-medium">AI Upskill</span> to <span className="text-white font-medium">learn Python basics</span>"
-                                </div>
-                                <div className="text-sm text-text-secondary bg-white/5 p-2 rounded-lg cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setInput("Need to buy groceries")}>
-                                    "Need to buy groceries" <span className="text-[10px] ml-2 text-orange-400 opacity-80">(Saves to Inbox)</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {inbox.length > 0 && (
-                            <div className="flex flex-col gap-3 mt-4">
-                                <div className="text-xs font-bold text-text-secondary uppercase tracking-widest flex items-center justify-between">
-                                    <span className="flex items-center gap-1.5"><Inbox size={12} /> Inbox Queue</span>
-                                    <span className="bg-orange-500/20 text-orange-400 px-1.5 rounded">{inbox.length}</span>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    {inbox.map(item => (
-                                        <div key={item.id} className="group flex items-start gap-3 p-3 rounded-xl bg-orange-500/5 border border-orange-500/10 hover:border-orange-500/30 transition-colors">
-                                            <div className="flex-1 text-sm text-text-primary leading-snug">{item.text}</div>
-                                            <button onClick={() => removeInboxItem(item.id)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-white/10 text-text-secondary transition-all">
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                    </div>
-                )}
             </div>
-            {/* Mobile keyboard padding spacer could go here if needed */}
         </div>
     );
 };
-
-// CheckCircle is missing from imports, need to add it or fix. Wait, let's fix it later if needed. I'll just use Sparkles or something. Ah, let's import it.
-import { CheckCircle } from 'lucide-react';
 
 export default CommandCenter;

@@ -7,7 +7,7 @@ export interface LifeMapNode extends Node {
     data: {
         label: string;
         description?: string;
-        status?: 'active' | 'paused' | 'completed' | 'archived';
+        status?: 'active' | 'paused' | 'completed' | 'archived' | 'backlog';
         expanded?: boolean;
         parentId?: string;
         editing?: boolean;

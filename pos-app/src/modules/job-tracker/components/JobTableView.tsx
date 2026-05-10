@@ -3,7 +3,7 @@ import { useJobTrackerStore } from '@/store/useJobTrackerStore';
 import { Job, JobStatus, EmploymentType } from '../types';
 import { JobDetailSheet } from './JobDetailSheet';
 import { 
-    MoreHorizontal, ExternalLink, MapPin, Building2, Wallet, Star,
+    MoreHorizontal, MapPin, Building2, Wallet, Star,
     Edit2, FileText, Globe
 } from 'lucide-react';
 import {
