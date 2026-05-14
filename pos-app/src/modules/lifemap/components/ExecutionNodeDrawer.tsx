@@ -1,11 +1,14 @@
 import { FC, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { Resource, ResourceType } from '@/types/lifemap';
 import { uploadResourceFile } from '@/services/lifeMapService';
 import { supabase } from '@/lib/supabase';
-import { X, Plus, Trash2, CheckCircle, Circle, BookOpen, Clock, Flame, Link as LinkIcon, FileText, Play, Pause, Archive, ArrowRight, Activity, Calendar, Youtube, Paperclip, ExternalLink } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle, Circle, BookOpen, Clock, Flame, Link as LinkIcon, FileText, Play, Pause, Archive, ArrowRight, Activity, Calendar, Youtube, Paperclip, ExternalLink, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
+import { AnimatePresence } from 'framer-motion';
+import ContextEditorCanvas from './ContextEditorCanvas';
 
 // Detect resource type from URL
 const detectType = (url: string): ResourceType => {
@@ -27,12 +30,15 @@ const formatFileSize = (bytes: number) => {
 };
 
 const ExecutionNodeDrawer: FC = () => {
-    const { nodes, selectedExecutionNodeId, setSelectedExecutionNodeId, addTaskToNode, toggleNodeTask, updateNode, deleteNode, addResource, removeResource, loadFromDB } = useLifeMapStore();
+    const { nodes, selectedExecutionNodeId, setSelectedExecutionNodeId, addTaskToNode, toggleNodeTask, deleteTaskFromNode, editTaskInNode, updateNode, deleteNode, addResource, removeResource, loadFromDB } = useLifeMapStore();
     const [newTaskText, setNewTaskText] = useState('');
     const [newNoteText, setNewNoteText] = useState('');
     const [resUrl, setResUrl] = useState('');
     const [resTitle, setResTitle] = useState('');
     const [resUploading, setResUploading] = useState(false);
+    const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
+    const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+    const [editTaskText, setEditTaskText] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Load from DB on mount so data is always fresh
@@ -44,7 +50,7 @@ const ExecutionNodeDrawer: FC = () => {
 
     const data = node.data;
     const tasks = (data.tasks as any[]) || [];
-    const notes = (data.notes as string) || '';
+    const canvases = (data.canvases as any[]) || [];
     const resources = (data.resources as any[]) || [];
     const priority = (data.priority as string) || 'medium';
     const status = data.status || 'active'; // active, completed, paused, backlog
@@ -67,13 +73,22 @@ const ExecutionNodeDrawer: FC = () => {
         }
     };
 
-    const handleAddNote = () => {
-        if (newNoteText.trim()) {
-            const newEntry = `[${new Date().toLocaleDateString()}] ${newNoteText.trim()}`;
-            const updatedNotes = notes ? `${newEntry}\n\n${notes}` : newEntry;
-            updateNode(node.id, { notes: updatedNotes, lastUpdated: Date.now() });
-            setNewNoteText('');
-        }
+    const handleCreateCanvas = () => {
+        const newCanvas = {
+            id: `canvas-${Date.now()}`,
+            title: 'Untitled Canvas',
+            content: '',
+            lastEdited: Date.now()
+        };
+        const updatedCanvases = [newCanvas, ...canvases];
+        updateNode(node.id, { canvases: updatedCanvases, lastUpdated: Date.now() });
+        setActiveCanvasId(newCanvas.id);
+    };
+
+    const handleDeleteCanvas = (e: React.MouseEvent, canvasId: string) => {
+        e.stopPropagation();
+        const updatedCanvases = canvases.filter(c => c.id !== canvasId);
+        updateNode(node.id, { canvases: updatedCanvases, lastUpdated: Date.now() });
     };
 
     const handleAddUrlResource = () => {
@@ -191,13 +206,70 @@ const ExecutionNodeDrawer: FC = () => {
                     </div>
                     <div className="bg-black/30 border border-white/5 rounded-xl p-2 flex flex-col gap-1 shadow-inner">
                         {tasks.length > 0 ? tasks.map(task => (
-                            <div key={task.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white/5 group transition-all cursor-pointer" onClick={() => toggleNodeTask(node.id, task.id)}>
-                                <div className={`mt-0.5 flex-shrink-0 transition-colors ${task.completed ? 'text-green-500' : 'text-text-secondary group-hover:text-blue-400'}`}>
+                            <div key={task.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white/5 group transition-all">
+                                <div 
+                                    className={`mt-0.5 flex-shrink-0 transition-colors cursor-pointer ${task.completed ? 'text-green-500' : 'text-text-secondary group-hover:text-blue-400'}`}
+                                    onClick={() => toggleNodeTask(node.id, task.id)}
+                                >
                                     {task.completed ? <CheckCircle size={16} /> : <Circle size={16} />}
                                 </div>
-                                <span className={`text-sm flex-1 font-medium leading-snug ${task.completed ? 'line-through text-text-secondary opacity-60' : 'text-text-primary opacity-90'}`}>
-                                    {task.text}
-                                </span>
+                                
+                                {editingTaskId === task.id ? (
+                                    <div className="flex-1 flex gap-2">
+                                        <input
+                                            type="text"
+                                            autoFocus
+                                            value={editTaskText}
+                                            onChange={(e) => setEditTaskText(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && editTaskText.trim()) {
+                                                    editTaskInNode(node.id, task.id, editTaskText.trim());
+                                                    setEditingTaskId(null);
+                                                } else if (e.key === 'Escape') {
+                                                    setEditingTaskId(null);
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                if (editTaskText.trim()) editTaskInNode(node.id, task.id, editTaskText.trim());
+                                                setEditingTaskId(null);
+                                            }}
+                                            className="flex-1 bg-black/40 border border-accent/50 rounded px-2 py-0.5 text-sm text-text-primary focus:outline-none"
+                                        />
+                                    </div>
+                                ) : (
+                                    <span 
+                                        className={`text-sm flex-1 font-medium leading-snug cursor-pointer ${task.completed ? 'line-through text-text-secondary opacity-60' : 'text-text-primary opacity-90'}`}
+                                        onClick={() => toggleNodeTask(node.id, task.id)}
+                                    >
+                                        {task.text}
+                                    </span>
+                                )}
+
+                                {!editingTaskId && (
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditTaskText(task.text);
+                                                setEditingTaskId(task.id);
+                                            }}
+                                            className="p-1 rounded text-text-secondary hover:text-white hover:bg-white/10 transition-colors"
+                                            title="Edit Task"
+                                        >
+                                            <Edit2 size={12} />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteTaskFromNode(node.id, task.id);
+                                            }}
+                                            className="p-1 rounded text-text-secondary hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                                            title="Delete Task"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )) : (
                             <div className="p-3 text-sm text-text-secondary italic">
@@ -238,41 +310,66 @@ const ExecutionNodeDrawer: FC = () => {
                     </div>
                 </section>
 
-                {/* 4. CONTEXT & NOTES */}
+                {/* 4. CONTEXT & NOTES (Canvases List) */}
                 <section>
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-bold tracking-wide text-text-primary flex items-center gap-2">
                             <FileText size={14} className="text-text-secondary" /> Context & Insights
                         </h3>
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={handleCreateCanvas}
+                            className="h-7 text-[10px] bg-white/5 hover:bg-white/10 text-white border border-white/5"
+                        >
+                            <Plus size={12} className="mr-1" /> New Canvas
+                        </Button>
                     </div>
                     
-                    <div className="relative mb-4">
-                        <textarea 
-                            placeholder="Capture quick thoughts, blockers, or insights..."
-                            value={newNoteText}
-                            onChange={(e) => setNewNoteText(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleAddNote();
-                                }
-                            }}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-3 text-sm text-text-primary focus:outline-none focus:border-accent resize-none min-h-[80px] shadow-inner placeholder:text-text-secondary/50"
-                        />
-                        <Button size="sm" onClick={handleAddNote} className="absolute bottom-2 right-2 h-7 px-3 text-xs bg-white/10 hover:bg-white/20 text-white">Save</Button>
-                    </div>
-
-                    {notes && (
-                        <div className="flex flex-col gap-2">
-                            {notes.split('\n\n').map((block, i) => (
-                                block.trim() && (
-                                    <div key={i} className="bg-white/5 border border-white/5 rounded-lg p-3 text-sm text-text-primary/90 whitespace-pre-wrap leading-relaxed shadow-sm">
-                                        {block}
+                    <div className="flex flex-col gap-2">
+                        {canvases.length > 0 ? (
+                            canvases.map((canvas: any) => (
+                                <div 
+                                    key={canvas.id}
+                                    onClick={() => setActiveCanvasId(canvas.id)}
+                                    className="bg-black/30 border border-white/10 hover:border-accent/50 rounded-xl p-3 cursor-pointer group transition-all"
+                                >
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <h4 className="text-sm font-semibold text-text-primary group-hover:text-accent transition-colors">{canvas.title}</h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[9px] text-text-secondary">
+                                                {formatDistanceToNow(canvas.lastEdited, { addSuffix: true })}
+                                            </span>
+                                            <button 
+                                                onClick={(e) => handleDeleteCanvas(e, canvas.id)}
+                                                className="p-1 rounded opacity-0 group-hover:opacity-100 text-text-secondary hover:text-red-400 hover:bg-red-400/10 transition-all"
+                                                title="Delete Canvas"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                     </div>
-                                )
-                            ))}
-                        </div>
-                    )}
+                                    <div className="text-xs text-text-secondary line-clamp-2 leading-relaxed opacity-80">
+                                        {canvas.content 
+                                            ? <div dangerouslySetInnerHTML={{ __html: canvas.content.replace(/<[^>]*>?/gm, ' ') }} />
+                                            : <span className="italic">Empty canvas...</span>
+                                        }
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div 
+                                onClick={handleCreateCanvas}
+                                className="bg-black/30 border border-white/10 border-dashed hover:border-accent/50 rounded-xl p-4 cursor-pointer group transition-all flex flex-col items-center justify-center text-center"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                    <Plus size={14} className="text-text-secondary group-hover:text-white transition-colors" />
+                                </div>
+                                <span className="text-xs font-medium text-text-primary">Create your first canvas</span>
+                                <span className="text-[10px] text-text-secondary mt-1">Capture rich notes, images, and context</span>
+                            </div>
+                        )}
+                    </div>
                 </section>
 
                 {/* 5. RESOURCES */}
@@ -385,6 +482,19 @@ const ExecutionNodeDrawer: FC = () => {
                     <span className="text-white/70">{completedTasksCount > 0 ? `${completedTasksCount} items shipped` : 'Just started'}</span>
                 </div>
             </div>
+
+            {typeof document !== 'undefined' && createPortal(
+                <AnimatePresence>
+                    {activeCanvasId && (
+                        <ContextEditorCanvas 
+                            nodeId={node.id} 
+                            canvasId={activeCanvasId}
+                            onClose={() => setActiveCanvasId(null)} 
+                        />
+                    )}
+                </AnimatePresence>,
+                document.body
+            )}
         </div>
     );
 };

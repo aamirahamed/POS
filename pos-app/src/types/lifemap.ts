@@ -13,6 +13,13 @@ export interface Resource {
     fileSize?: number;  // bytes, for attachments
 }
 
+export interface ContextCanvas {
+    id: string;
+    title: string;
+    content: string;
+    lastEdited: number;
+}
+
 export interface LifeMapNode extends Node {
     type: NodeType;
     data: {
@@ -26,6 +33,8 @@ export interface LifeMapNode extends Node {
         tasks?: { id: string; text: string; completed: boolean }[];
         priority?: 'low' | 'medium' | 'high';
         notes?: string;
+        contextRich?: string;
+        canvases?: ContextCanvas[];
         resources?: Resource[];
         lastUpdated?: number;
         streak?: number;
@@ -69,6 +78,8 @@ export interface LifeMapState {
     // Task actions
     addTaskToNode: (nodeId: string, text: string) => void;
     toggleNodeTask: (nodeId: string, taskId: string) => void;
+    deleteTaskFromNode: (nodeId: string, taskId: string) => void;
+    editTaskInNode: (nodeId: string, taskId: string, newText: string) => void;
     lastLayoutTrigger: number;
     triggerLayout: () => void;
 

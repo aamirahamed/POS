@@ -354,6 +354,42 @@ export const useLifeMapStore = create<LifeMapState>()(
                     debouncedSync(nodes, get().edges);
                 },
 
+                deleteTaskFromNode: (nodeId, taskId) => {
+                    const nodes = get().nodes.map(node => {
+                        if (node.id === nodeId && node.data.tasks) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    tasks: node.data.tasks.filter(t => t.id !== taskId)
+                                }
+                            };
+                        }
+                        return node;
+                    });
+                    set({ nodes });
+                    debouncedSync(nodes, get().edges);
+                },
+
+                editTaskInNode: (nodeId, taskId, newText) => {
+                    const nodes = get().nodes.map(node => {
+                        if (node.id === nodeId && node.data.tasks) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    tasks: node.data.tasks.map(t =>
+                                        t.id === taskId ? { ...t, text: newText } : t
+                                    )
+                                }
+                            };
+                        }
+                        return node;
+                    });
+                    set({ nodes });
+                    debouncedSync(nodes, get().edges);
+                },
+
                 lastLayoutTrigger: 0,
                 triggerLayout: () => {
                     const { nodes, edges } = get();
