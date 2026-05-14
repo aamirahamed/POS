@@ -3,6 +3,28 @@ import { supabase } from '@/lib/supabase';
 import { LifeMapNode } from '@/types/lifemap';
 import { Edge } from '@xyflow/react';
 
+// ─── File Upload ────────────────────────────────────────────────────────────────
+export const uploadResourceFile = async (userId: string, nodeId: string, file: File): Promise<string | null> => {
+    const ext = file.name.split('.').pop();
+    const path = `${userId}/${nodeId}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+        .from('life-map-resources')
+        .upload(path, file, { upsert: false });
+    if (error) { console.error('Upload error:', error); return null; }
+    const { data } = supabase.storage.from('life-map-resources').getPublicUrl(path);
+    return data.publicUrl;
+};
+
+export const deleteResourceFile = async (publicUrl: string): Promise<void> => {
+    // Extract path from public URL
+    const url = new URL(publicUrl);
+    const pathParts = url.pathname.split('/life-map-resources/');
+    if (pathParts.length < 2) return;
+    const path = pathParts[1];
+    const { error } = await supabase.storage.from('life-map-resources').remove([path]);
+    if (error) console.error('Delete error:', error);
+};
+
 export const saveLifeMap = async (userId: string, nodes: LifeMapNode[], edges: Edge[]) => {
     // Check if map exists
     const { data: existing } = await supabase

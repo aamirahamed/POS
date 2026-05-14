@@ -8,6 +8,8 @@ import DashboardPage from '@/modules/dashboard/DashboardPage';
 import { JobTrackerPage } from '@/modules/job-tracker/JobTrackerPage';
 import ShoppingListPage from '@/modules/shopping/ShoppingListPage';
 import AuthWrapper from '@/modules/auth/AuthWrapper';
+import ThoughtIncubatorPage from '@/modules/incubator/ThoughtIncubatorPage';
+import FinancePage from '@/modules/finance/FinancePage';
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
             <Route path="tracker" element={<AssignmentTracker />} />
             <Route path="jobs" element={<JobTrackerPage />} />
             <Route path="shopping" element={<ShoppingListPage />} />
+            <Route path="incubator" element={<ThoughtIncubatorPage />} />
+            <Route path="finance" element={<FinancePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

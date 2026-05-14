@@ -10,6 +10,26 @@ import {
 } from '@xyflow/react';
 import { LifeMapState, LifeMapNode } from '@/types/lifemap';
 import { calculateRadialLayout } from '@/utils/layout';
+import { saveLifeMap, fetchLifeMap } from '@/services/lifeMapService';
+import { supabase } from '@/lib/supabase';
+
+// Debounced DB sync — waits 1.5s after last change before writing
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+const debouncedSync = (nodes: LifeMapNode[], edges: any[]) => {
+    if (syncTimer) clearTimeout(syncTimer);
+    syncTimer = setTimeout(async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) await saveLifeMap(user.id, nodes, edges);
+    }, 1500);
+};
+
+// Immediate DB sync — used for high-value writes (resources, etc.) that must not be lost
+const immediateSync = async (nodes: LifeMapNode[], edges: any[]) => {
+    // Cancel any pending debounce to avoid a stale overwrite racing this write
+    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await saveLifeMap(user.id, nodes, edges);
+};
 
 
 const PILLAR_HUES = [210, 270, 330, 40, 150, 180, 30, 240]; // Blue, Purple, Pink, Amber, Green, Teal, Orange, Indigo
@@ -80,6 +100,17 @@ export const useLifeMapStore = create<LifeMapState>()(
 
                 nodeToDelete: null,
                 setNodeToDelete: (id) => set({ nodeToDelete: id }),
+
+                // Load from Supabase on app start (falls back to localStorage)
+                loadFromDB: async () => {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (!user) return;
+                    const map = await fetchLifeMap(user.id);
+                    if (map?.nodes?.length) {
+                        const layouted = calculateRadialLayout(map.nodes, map.edges || []);
+                        set({ nodes: layouted.nodes, edges: map.edges || [] });
+                    }
+                },
                 confirmDeleteNode: () => {
                     const state = get();
                     const id = state.nodeToDelete;
@@ -102,6 +133,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     
                     const layouted = calculateRadialLayout(newNodes, newEdges);
                     set({ nodes: layouted.nodes, edges: newEdges, nodeToDelete: null });
+                    debouncedSync(layouted.nodes, newEdges);
                 },
 
                 addNode: (node) => {
@@ -141,6 +173,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
+                    debouncedSync(layouted.nodes, newEdges);
                 },
 
                 addThread: (parentId, label) => {
@@ -192,6 +225,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
+                    debouncedSync(layouted.nodes, newEdges);
                 },
 
                 addInitiative: (parentId, label) => {
@@ -231,6 +265,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
+                    debouncedSync(layouted.nodes, newEdges);
                 },
 
                 addSubnode: (parentId, label) => {
@@ -275,6 +310,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
+                    debouncedSync(layouted.nodes, newEdges);
                 },
 
                 addTaskToNode: (nodeId, text) => {
@@ -296,6 +332,7 @@ export const useLifeMapStore = create<LifeMapState>()(
 
                     const layouted = calculateRadialLayout(nodes, get().edges);
                     set({ nodes: layouted.nodes, lastLayoutTrigger: Date.now() });
+                    debouncedSync(layouted.nodes, get().edges);
                 },
 
                 toggleNodeTask: (nodeId, taskId) => {
@@ -314,6 +351,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                         return node;
                     });
                     set({ nodes });
+                    debouncedSync(nodes, get().edges);
                 },
 
                 lastLayoutTrigger: 0,
@@ -323,11 +361,51 @@ export const useLifeMapStore = create<LifeMapState>()(
                     set({ nodes: layouted.nodes, lastLayoutTrigger: Date.now() });
                 },
 
-                updateNode: (id, data) => set({
-                    nodes: get().nodes.map((node) =>
+                updateNode: (id, data) => {
+                    const nodes = get().nodes.map((node) =>
                         node.id === id ? { ...node, data: { ...node.data, ...data } } : node
-                    ),
-                }),
+                    );
+                    set({ nodes });
+                    debouncedSync(nodes, get().edges);
+                },
+
+                addResource: (nodeId, resource) => {
+                    const nodes = get().nodes.map(node => {
+                        if (node.id === nodeId) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    resources: [...(node.data.resources || []), resource],
+                                    lastUpdated: Date.now(),
+                                },
+                            };
+                        }
+                        return node;
+                    });
+                    set({ nodes });
+                    // Immediate sync — resources are explicit user intent, must not be lost
+                    immediateSync(nodes, get().edges);
+                },
+
+                removeResource: (nodeId, resourceId) => {
+                    const nodes = get().nodes.map(node => {
+                        if (node.id === nodeId) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    resources: (node.data.resources || []).filter((r: any) => r.id !== resourceId),
+                                    lastUpdated: Date.now(),
+                                },
+                            };
+                        }
+                        return node;
+                    });
+                    set({ nodes });
+                    // Immediate sync — deletion is irreversible, must persist right away
+                    immediateSync(nodes, get().edges);
+                },
 
                 toggleNodeExpansion: (id) => {
                     const nodes = get().nodes;

@@ -1,6 +1,6 @@
 import { FC, useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Network, Bell, Settings, LayoutGrid, GraduationCap, Briefcase, ShoppingCart, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Network, Bell, Settings, LayoutGrid, GraduationCap, Briefcase, ShoppingCart, Menu, X, Lightbulb, Wallet } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import CommandCenter from '@/modules/lifemap/components/CommandCenter';
@@ -14,8 +14,10 @@ const NAV_ITEMS = [
     { path: '/wishlist', label: 'Wishlist', icon: LayoutGrid },
     { path: '/tracker', label: 'Assignments', icon: GraduationCap },
     { path: '/jobs', label: 'Job Tracker', icon: Briefcase },
-    { path: '/shopping', label: 'Shopping', icon: ShoppingCart },
-    { path: '/settings', label: 'Settings', icon: Settings, disabled: true },
+    { path: '/shopping',   label: 'Shopping',          icon: ShoppingCart },
+    { path: '/incubator',  label: 'Thought Incubator', icon: Lightbulb },
+    { path: '/finance',    label: 'Finance',            icon: Wallet },
+    { path: '/settings',   label: 'Settings',          icon: Settings, disabled: true },
 ] as const;
 
 type NavItem = typeof NAV_ITEMS[number];

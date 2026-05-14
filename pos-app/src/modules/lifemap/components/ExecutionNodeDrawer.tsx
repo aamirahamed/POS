@@ -1,14 +1,42 @@
-import { FC, useState } from 'react';
+import { FC, useState, useRef, useEffect } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
-import { X, Plus, Trash2, CheckCircle, Circle, BookOpen, Clock, Flame, Link as LinkIcon, FileText, Play, Pause, Archive, ArrowRight, Activity, Calendar } from 'lucide-react';
+import { Resource, ResourceType } from '@/types/lifemap';
+import { uploadResourceFile } from '@/services/lifeMapService';
+import { supabase } from '@/lib/supabase';
+import { X, Plus, Trash2, CheckCircle, Circle, BookOpen, Clock, Flame, Link as LinkIcon, FileText, Play, Pause, Archive, ArrowRight, Activity, Calendar, Youtube, Paperclip, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 
+// Detect resource type from URL
+const detectType = (url: string): ResourceType => {
+    if (/youtube\.com|youtu\.be/.test(url)) return 'youtube';
+    if (/\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip|png|jpg|jpeg|gif|mp4)$/i.test(url)) return 'attachment';
+    return 'article';
+};
+
+const ResourceIcon: FC<{ type: ResourceType; size?: number }> = ({ type, size = 14 }) => {
+    if (type === 'youtube') return <Youtube size={size} className="text-red-400" />;
+    if (type === 'attachment') return <Paperclip size={size} className="text-amber-400" />;
+    return <ExternalLink size={size} className="text-blue-400" />;
+};
+
+const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+};
+
 const ExecutionNodeDrawer: FC = () => {
-    const { nodes, selectedExecutionNodeId, setSelectedExecutionNodeId, addTaskToNode, toggleNodeTask, updateNode, deleteNode } = useLifeMapStore();
+    const { nodes, selectedExecutionNodeId, setSelectedExecutionNodeId, addTaskToNode, toggleNodeTask, updateNode, deleteNode, addResource, removeResource, loadFromDB } = useLifeMapStore();
     const [newTaskText, setNewTaskText] = useState('');
     const [newNoteText, setNewNoteText] = useState('');
-    // const [showFullList, setShowFullList] = useState(false);
+    const [resUrl, setResUrl] = useState('');
+    const [resTitle, setResTitle] = useState('');
+    const [resUploading, setResUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Load from DB on mount so data is always fresh
+    useEffect(() => { loadFromDB(); }, []);
 
     const node = nodes.find(n => n.id === selectedExecutionNodeId);
 
@@ -41,12 +69,54 @@ const ExecutionNodeDrawer: FC = () => {
 
     const handleAddNote = () => {
         if (newNoteText.trim()) {
-            // Append note with timestamp
             const newEntry = `[${new Date().toLocaleDateString()}] ${newNoteText.trim()}`;
             const updatedNotes = notes ? `${newEntry}\n\n${notes}` : newEntry;
             updateNode(node.id, { notes: updatedNotes, lastUpdated: Date.now() });
             setNewNoteText('');
         }
+    };
+
+    const handleAddUrlResource = () => {
+        if (!resUrl.trim()) return;
+        const type = detectType(resUrl);
+        const resource: Resource = {
+            id: `res-${Date.now()}`,
+            title: resTitle.trim() || resUrl,
+            url: resUrl.trim(),
+            type,
+        };
+        addResource(node.id, resource);
+        setResUrl('');
+        setResTitle('');
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !node) return;
+        setResUploading(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) { setResUploading(false); return; }
+            const url = await uploadResourceFile(user.id, node.id, file);
+            if (url) {
+                const resource: Resource = {
+                    id: `res-${Date.now()}`,
+                    title: file.name,
+                    url,
+                    type: 'attachment',
+                    fileName: file.name,
+                    fileSize: file.size,
+                };
+                addResource(node.id, resource);
+            }
+        } finally {
+            setResUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleDeleteResource = async (res: Resource) => {
+        removeResource(node.id, res.id);
     };
 
     const setStatus = (newStatus: string) => {
@@ -207,26 +277,91 @@ const ExecutionNodeDrawer: FC = () => {
 
                 {/* 5. RESOURCES */}
                 <section>
-                    <h3 className="text-sm font-bold tracking-wide text-text-primary flex items-center gap-2 mb-3">
-                        <LinkIcon size={14} className="text-text-secondary" /> Resources
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold tracking-wide text-text-primary flex items-center gap-2">
+                            <LinkIcon size={14} className="text-text-secondary" /> Resources
+                            {resources.length > 0 && (
+                                <span className="text-[10px] font-bold bg-white/10 text-text-secondary px-1.5 py-0.5 rounded-full">{resources.length}</span>
+                            )}
+                        </h3>
+                    </div>
+
+                    {/* URL / Link input */}
+                    <div className="flex flex-col gap-2 mb-3">
+                        <input
+                            type="text"
+                            placeholder="Paste a YouTube, article, or any URL..."
+                            value={resUrl}
+                            onChange={(e) => {
+                                setResUrl(e.target.value);
+                                // Auto-fill title from URL if title is empty
+                                if (!resTitle && e.target.value) {
+                                    try { setResTitle(new URL(e.target.value).hostname.replace('www.', '')); } catch {}
+                                }
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddUrlResource()}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-accent placeholder:text-text-secondary/50"
+                        />
+                        {resUrl.trim() && (
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Label (optional)"
+                                    value={resTitle}
+                                    onChange={(e) => setResTitle(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddUrlResource()}
+                                    className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent placeholder:text-text-secondary/50"
+                                />
+                                <Button size="sm" onClick={handleAddUrlResource} className="h-9 px-3 text-xs bg-accent/20 hover:bg-accent/30 text-accent border border-accent/30">
+                                    <Plus size={14} className="mr-1" /> Add
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* File attachment upload */}
+                    <div className="mb-4">
+                        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={resUploading}
+                            className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-white/10 rounded-xl text-xs text-text-secondary hover:text-white hover:border-white/30 transition-all disabled:opacity-50"
+                        >
+                            <Paperclip size={13} />
+                            {resUploading ? 'Uploading...' : 'Attach a file (PDF, image, doc...)'}
+                        </button>
+                    </div>
+
+                    {/* Resource list */}
                     {resources.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2">
-                            {resources.map((res, i) => (
-                                <a key={i} href={res.url || '#'} target="_blank" rel="noreferrer" className="flex items-center gap-2.5 p-2 rounded-lg bg-black/40 hover:bg-white/10 border border-white/5 transition-all group">
-                                    <div className="p-1.5 rounded-md bg-white/5 group-hover:bg-accent/20 transition-colors">
-                                        <BookOpen size={12} className="text-text-secondary group-hover:text-accent" />
+                        <div className="flex flex-col gap-2">
+                            {resources.map((res) => (
+                                <div key={res.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-black/40 border border-white/5 group hover:border-white/10 transition-all">
+                                    <div className="p-1.5 rounded-md bg-white/5 shrink-0">
+                                        <ResourceIcon type={res.type as ResourceType} size={13} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-xs font-medium text-text-primary truncate">{res.title}</div>
-                                        <div className="text-[9px] text-text-secondary uppercase mt-0.5 truncate">{res.type}</div>
+                                        <a href={res.url} target="_blank" rel="noreferrer" className="text-xs font-medium text-text-primary truncate block hover:text-accent transition-colors">
+                                            {res.title}
+                                        </a>
+                                        <div className="flex items-center gap-2 mt-0.5">
+                                            <span className="text-[9px] text-text-secondary uppercase tracking-wider">{res.type}</span>
+                                            {res.fileSize && <span className="text-[9px] text-text-secondary/60">{formatFileSize(res.fileSize)}</span>}
+                                        </div>
                                     </div>
-                                </a>
+                                    <button
+                                        onClick={() => handleDeleteResource(res)}
+                                        className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-text-secondary hover:text-red-400 transition-all"
+                                        title="Remove resource"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
                             ))}
                         </div>
                     ) : (
                         <div className="bg-white/5 border border-white/5 border-dashed rounded-lg p-4 text-center text-xs text-text-secondary">
-                            No resources attached. Use metadata to link docs.
+                            No resources yet. Add a link or attach a file above.
                         </div>
                     )}
                 </section>

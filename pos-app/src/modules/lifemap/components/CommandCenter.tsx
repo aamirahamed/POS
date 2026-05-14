@@ -95,11 +95,12 @@ const CommandCenter: FC = () => {
 
             return { actionType: action.actionType, reply: action.reply };
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('AI Processing Error:', error);
+            const errorMessage = error?.message || 'Unknown error occurred';
             // Fallback
             addInboxItem(text);
-            return { actionType: 'error', reply: `Something went wrong. Saved to Inbox instead.` };
+            return { actionType: 'error', reply: `Something went wrong (${errorMessage}). Saved to Inbox instead.` };
         } finally {
             setIsTyping(false);
         }

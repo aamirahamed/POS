@@ -2,6 +2,17 @@ import { Node, Edge } from '@xyflow/react';
 
 export type NodeType = 'center' | 'pillar' | 'thread' | 'initiative' | 'subnode';
 
+export type ResourceType = 'youtube' | 'article' | 'attachment' | 'link';
+
+export interface Resource {
+    id: string;
+    title: string;
+    url: string;
+    type: ResourceType;
+    fileName?: string;  // for file attachments
+    fileSize?: number;  // bytes, for attachments
+}
+
 export interface LifeMapNode extends Node {
     type: NodeType;
     data: {
@@ -11,12 +22,12 @@ export interface LifeMapNode extends Node {
         expanded?: boolean;
         parentId?: string;
         editing?: boolean;
-        hue?: number; // 0-360 HSL hue value
+        hue?: number;
         tasks?: { id: string; text: string; completed: boolean }[];
         priority?: 'low' | 'medium' | 'high';
         notes?: string;
-        resources?: { id: string; title: string; url?: string; type: string }[];
-        lastUpdated?: number; // timestamp
+        resources?: Resource[];
+        lastUpdated?: number;
         streak?: number;
     };
 }
@@ -64,6 +75,13 @@ export interface LifeMapState {
     onNodesChange: (changes: any) => void;
     onEdgesChange: (changes: any) => void;
     onConnect: (connection: any) => void;
+
+    // DB sync
+    loadFromDB: () => Promise<void>;
+
+    // Resource actions
+    addResource: (nodeId: string, resource: Resource) => void;
+    removeResource: (nodeId: string, resourceId: string) => void;
 
     // Inbox actions
     addInboxItem: (text: string) => void;
