@@ -110,22 +110,30 @@ const InitiativeNode = ({ id, data, selected }: NodeProps) => {
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onDoubleClick={() => {
-                setIsEditing(true);
-                setEditValue(data.label as string);
+                if (id !== 'initiative-inbox') {
+                    setIsEditing(true);
+                    setEditValue(data.label as string);
+                }
             }}
         >
             <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
-                <button onClick={() => setStatus('active')} className="p-1 rounded-full bg-surface hover:bg-green-600/30 text-green-400 transition-colors" title="Activate"><Play size={12} /></button>
-                <button onClick={() => setStatus('paused')} className="p-1 rounded-full bg-surface hover:bg-orange-600/30 text-orange-400 transition-colors" title="Pause"><Pause size={12} /></button>
-                <button onClick={() => setStatus('completed')} className="p-1 rounded-full bg-surface hover:bg-indigo-600/30 text-indigo-400 transition-colors" title="Complete"><CheckCircle size={12} /></button>
-                <div className="w-[1px] h-4 bg-white/20 self-center mx-1" />
-                <button onClick={handleAddSubnode} className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors" title="Add Execution Node"><Plus size={12} /></button>
+                {id !== 'initiative-inbox' && (
+                    <>
+                        <button onClick={() => setStatus('active')} className="p-1 rounded-full bg-surface hover:bg-green-600/30 text-green-400 transition-colors" title="Activate"><Play size={12} /></button>
+                        <button onClick={() => setStatus('paused')} className="p-1 rounded-full bg-surface hover:bg-orange-600/30 text-orange-400 transition-colors" title="Pause"><Pause size={12} /></button>
+                        <button onClick={() => setStatus('completed')} className="p-1 rounded-full bg-surface hover:bg-indigo-600/30 text-indigo-400 transition-colors" title="Complete"><CheckCircle size={12} /></button>
+                        <div className="w-[1px] h-4 bg-white/20 self-center mx-1" />
+                        <button onClick={handleAddSubnode} className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors" title="Add Execution Node"><Plus size={12} /></button>
+                    </>
+                )}
                 <button onClick={() => toggleNodeExpansion(id)} className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors" title={isExpanded ? "Collapse" : "Expand"}>
                     {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 </button>
-                <button onClick={() => deleteNode(id)} className="p-1 rounded-full bg-surface hover:bg-red-500 text-text-primary transition-colors" title="Delete">
-                    <Trash2 size={12} />
-                </button>
+                {id !== 'initiative-inbox' && (
+                    <button onClick={() => deleteNode(id)} className="p-1 rounded-full bg-surface hover:bg-red-500 text-text-primary transition-colors" title="Delete">
+                        <Trash2 size={12} />
+                    </button>
+                )}
             </NodeToolbar>
 
             <Handle type="target" position={Position.Top} id="target-top" className="invisible" />
@@ -148,16 +156,23 @@ const InitiativeNode = ({ id, data, selected }: NodeProps) => {
 
             {/* State Chip Dropdown */}
             <div className="relative">
-                <div 
-                    onClick={(e) => { e.stopPropagation(); setShowStateMenu(!showStateMenu); }}
-                    className={`cursor-pointer inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] uppercase font-bold tracking-widest transition-colors ${stateColors[status]}`}
-                >
-                    <span>{stateIcons[status]}</span>
-                    <span>{status}</span>
-                    <span className="opacity-50 ml-0.5">▼</span>
-                </div>
+                {id === 'initiative-inbox' ? (
+                    <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] uppercase font-bold tracking-widest ${stateColors[status]}`}>
+                        <span>{stateIcons[status]}</span>
+                        <span>{status}</span>
+                    </div>
+                ) : (
+                    <div 
+                        onClick={(e) => { e.stopPropagation(); setShowStateMenu(!showStateMenu); }}
+                        className={`cursor-pointer inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] uppercase font-bold tracking-widest transition-colors ${stateColors[status]}`}
+                    >
+                        <span>{stateIcons[status]}</span>
+                        <span>{status}</span>
+                        <span className="opacity-50 ml-0.5">▼</span>
+                    </div>
+                )}
                 
-                {showStateMenu && (
+                {showStateMenu && id !== 'initiative-inbox' && (
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-surface-elevated border border-white/10 rounded-lg shadow-2xl flex flex-col z-[100] text-[10px] uppercase font-bold tracking-widest w-32 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <button onClick={(e) => { e.stopPropagation(); setStatus('active'); }} className="px-3 py-2 hover:bg-white/10 text-left text-green-400 flex items-center gap-2"><span>🟢</span> Active</button>
                         <button onClick={(e) => { e.stopPropagation(); setStatus('backlog'); }} className="px-3 py-2 hover:bg-white/10 text-left text-gray-300 flex items-center gap-2"><span>⚪</span> Backlog</button>
@@ -168,13 +183,15 @@ const InitiativeNode = ({ id, data, selected }: NodeProps) => {
             </div>
 
             {/* Persistent Add Execution Node Button */}
-            <button 
-                onClick={(e) => { e.stopPropagation(); handleAddSubnode(); }}
-                className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-5 h-5 bg-surface hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
-                title="Add Execution Node"
-            >
-                <Plus size={10} />
-            </button>
+            {id !== 'initiative-inbox' && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); handleAddSubnode(); }}
+                    className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-5 h-5 bg-surface hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
+                    title="Add Execution Node"
+                >
+                    <Plus size={10} />
+                </button>
+            )}
 
             <Handle type="source" position={Position.Bottom} id="source-bottom" className="invisible" />
         </div>

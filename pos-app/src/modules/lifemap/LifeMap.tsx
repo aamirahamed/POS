@@ -41,7 +41,8 @@ const LifeMap: FC = () => {
         triggerLayout,
         nodeToDelete,
         confirmDeleteNode,
-        setNodeToDelete
+        setNodeToDelete,
+        loadFromDB
     } = useLifeMapStore();
 
     // Sync state
@@ -55,21 +56,14 @@ const LifeMap: FC = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setUserId(user.id);
-                const data = await fetchLifeMap(user.id);
-                if (data) {
-                    // Only override if remote data exists
-                    if (data.nodes && data.nodes.length > 0) {
-                        setNodes(data.nodes);
-                        setEdges(data.edges);
-                        // Trigger the new layout engine to reposition old saved nodes correctly
-                        setTimeout(() => triggerLayout(), 50);
-                    }
-                }
+                await loadFromDB();
+                // Trigger the new layout engine to reposition nodes correctly
+                setTimeout(() => triggerLayout(), 50);
                 setIsLoaded(true);
             }
         };
         load();
-    }, [setNodes, setEdges]);
+    }, [loadFromDB, triggerLayout]);
 
     // 2. Auto-save on changes
     useEffect(() => {

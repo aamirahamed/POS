@@ -161,23 +161,27 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
                 >
                     <Maximize2 size={12} />
                 </button>
-                <button
-                    onClick={toggleStatus}
-                    className={`p-1.5 rounded-full bg-surface hover:bg-green-600/30 transition-colors shadow-md ${isCompleted ? 'text-green-400' : 'text-text-primary'}`}
-                    title="Toggle Status"
-                >
-                    {isCompleted ? <CheckCircle size={12} /> : <Circle size={12} />}
-                </button>
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        deleteNode(id);
-                    }}
-                    className="p-1.5 rounded-full bg-surface hover:bg-red-500/30 text-text-primary transition-colors shadow-md"
-                    title="Delete"
-                >
-                    <Trash2 size={12} />
-                </button>
+                {id !== 'subnode-inbox' && (
+                    <>
+                        <button
+                            onClick={toggleStatus}
+                            className={`p-1.5 rounded-full bg-surface hover:bg-green-600/30 transition-colors shadow-md ${isCompleted ? 'text-green-400' : 'text-text-primary'}`}
+                            title="Toggle Status"
+                        >
+                            {isCompleted ? <CheckCircle size={12} /> : <Circle size={12} />}
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNode(id);
+                            }}
+                            className="p-1.5 rounded-full bg-surface hover:bg-red-500/30 text-text-primary transition-colors shadow-md"
+                            title="Delete"
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    </>
+                )}
             </NodeToolbar>
 
             <Handle type="target" position={Position.Top} id="target-top" className="invisible" />
@@ -185,7 +189,7 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
             {/* HEADER SECTION */}
             <div className="p-3 border-b border-white/5 flex flex-col gap-2">
                 <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1" onDoubleClick={(e) => { e.stopPropagation(); setIsEditing(true); setEditValue(data.label as string); }}>
+                    <div className="flex-1" onDoubleClick={(e) => { if (id !== 'subnode-inbox') { e.stopPropagation(); setIsEditing(true); setEditValue(data.label as string); } }}>
                         {isEditing ? (
                             <input
                                 ref={inputRef}

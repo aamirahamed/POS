@@ -76,18 +76,22 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onDoubleClick={() => {
-                setIsEditing(true);
-                setEditValue(data.label as string);
+                if (id !== 'thread-inbox') {
+                    setIsEditing(true);
+                    setEditValue(data.label as string);
+                }
             }}
         >
             <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
-                <button
-                    onClick={handleAddInitiative}
-                    className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors"
-                    title="Add Initiative"
-                >
-                    <Plus size={12} />
-                </button>
+                {id !== 'thread-inbox' && (
+                    <button
+                        onClick={handleAddInitiative}
+                        className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors"
+                        title="Add Initiative"
+                    >
+                        <Plus size={12} />
+                    </button>
+                )}
                 <button
                     onClick={() => toggleNodeExpansion(id)}
                     className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors"
@@ -95,20 +99,24 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
                 >
                     {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                 </button>
-                <button
-                    onClick={toggleStatus}
-                    className={`p-1 rounded-full bg-surface hover:bg-green-600 text-text-primary transition-colors ${isCompleted ? 'text-green-500' : ''}`}
-                    title="Toggle Status"
-                >
-                    {isCompleted ? <CheckCircle size={12} /> : <Circle size={12} />}
-                </button>
-                <button
-                    onClick={() => deleteNode(id)}
-                    className="p-1 rounded-full bg-surface hover:bg-red-500 text-text-primary transition-colors"
-                    title="Delete"
-                >
-                    <Trash2 size={12} />
-                </button>
+                {id !== 'thread-inbox' && (
+                    <>
+                        <button
+                            onClick={toggleStatus}
+                            className={`p-1 rounded-full bg-surface hover:bg-green-600 text-text-primary transition-colors ${isCompleted ? 'text-green-500' : ''}`}
+                            title="Toggle Status"
+                        >
+                            {isCompleted ? <CheckCircle size={12} /> : <Circle size={12} />}
+                        </button>
+                        <button
+                            onClick={() => deleteNode(id)}
+                            className="p-1 rounded-full bg-surface hover:bg-red-500 text-text-primary transition-colors"
+                            title="Delete"
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    </>
+                )}
             </NodeToolbar>
 
             <Handle type="target" position={Position.Left} id="target-left" className="invisible" />
@@ -133,13 +141,15 @@ const ThreadNode = ({ id, data, selected }: NodeProps) => {
             )}
             
             {/* Persistent Add Initiative Button */}
-            <button 
-                onClick={(e) => { e.stopPropagation(); handleAddInitiative(); }}
-                className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-5 h-5 bg-surface hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
-                title="Add Initiative"
-            >
-                <Plus size={10} />
-            </button>
+            {id !== 'thread-inbox' && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); handleAddInitiative(); }}
+                    className="absolute -bottom-2.5 left-1/2 transform -translate-x-1/2 w-5 h-5 bg-surface hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
+                    title="Add Initiative"
+                >
+                    <Plus size={10} />
+                </button>
+            )}
 
             <Handle type="source" position={Position.Bottom} id="source-bottom" className="invisible" />
             <Handle type="source" position={Position.Right} id="source-right" className="invisible" />

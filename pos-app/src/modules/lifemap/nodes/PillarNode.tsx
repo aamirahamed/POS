@@ -69,18 +69,22 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onDoubleClick={() => {
-                setIsEditing(true);
-                setEditValue(data.label as string);
+                if (id !== 'pillar-inbox') {
+                    setIsEditing(true);
+                    setEditValue(data.label as string);
+                }
             }}
         >
             <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
-                <button
-                    onClick={handleAddThread}
-                    className="p-1 rounded-full bg-surface-hover hover:bg-accent text-text-primary transition-colors"
-                    title="Add Thread"
-                >
-                    <Plus size={14} />
-                </button>
+                {id !== 'pillar-inbox' && (
+                    <button
+                        onClick={handleAddThread}
+                        className="p-1 rounded-full bg-surface-hover hover:bg-accent text-text-primary transition-colors"
+                        title="Add Thread"
+                    >
+                        <Plus size={14} />
+                    </button>
+                )}
                 <button
                     onClick={() => toggleNodeExpansion(id)}
                     className="p-1 rounded-full bg-surface-hover hover:bg-accent text-text-primary transition-colors"
@@ -88,13 +92,15 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
                 >
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
-                <button
-                    onClick={() => deleteNode(id)}
-                    className="p-1 rounded-full bg-surface-hover hover:bg-red-500 text-text-primary transition-colors"
-                    title="Delete"
-                >
-                    <Trash2 size={14} />
-                </button>
+                {id !== 'pillar-inbox' && (
+                    <button
+                        onClick={() => deleteNode(id)}
+                        className="p-1 rounded-full bg-surface-hover hover:bg-red-500 text-text-primary transition-colors"
+                        title="Delete"
+                    >
+                        <Trash2 size={14} />
+                    </button>
+                )}
             </NodeToolbar>
 
             <Handle type="target" position={Position.Left} id="target-left" className="invisible" />
@@ -126,13 +132,15 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
             </div>
 
             {/* Persistent Add Thread Button */}
-            <button 
-                onClick={(e) => { e.stopPropagation(); handleAddThread(); }}
-                className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-surface-hover hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
-                title="Add Thread"
-            >
-                <Plus size={12} />
-            </button>
+            {id !== 'pillar-inbox' && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); handleAddThread(); }}
+                    className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-surface-hover hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
+                    title="Add Thread"
+                >
+                    <Plus size={12} />
+                </button>
+            )}
 
             <Handle type="source" position={Position.Left} id="source-left" className="invisible" />
             <Handle type="source" position={Position.Right} id="source-right" className="invisible" />

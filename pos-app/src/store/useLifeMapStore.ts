@@ -82,61 +82,91 @@ const initialEdges = [
 ];
 
 const ensureInboxExists = (nodes: LifeMapNode[], edges: any[]): { nodes: LifeMapNode[], edges: any[] } => {
-    const hasInboxSubnode = nodes.some(n => n.id === 'subnode-inbox');
-    if (hasInboxSubnode) return { nodes, edges };
+    let newNodes = [...nodes];
+    let newEdges = [...edges];
+    let changed = false;
 
-    const inboxPillar: LifeMapNode = {
-        id: 'pillar-inbox',
-        type: 'pillar',
-        position: { x: -350, y: 0 },
-        data: { label: 'Inbox', expanded: true, hue: 240 },
-        zIndex: 50,
-    };
+    // 1. Ensure pillar-inbox
+    const pillarIdx = newNodes.findIndex(n => n.id === 'pillar-inbox');
+    if (pillarIdx === -1) {
+        newNodes.push({
+            id: 'pillar-inbox',
+            type: 'pillar',
+            position: { x: -350, y: 0 },
+            data: { label: 'Inbox', expanded: true, hue: 240 },
+            zIndex: 50,
+        });
+        changed = true;
+    }
 
-    const inboxThread: LifeMapNode = {
-        id: 'thread-inbox',
-        type: 'thread',
-        position: { x: -350, y: 280 },
-        data: { label: 'Quick captures', parentId: 'pillar-inbox', expanded: true, hue: 240 },
-        zIndex: 40,
-    };
+    // 2. Ensure thread-inbox
+    const threadIdx = newNodes.findIndex(n => n.id === 'thread-inbox');
+    if (threadIdx === -1) {
+        newNodes.push({
+            id: 'thread-inbox',
+            type: 'thread',
+            position: { x: -350, y: 280 },
+            data: { label: 'Quick captures', parentId: 'pillar-inbox', expanded: true, hue: 240 },
+            zIndex: 40,
+        });
+        changed = true;
+    }
 
-    const inboxInitiative: LifeMapNode = {
-        id: 'initiative-inbox',
-        type: 'initiative',
-        position: { x: -350, y: 560 },
-        data: { label: 'Inbox Focus', parentId: 'thread-inbox', expanded: true, hue: 240, status: 'active' },
-        zIndex: 30,
-    };
+    // 3. Ensure initiative-inbox
+    const initIdx = newNodes.findIndex(n => n.id === 'initiative-inbox');
+    if (initIdx === -1) {
+        newNodes.push({
+            id: 'initiative-inbox',
+            type: 'initiative',
+            position: { x: -350, y: 560 },
+            data: { label: 'Inbox Focus', parentId: 'thread-inbox', expanded: true, hue: 240, status: 'active' },
+            zIndex: 30,
+        });
+        changed = true;
+    }
 
-    const inboxSubnode: LifeMapNode = {
-        id: 'subnode-inbox',
-        type: 'subnode',
-        position: { x: -350, y: 840 },
-        data: {
-            label: 'Quick Captures',
-            parentId: 'initiative-inbox',
-            status: 'active',
-            hue: 240,
-            priority: 'medium',
-            tasks: [],
-            resources: [],
-            notes: 'Capture area for untagged items.',
-            lastUpdated: Date.now(),
-        },
-        zIndex: 20,
-    };
+    // 4. Ensure subnode-inbox
+    const subIdx = newNodes.findIndex(n => n.id === 'subnode-inbox');
+    if (subIdx === -1) {
+        newNodes.push({
+            id: 'subnode-inbox',
+            type: 'subnode',
+            position: { x: -350, y: 840 },
+            data: {
+                label: 'Quick Captures',
+                parentId: 'initiative-inbox',
+                status: 'active',
+                hue: 240,
+                priority: 'medium',
+                tasks: [],
+                resources: [],
+                notes: 'Capture area for untagged items.',
+                lastUpdated: Date.now(),
+            },
+            zIndex: 20,
+        });
+        changed = true;
+    }
 
-    const newNodes = [...nodes, inboxPillar, inboxThread, inboxInitiative, inboxSubnode];
-    const newEdges = [
-        ...edges,
+    // 5. Ensure edges
+    const requiredEdges = [
         { id: 'e-center-pillar-inbox', source: 'center', target: 'pillar-inbox', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
         { id: 'e-pillar-inbox-thread-inbox', source: 'pillar-inbox', target: 'thread-inbox', type: 'smoothstep', animated: false, zIndex: 5, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
         { id: 'e-thread-inbox-initiative-inbox', source: 'thread-inbox', target: 'initiative-inbox', type: 'smoothstep', animated: false, zIndex: 3, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
         { id: 'e-initiative-inbox-subnode-inbox', source: 'initiative-inbox', target: 'subnode-inbox', type: 'default', animated: false, zIndex: 1, sourceHandle: 'source-bottom', targetHandle: 'target-top' }
     ];
 
-    return calculateRadialLayout(newNodes, newEdges);
+    requiredEdges.forEach(reqEdge => {
+        if (!newEdges.some(e => e.id === reqEdge.id)) {
+            newEdges.push(reqEdge);
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        return calculateRadialLayout(newNodes, newEdges);
+    }
+    return { nodes: newNodes, edges: newEdges };
 };
 
 export const useLifeMapStore = create<LifeMapState>()(
@@ -542,7 +572,10 @@ export const useLifeMapStore = create<LifeMapState>()(
                     set({ nodes: layouted.nodes });
                 },
 
-                deleteNode: (id) => set({ nodeToDelete: id }),
+                deleteNode: (id) => {
+                    if (id.endsWith('-inbox')) return;
+                    set({ nodeToDelete: id });
+                },
 
                 setNodes: (nodes) => set({ nodes }),
                 setEdges: (edges) => set({ edges }),
