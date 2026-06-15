@@ -11,7 +11,6 @@ import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Z
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 
 const DashboardPage: FC = () => {
@@ -36,8 +35,7 @@ const DashboardPage: FC = () => {
     const [dumpInput, setDumpInput] = useState('');
     const [isDumping, setIsDumping] = useState(false);
     const [showFocusSelector, setShowFocusSelector] = useState(false);
-    const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
-    const [triageSearchQuery, setTriageSearchQuery] = useState('');
+    const [itemSearchQueries, setItemSearchQueries] = useState<Record<string, string>>({});
 
     // Load life map from DB on mount
     useEffect(() => {
@@ -512,107 +510,29 @@ const DashboardPage: FC = () => {
                                     <span>🎉 All captured items are assigned! Your Inbox is completely clean.</span>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-1">
                                     {inboxItems.map(item => (
-                                        <div key={item.id} className="flex items-center justify-between gap-3 p-3 bg-surface-elevated/40 border border-border/40 hover:bg-surface-elevated/60 transition-colors rounded-2xl shadow-sm min-w-0">
-                                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                {/* Type icon */}
-                                                <div className={`p-2 rounded-xl shrink-0 ${item.type === 'task' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
-                                                    {item.type === 'task' ? <Check size={14} /> : <LinkIcon size={14} />}
+                                        <div key={item.id} className="flex flex-col gap-3 p-3.5 bg-surface-elevated/40 border border-border/40 hover:bg-surface-elevated/60 transition-colors rounded-2xl shadow-sm min-w-0">
+                                            {/* Top Row: Icon, Title and Discard */}
+                                            <div className="flex items-start justify-between gap-3 min-w-0">
+                                                <div className="flex items-start gap-3 min-w-0 flex-1">
+                                                    {/* Type icon */}
+                                                    <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${item.type === 'task' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
+                                                        {item.type === 'task' ? <Check size={14} /> : <LinkIcon size={14} />}
+                                                    </div>
+                                                    {/* Content */}
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-semibold text-white leading-normal break-words">{item.text}</p>
+                                                        {item.type === 'resource' && item.url && (
+                                                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent font-bold hover:underline inline-flex items-center gap-0.5 mt-1 select-none">
+                                                                <span>View Link</span>
+                                                                <ExternalLink size={8} />
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                {/* Content */}
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-semibold text-white truncate">{item.text}</p>
-                                                    {item.type === 'resource' && item.url && (
-                                                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent font-bold hover:underline inline-flex items-center gap-0.5 mt-0.5 select-none">
-                                                            <span>View Link</span>
-                                                            <ExternalLink size={8} />
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            </div>
 
-                                            {/* Dropdown & Actions */}
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <Popover 
-                                                    open={openPopoverId === item.id} 
-                                                    onOpenChange={(open) => {
-                                                        setOpenPopoverId(open ? item.id : null);
-                                                        setTriageSearchQuery('');
-                                                    }}
-                                                >
-                                                    <PopoverTrigger asChild>
-                                                        <Button 
-                                                            variant="outline" 
-                                                            size="sm" 
-                                                            className="bg-surface hover:bg-surface-hover border-border/80 text-text-secondary hover:text-white text-xs font-bold h-8 py-0 px-2.5 rounded-xl transition-all"
-                                                        >
-                                                            Assign Node...
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-80 p-3 bg-surface-elevated/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl flex flex-col gap-3 z-[110]">
-                                                        {/* Search input inside Popover */}
-                                                        <div className="relative">
-                                                            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-text-secondary h-3.5 w-3.5" />
-                                                            <Input
-                                                                placeholder="Search execution nodes..."
-                                                                value={triageSearchQuery}
-                                                                onChange={(e) => setTriageSearchQuery(e.target.value)}
-                                                                className="pl-8 bg-surface border-border/40 focus:border-accent text-xs rounded-xl h-8 text-white focus-visible:ring-1 focus-visible:ring-accent"
-                                                            />
-                                                        </div>
-
-                                                        {/* Scrollable Pills Container */}
-                                                        <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto pr-1 py-1">
-                                                            {(() => {
-                                                                const query = triageSearchQuery.toLowerCase().trim();
-                                                                const filtered = executionNodes.filter(node => {
-                                                                    const label = node.data.label.toLowerCase();
-                                                                    const path = resolveNodePath(node.id, nodes, edges).toLowerCase();
-                                                                    return label.includes(query) || path.includes(query);
-                                                                });
-
-                                                                if (filtered.length === 0) {
-                                                                    return (
-                                                                        <div className="w-full text-center py-4 text-xs text-text-secondary italic">
-                                                                            No execution nodes found.
-                                                                        </div>
-                                                                    );
-                                                                }
-
-                                                                return filtered.map(node => {
-                                                                    const hue = node.data.hue || 210;
-                                                                    const path = resolveNodePath(node.id, nodes, edges);
-
-                                                                    return (
-                                                                        <button
-                                                                            key={node.id}
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                handleMoveItem(item.id, item.type, node.id);
-                                                                                setOpenPopoverId(null);
-                                                                            }}
-                                                                            style={{
-                                                                                borderColor: `hsla(${hue}, 70%, 50%, 0.25)`,
-                                                                                backgroundColor: `hsla(${hue}, 75%, 15%, 0.25)`
-                                                                            }}
-                                                                            className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-lg border text-[10px] font-semibold text-text-secondary hover:text-white hover:border-white/20 transition-all max-w-full"
-                                                                            title={path ? `${path} > ${node.data.label}` : node.data.label}
-                                                                        >
-                                                                            {/* Left Hue Dot */}
-                                                                            <span 
-                                                                                className="w-1.5 h-1.5 rounded-full shrink-0" 
-                                                                                style={{ backgroundColor: `hsl(${hue}, 70%, 55%)` }}
-                                                                            />
-                                                                            <span className="truncate">{node.data.label}</span>
-                                                                        </button>
-                                                                    );
-                                                                });
-                                                            })()}
-                                                        </div>
-                                                    </PopoverContent>
-                                                </Popover>
-
+                                                {/* Discard Action */}
                                                 <button
                                                     onClick={() => handleDeleteInboxItem(item.id, item.type)}
                                                     className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors shrink-0"
@@ -620,6 +540,66 @@ const DashboardPage: FC = () => {
                                                 >
                                                     <Trash2 size={13} />
                                                 </button>
+                                            </div>
+
+                                            {/* Bottom Area: Search and Pills Grid */}
+                                            <div className="space-y-2 pt-2 border-t border-white/5 flex flex-col">
+                                                {/* Search Box */}
+                                                <div className="relative">
+                                                    <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-text-secondary h-3 w-3" />
+                                                    <Input
+                                                        placeholder="Search target node..."
+                                                        value={itemSearchQueries[item.id] || ''}
+                                                        onChange={(e) => setItemSearchQueries(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                                        className="pl-7 bg-surface/40 border-border/40 focus:border-accent text-[11px] rounded-lg h-7 text-white focus-visible:ring-0"
+                                                    />
+                                                </div>
+
+                                                {/* Pills List */}
+                                                <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1 py-0.5 custom-scrollbar">
+                                                    {(() => {
+                                                        const query = (itemSearchQueries[item.id] || '').toLowerCase().trim();
+                                                        const filtered = executionNodes.filter(node => {
+                                                            const label = node.data.label.toLowerCase();
+                                                            const path = resolveNodePath(node.id, nodes, edges).toLowerCase();
+                                                            return label.includes(query) || path.includes(query);
+                                                        });
+
+                                                        if (filtered.length === 0) {
+                                                            return (
+                                                                <div className="w-full py-1 text-[10px] text-text-secondary/70 italic pl-1">
+                                                                    No matching execution nodes.
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return filtered.map(node => {
+                                                            const hue = node.data.hue || 210;
+                                                            const path = resolveNodePath(node.id, nodes, edges);
+
+                                                            return (
+                                                                <button
+                                                                    key={node.id}
+                                                                    type="button"
+                                                                    onClick={() => handleMoveItem(item.id, item.type, node.id)}
+                                                                    style={{
+                                                                        borderColor: `hsla(${hue}, 70%, 50%, 0.2)`,
+                                                                        backgroundColor: `hsla(${hue}, 75%, 15%, 0.15)`
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1.5 py-0.5 px-2 rounded-md border text-[9px] font-medium text-text-secondary hover:text-white hover:border-white/20 transition-all max-w-full"
+                                                                    title={path ? `${path} > ${node.data.label}` : node.data.label}
+                                                                >
+                                                                    {/* Left Hue Dot */}
+                                                                    <span 
+                                                                        className="w-1.5 h-1.5 rounded-full shrink-0" 
+                                                                        style={{ backgroundColor: `hsl(${hue}, 70%, 55%)` }}
+                                                                    />
+                                                                    <span className="truncate">{node.data.label}</span>
+                                                                </button>
+                                                            );
+                                                        });
+                                                    })()}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
