@@ -358,7 +358,7 @@ const QuickCapture: FC = () => {
                             <Input
                                 id="inputText"
                                 ref={inputRef}
-                                placeholder={captureType === 'task' ? 'Code next layout, buy groceries...' : 'Paste website link, youtube or medium URL...'}
+                                placeholder={captureType === 'task' ? '' : 'Paste website link, youtube or medium URL...'}
                                 value={inputText}
                                 onChange={(e) => handleInputChange(e.target.value)}
                                 className="bg-surface border-border/80 focus:border-accent text-base rounded-2xl h-14 px-4 shadow-sm"
