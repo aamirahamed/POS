@@ -101,7 +101,7 @@ const resolveNodePath = (subnodeId: string, nodes: LifeMapNode[], edges: any[]):
 
 const QuickCapture: FC = () => {
     const navigate = useNavigate();
-    const { nodes, edges, addTaskToNode, addResource, deleteTaskFromNode, removeResource } = useLifeMapStore();
+    const { nodes, edges, addTaskToNode, addResource, deleteTaskFromNode, removeResource, loadFromDB } = useLifeMapStore();
     
     // States
     const [captureType, setCaptureType] = useState<'task' | 'resource'>('task');
@@ -114,12 +114,13 @@ const QuickCapture: FC = () => {
     
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Auto-focus main input on mount
+    // Load nodes from database and auto-focus main input on mount
     useEffect(() => {
+        loadFromDB();
         if (inputRef.current) {
             inputRef.current.focus();
         }
-    }, []);
+    }, [loadFromDB]);
 
     // Filter nodes list to include only subnodes (execution nodes)
     const subnodes = nodes.filter(n => n.type === 'subnode');

@@ -224,7 +224,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     
                     const layouted = calculateRadialLayout(newNodes, newEdges);
                     set({ nodes: layouted.nodes, edges: newEdges, nodeToDelete: null });
-                    debouncedSync(layouted.nodes, newEdges);
+                    immediateSync(layouted.nodes, newEdges);
                 },
 
                 addNode: (node) => {
@@ -264,7 +264,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
-                    debouncedSync(layouted.nodes, newEdges);
+                    immediateSync(layouted.nodes, newEdges);
                 },
 
                 addThread: (parentId, label) => {
@@ -316,7 +316,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
-                    debouncedSync(layouted.nodes, newEdges);
+                    immediateSync(layouted.nodes, newEdges);
                 },
 
                 addInitiative: (parentId, label) => {
@@ -356,7 +356,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
-                    debouncedSync(layouted.nodes, newEdges);
+                    immediateSync(layouted.nodes, newEdges);
                 },
 
                 addSubnode: (parentId, label) => {
@@ -401,7 +401,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
-                    debouncedSync(layouted.nodes, newEdges);
+                    immediateSync(layouted.nodes, newEdges);
                 },
 
                 addTaskToNode: (nodeId, text) => {
@@ -423,7 +423,7 @@ export const useLifeMapStore = create<LifeMapState>()(
 
                     const layouted = calculateRadialLayout(nodes, get().edges);
                     set({ nodes: layouted.nodes, lastLayoutTrigger: Date.now() });
-                    debouncedSync(layouted.nodes, get().edges);
+                    immediateSync(layouted.nodes, get().edges);
                 },
 
                 toggleNodeTask: (nodeId, taskId) => {
@@ -442,7 +442,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                         return node;
                     });
                     set({ nodes });
-                    debouncedSync(nodes, get().edges);
+                    immediateSync(nodes, get().edges);
                 },
 
                 deleteTaskFromNode: (nodeId, taskId) => {
@@ -459,7 +459,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                         return node;
                     });
                     set({ nodes });
-                    debouncedSync(nodes, get().edges);
+                    immediateSync(nodes, get().edges);
                 },
 
                 editTaskInNode: (nodeId, taskId, newText) => {
@@ -478,7 +478,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                         return node;
                     });
                     set({ nodes });
-                    debouncedSync(nodes, get().edges);
+                    immediateSync(nodes, get().edges);
                 },
 
                 lastLayoutTrigger: 0,
@@ -493,7 +493,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                         node.id === id ? { ...node, data: { ...node.data, ...data } } : node
                     );
                     set({ nodes });
-                    debouncedSync(nodes, get().edges);
+                    immediateSync(nodes, get().edges);
                 },
 
                 addResource: (nodeId, resource) => {

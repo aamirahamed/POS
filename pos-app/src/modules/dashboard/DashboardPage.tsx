@@ -25,7 +25,8 @@ const DashboardPage: FC = () => {
         addTaskToNode,
         addResource,
         deleteTaskFromNode,
-        removeResource
+        removeResource,
+        loadFromDB
     } = useLifeMapStore();
     const { reminders } = useRemindersStore();
     const { items: shoppingItems, addItem: addShoppingItem } = useShoppingStore();
@@ -37,6 +38,11 @@ const DashboardPage: FC = () => {
     const [showFocusSelector, setShowFocusSelector] = useState(false);
     const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
     const [triageSearchQuery, setTriageSearchQuery] = useState('');
+
+    // Load life map from DB on mount
+    useEffect(() => {
+        loadFromDB();
+    }, [loadFromDB]);
     
     // Live Time State
     const [now, setNow] = useState(new Date());
