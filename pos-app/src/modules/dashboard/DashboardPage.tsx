@@ -7,9 +7,12 @@ import { useTodayStore, BrainDumpItem, FocusItem } from '@/store/useTodayStore';
 import { processUserCommand } from '@/services/geminiService';
 import { useIncubatorStore } from '@/store/useIncubatorStore';
 import { CalendarSection } from './components/CalendarSection';
-import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, BrainCircuit, MessageSquare, Loader2, Bell, Clock, Calendar, Edit2, Trash2, RefreshCw, Check, Inbox, ExternalLink, Link as LinkIcon } from 'lucide-react';
+import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, BrainCircuit, MessageSquare, Loader2, Bell, Clock, Calendar, Edit2, Trash2, RefreshCw, Check, Inbox, ExternalLink, Link as LinkIcon, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
 
 const DashboardPage: FC = () => {
     const navigate = useNavigate();
@@ -32,6 +35,8 @@ const DashboardPage: FC = () => {
     const [dumpInput, setDumpInput] = useState('');
     const [isDumping, setIsDumping] = useState(false);
     const [showFocusSelector, setShowFocusSelector] = useState(false);
+    const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+    const [triageSearchQuery, setTriageSearchQuery] = useState('');
     
     // Live Time State
     const [now, setNow] = useState(new Date());
@@ -523,21 +528,84 @@ const DashboardPage: FC = () => {
 
                                             {/* Dropdown & Actions */}
                                             <div className="flex items-center gap-2 shrink-0">
-                                                <select
-                                                    value=""
-                                                    onChange={(e) => handleMoveItem(item.id, item.type, e.target.value)}
-                                                    className="bg-surface border border-border/80 text-text-secondary hover:text-white text-xs font-bold py-1.5 px-2.5 rounded-xl focus:outline-none focus:border-accent cursor-pointer max-w-[150px] truncate"
+                                                <Popover 
+                                                    open={openPopoverId === item.id} 
+                                                    onOpenChange={(open) => {
+                                                        setOpenPopoverId(open ? item.id : null);
+                                                        setTriageSearchQuery('');
+                                                    }}
                                                 >
-                                                    <option value="" disabled>Assign Node...</option>
-                                                    {executionNodes.map(node => {
-                                                        const path = resolveNodePath(node.id, nodes, edges);
-                                                        return (
-                                                            <option key={node.id} value={node.id}>
-                                                                {path ? `${path} > ${node.data.label}` : node.data.label}
-                                                            </option>
-                                                        );
-                                                    })}
-                                                </select>
+                                                    <PopoverTrigger asChild>
+                                                        <Button 
+                                                            variant="outline" 
+                                                            size="sm" 
+                                                            className="bg-surface hover:bg-surface-hover border-border/80 text-text-secondary hover:text-white text-xs font-bold h-8 py-0 px-2.5 rounded-xl transition-all"
+                                                        >
+                                                            Assign Node...
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-80 p-3 bg-surface-elevated/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl flex flex-col gap-3 z-[110]">
+                                                        {/* Search input inside Popover */}
+                                                        <div className="relative">
+                                                            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-text-secondary h-3.5 w-3.5" />
+                                                            <Input
+                                                                placeholder="Search execution nodes..."
+                                                                value={triageSearchQuery}
+                                                                onChange={(e) => setTriageSearchQuery(e.target.value)}
+                                                                className="pl-8 bg-surface border-border/40 focus:border-accent text-xs rounded-xl h-8 text-white focus-visible:ring-1 focus-visible:ring-accent"
+                                                            />
+                                                        </div>
+
+                                                        {/* Scrollable Pills Container */}
+                                                        <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto pr-1 py-1">
+                                                            {(() => {
+                                                                const query = triageSearchQuery.toLowerCase().trim();
+                                                                const filtered = executionNodes.filter(node => {
+                                                                    const label = node.data.label.toLowerCase();
+                                                                    const path = resolveNodePath(node.id, nodes, edges).toLowerCase();
+                                                                    return label.includes(query) || path.includes(query);
+                                                                });
+
+                                                                if (filtered.length === 0) {
+                                                                    return (
+                                                                        <div className="w-full text-center py-4 text-xs text-text-secondary italic">
+                                                                            No execution nodes found.
+                                                                        </div>
+                                                                    );
+                                                                }
+
+                                                                return filtered.map(node => {
+                                                                    const hue = node.data.hue || 210;
+                                                                    const path = resolveNodePath(node.id, nodes, edges);
+
+                                                                    return (
+                                                                        <button
+                                                                            key={node.id}
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                handleMoveItem(item.id, item.type, node.id);
+                                                                                setOpenPopoverId(null);
+                                                                            }}
+                                                                            style={{
+                                                                                borderColor: `hsla(${hue}, 70%, 50%, 0.25)`,
+                                                                                backgroundColor: `hsla(${hue}, 75%, 15%, 0.25)`
+                                                                            }}
+                                                                            className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-lg border text-[10px] font-semibold text-text-secondary hover:text-white hover:border-white/20 transition-all max-w-full"
+                                                                            title={path ? `${path} > ${node.data.label}` : node.data.label}
+                                                                        >
+                                                                            {/* Left Hue Dot */}
+                                                                            <span 
+                                                                                className="w-1.5 h-1.5 rounded-full shrink-0" 
+                                                                                style={{ backgroundColor: `hsl(${hue}, 70%, 55%)` }}
+                                                                            />
+                                                                            <span className="truncate">{node.data.label}</span>
+                                                                        </button>
+                                                                    );
+                                                                });
+                                                            })()}
+                                                        </div>
+                                                    </PopoverContent>
+                                                </Popover>
 
                                                 <button
                                                     onClick={() => handleDeleteInboxItem(item.id, item.type)}
