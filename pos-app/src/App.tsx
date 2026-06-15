@@ -11,6 +11,7 @@ import AuthWrapper from '@/modules/auth/AuthWrapper';
 import ThoughtIncubatorPage from '@/modules/incubator/ThoughtIncubatorPage';
 import FinancePage from '@/modules/finance/FinancePage';
 import QuickCapture from '@/modules/capture/QuickCapture';
+import { Toaster } from '@/components/ui/sonner';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster />
     </AuthWrapper>
   );
 }
