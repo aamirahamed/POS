@@ -7,21 +7,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { toast } from 'sonner';
 import { 
     Zap, 
     ArrowLeft, 
     Check, 
-    ChevronsUpDown, 
     Sparkles, 
     Link as LinkIcon, 
     FileText, 
     Clock, 
     Trash2, 
     ExternalLink, 
-    CheckCircle2
+    CheckCircle2,
+    Search,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -108,7 +108,8 @@ const QuickCapture: FC = () => {
     const [inputText, setInputText] = useState('');
     const [resourceTitle, setResourceTitle] = useState('');
     const [selectedNodeId, setSelectedNodeId] = useState<string>('subnode-inbox');
-    const [openSelect, setOpenSelect] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showAllNodes, setShowAllNodes] = useState(false);
     const [isManualOverride, setIsManualOverride] = useState(false);
     
     const inputRef = useRef<HTMLInputElement>(null);
@@ -122,6 +123,32 @@ const QuickCapture: FC = () => {
 
     // Filter nodes list to include only subnodes (execution nodes)
     const subnodes = nodes.filter(n => n.type === 'subnode');
+
+    // Rank subnodes based on count of tasks they contain
+    // inbox captures always goes first
+    const inboxSubnode = subnodes.find(n => n.id === 'subnode-inbox');
+    const otherSubnodes = subnodes.filter(n => n.id !== 'subnode-inbox');
+    const rankedOtherSubnodes = [...otherSubnodes].sort((a, b) => {
+        const aCount = a.data.tasks?.length || 0;
+        const bCount = b.data.tasks?.length || 0;
+        return bCount - aCount;
+    });
+    const allRankedSubnodes = inboxSubnode ? [inboxSubnode, ...rankedOtherSubnodes] : rankedOtherSubnodes;
+
+    // Filter subnodes by search query
+    const filteredSubnodes = allRankedSubnodes.filter(node => {
+        const label = node.data.label.toLowerCase();
+        const path = resolveNodePath(node.id, nodes, edges).toLowerCase();
+        const query = searchQuery.toLowerCase().trim();
+        return label.includes(query) || path.includes(query);
+    });
+
+    // Determine which subnodes to show as pills
+    // If searching, show all matching subnodes
+    // If not searching, show top 10 (or expand to all if showAllNodes is true)
+    const visibleSubnodes = searchQuery.trim() !== ''
+        ? filteredSubnodes
+        : (showAllNodes ? filteredSubnodes : filteredSubnodes.slice(0, 10));
 
     // Handle input change and auto-detect URL
     const handleInputChange = (val: string) => {
@@ -265,208 +292,224 @@ const QuickCapture: FC = () => {
                     variant="ghost" 
                     size="icon" 
                     onClick={() => navigate(-1)}
-                    className="h-9 w-9 rounded-lg"
+                    className="h-10 w-10 rounded-lg text-text-secondary hover:text-white hover:bg-surface-elevated"
                 >
-                    <ArrowLeft size={18} />
+                    <ArrowLeft size={20} />
                 </Button>
-                <div className="flex items-center gap-1.5 font-bold tracking-tight text-white">
-                    <Zap size={16} className="text-accent fill-accent/15" />
+                <div className="flex items-center gap-2 font-bold tracking-tight text-white text-lg">
+                    <Zap size={18} className="text-accent fill-accent/15" />
                     <span>Quick Capture</span>
                 </div>
-                <div className="w-9 h-9" /> {/* Spacer for symmetry */}
+                <div className="w-10 h-10" /> {/* Spacer for symmetry */}
             </div>
 
-            <div className="w-full max-w-md px-4 sm:px-0 mt-3 sm:mt-6 space-y-6">
+            {/* Main Content Area */}
+            <div className="w-full max-w-md px-4 sm:px-0 mt-4 sm:mt-6 flex-1 flex flex-col justify-between">
                 
-                {/* Form Card */}
-                <Card className="border-none sm:border border-border/60 bg-transparent sm:bg-surface/80 backdrop-blur-sm shadow-none sm:shadow-xl rounded-none sm:rounded-2xl overflow-hidden relative">
-                    <CardHeader className="px-0 sm:px-6 pb-2 pt-4 sm:pt-6">
-                        <CardTitle className="text-lg font-bold flex items-center gap-2 text-white">
-                            <Sparkles size={16} className="text-accent" />
-                            <span>Capture Idea</span>
-                        </CardTitle>
-                        <CardDescription className="text-xs text-text-secondary">
-                            Auto-detects URLs. Leave Node empty to place in Inbox.
-                        </CardDescription>
-                    </CardHeader>
+                {/* FIRST FOLD: The Capturing Form */}
+                <div className="space-y-6 flex-1">
                     
-                    <CardContent className="px-0 sm:px-6 pb-4 sm:pb-6 space-y-4">
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            
-                            {/* Segmented control for Type */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Capture Type</Label>
-                                <div className="grid grid-cols-2 gap-1 p-1 bg-surface-elevated border border-border/40 rounded-xl">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleTypeSelect('task')}
-                                        className={cn(
-                                            "flex items-center justify-center gap-2 py-3 sm:py-2.5 rounded-lg text-xs font-semibold transition-all duration-200",
-                                            captureType === 'task' 
-                                                ? "bg-accent text-white shadow-md" 
-                                                : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                                        )}
-                                    >
-                                        <FileText size={14} />
-                                        <span>Task / Todo</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleTypeSelect('resource')}
-                                        className={cn(
-                                            "flex items-center justify-center gap-2 py-3 sm:py-2.5 rounded-lg text-xs font-semibold transition-all duration-200",
-                                            captureType === 'resource' 
-                                                ? "bg-accent text-white shadow-md" 
-                                                : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                                        )}
-                                    >
-                                        <LinkIcon size={14} />
-                                        <span>Link / Resource</span>
-                                    </button>
-                                </div>
-                            </div>
+                    {/* Header Banner */}
+                    <div className="flex items-center gap-2 px-1 py-1">
+                        <Sparkles size={18} className="text-accent" />
+                        <h2 className="text-lg font-bold text-white">Capture Idea</h2>
+                    </div>
 
-                            {/* Main Text Input */}
-                            <div className="space-y-1.5">
-                                <Label htmlFor="inputText" className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                                    {captureType === 'task' ? 'Task Description' : 'Resource URL'}
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        
+                        {/* Segmented control for Type */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-0.5">Capture Type</Label>
+                            <div className="grid grid-cols-2 gap-1.5 p-1.5 bg-surface-elevated border border-border/40 rounded-2xl">
+                                <button
+                                    type="button"
+                                    onClick={() => handleTypeSelect('task')}
+                                    className={cn(
+                                        "flex items-center justify-center gap-2.5 py-3.5 sm:py-3 rounded-xl text-sm font-bold transition-all duration-200 active:scale-98",
+                                        captureType === 'task' 
+                                            ? "bg-accent text-white shadow-lg shadow-accent/10" 
+                                            : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                                    )}
+                                >
+                                    <FileText size={16} />
+                                    <span>Task / Todo</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleTypeSelect('resource')}
+                                    className={cn(
+                                        "flex items-center justify-center gap-2.5 py-3.5 sm:py-3 rounded-xl text-sm font-bold transition-all duration-200 active:scale-98",
+                                        captureType === 'resource' 
+                                            ? "bg-accent text-white shadow-lg shadow-accent/10" 
+                                            : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                                    )}
+                                >
+                                    <LinkIcon size={16} />
+                                    <span>Link / Resource</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Main Text Input */}
+                        <div className="space-y-2">
+                            <Label htmlFor="inputText" className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-0.5">
+                                {captureType === 'task' ? 'Task Description' : 'Resource URL'}
+                            </Label>
+                            <Input
+                                id="inputText"
+                                ref={inputRef}
+                                placeholder={captureType === 'task' ? 'Code next layout, buy groceries...' : 'Paste website link, youtube or medium URL...'}
+                                value={inputText}
+                                onChange={(e) => handleInputChange(e.target.value)}
+                                className="bg-surface border-border/80 focus:border-accent text-base rounded-2xl h-14 px-4 shadow-sm"
+                            />
+                        </div>
+
+                        {/* Optional Title Input for resources */}
+                        {captureType === 'resource' && (
+                            <div className="space-y-2 animate-in fade-in slide-in-from-top-3 duration-350">
+                                <Label htmlFor="resourceTitle" className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-0.5">
+                                    Resource Title <span className="text-text-secondary/40 font-normal lowercase">(optional)</span>
                                 </Label>
                                 <Input
-                                    id="inputText"
-                                    ref={inputRef}
-                                    placeholder={captureType === 'task' ? 'Buy groceries, code next layout...' : 'Paste youtube.com, medium.com or website URL...'}
-                                    value={inputText}
-                                    onChange={(e) => handleInputChange(e.target.value)}
-                                    className="bg-surface border-border/80 focus:border-accent text-base md:text-sm rounded-xl py-6 sm:py-5"
+                                    id="resourceTitle"
+                                    placeholder="Add a friendly title..."
+                                    value={resourceTitle}
+                                    onChange={(e) => setResourceTitle(e.target.value)}
+                                    className="bg-surface border-border/80 focus:border-accent text-base rounded-2xl h-14 px-4 shadow-sm"
                                 />
                             </div>
+                        )}
 
-                            {/* Optional Title Input for resources */}
-                            {captureType === 'resource' && (
-                                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                                    <Label htmlFor="resourceTitle" className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                                        Resource Title <span className="text-text-secondary/50 font-normal lowercase">(optional)</span>
-                                    </Label>
-                                    <Input
-                                        id="resourceTitle"
-                                        placeholder="Add a friendly title (e.g. NextJS Routing Video)..."
-                                        value={resourceTitle}
-                                        onChange={(e) => setResourceTitle(e.target.value)}
-                                        className="bg-surface border-border/80 focus:border-accent text-base md:text-sm rounded-xl py-6 sm:py-5"
-                                    />
-                                </div>
-                            )}
-
-                            {/* Execution Node Combobox Dropdown */}
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Target Execution Node</Label>
-                                <Popover open={openSelect} onOpenChange={setOpenSelect}>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            role="combobox"
-                                            aria-expanded={openSelect}
-                                            className="w-full justify-between bg-surface border-border/80 hover:bg-surface text-text-primary text-base md:text-sm font-normal rounded-xl py-6 sm:py-5 shadow-sm"
-                                        >
-                                            <span className="truncate">
-                                                {selectedNodeId === 'subnode-inbox' 
-                                                    ? 'Inbox (Threadless Captures)' 
-                                                    : subnodes.find(n => n.id === selectedNodeId)?.data.label || 'Inbox (Threadless)'}
-                                            </span>
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[calc(100vw-32px)] max-w-sm p-0 border-border bg-surface shadow-2xl rounded-2xl overflow-hidden z-[1000]">
-                                        <Command className="bg-surface text-text-primary">
-                                            <CommandInput placeholder="Search execution nodes..." className="text-base md:text-sm py-3 border-none bg-surface-elevated text-text-primary" />
-                                            <CommandList className="max-h-[200px] overflow-auto">
-                                                <CommandEmpty>No execution nodes found.</CommandEmpty>
-                                                <CommandGroup>
-                                                    <CommandItem
-                                                        value="inbox-subnode-threadless"
-                                                        onSelect={() => {
-                                                            setSelectedNodeId('subnode-inbox');
-                                                            setOpenSelect(false);
-                                                        }}
-                                                        className="cursor-pointer text-xs font-semibold py-2.5 px-3 flex items-center justify-between"
-                                                    >
-                                                        <span>📥 Inbox (Threadless captures)</span>
-                                                        {selectedNodeId === 'subnode-inbox' && <Check className="h-4 w-4 text-accent" />}
-                                                    </CommandItem>
-                                                    {subnodes
-                                                        .filter(n => n.id !== 'subnode-inbox')
-                                                        .map((node) => {
-                                                            const path = resolveNodePath(node.id, nodes, edges);
-                                                            return (
-                                                                <CommandItem
-                                                                    key={node.id}
-                                                                    value={`${node.data.label} ${path}`}
-                                                                    onSelect={() => {
-                                                                        setSelectedNodeId(node.id);
-                                                                        setOpenSelect(false);
-                                                                    }}
-                                                                    className="cursor-pointer py-3 px-3 flex flex-col items-start gap-0.5 border-t border-border/10"
-                                                                >
-                                                                    <div className="flex items-center justify-between w-full">
-                                                                        <span className="font-bold text-xs text-white">{node.data.label}</span>
-                                                                        {selectedNodeId === node.id && <Check className="h-4 w-4 text-accent shrink-0" />}
-                                                                    </div>
-                                                                    <span className="text-[10px] text-text-secondary truncate max-w-full font-medium">
-                                                                        {path}
-                                                                    </span>
-                                                                </CommandItem>
-                                                            );
-                                                        })
-                                                    }
-                                                </CommandGroup>
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                                {selectedNodeId && selectedNodeId !== 'subnode-inbox' && (
-                                    <div className="text-[10px] text-text-secondary font-semibold pl-1">
-                                        Path: {resolveNodePath(selectedNodeId, nodes, edges)}
-                                    </div>
+                        {/* Pill-based Execution Node Selector */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-0.5">Target Execution Node</Label>
+                                {searchQuery.trim() === '' && subnodes.length > 10 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAllNodes(!showAllNodes)}
+                                        className="text-accent hover:text-accent-hover text-xs font-bold flex items-center gap-1 transition-colors py-1 px-1.5 rounded hover:bg-accent/5"
+                                    >
+                                        <span>{showAllNodes ? 'Show Less' : `Show All (${subnodes.length})`}</span>
+                                        {showAllNodes ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                    </button>
                                 )}
                             </div>
 
-                            {/* Submit Button */}
-                            <Button 
-                                type="submit" 
-                                className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-6 sm:py-5 rounded-xl shadow-lg shadow-accent/20 transition-all text-sm mt-2 flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                            >
-                                <Zap size={14} className="fill-white" />
-                                <span>Capture Item</span>
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
+                            {/* Search Filter for Pills */}
+                            <div className="relative">
+                                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-text-secondary h-4 w-4" />
+                                <Input
+                                    placeholder="Filter nodes..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-10 bg-surface-elevated/40 border-border/40 focus:border-accent text-base rounded-xl h-11"
+                                />
+                            </div>
 
-                {/* Recent Items List */}
-                <div className="space-y-3">
+                            {/* Pills Grid Container */}
+                            <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto pr-1 py-1">
+                                {visibleSubnodes.length === 0 ? (
+                                    <div className="w-full text-center py-4 text-xs text-text-secondary italic">
+                                        No matching execution nodes found.
+                                    </div>
+                                ) : (
+                                    visibleSubnodes.map((node) => {
+                                        const hue = node.data.hue || 210;
+                                        const isSelected = selectedNodeId === node.id;
+                                        const taskCount = node.data.tasks?.length || 0;
+
+                                        return (
+                                            <button
+                                                key={node.id}
+                                                type="button"
+                                                onClick={() => setSelectedNodeId(node.id)}
+                                                style={{
+                                                    borderColor: isSelected ? `hsl(${hue}, 70%, 50%)` : 'rgba(255,255,255,0.08)',
+                                                    backgroundColor: isSelected ? `hsla(${hue}, 75%, 15%, 0.45)` : 'rgba(255,255,255,0.02)',
+                                                    color: isSelected ? 'white' : 'var(--text-secondary)'
+                                                }}
+                                                className={cn(
+                                                    "inline-flex items-center gap-2 py-2 px-3.5 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-95 hover:text-white",
+                                                    isSelected ? "shadow-md" : "hover:border-white/10 hover:bg-white/5"
+                                                )}
+                                            >
+                                                {/* Left Hue Dot */}
+                                                <span 
+                                                    className="w-2 h-2 rounded-full shrink-0" 
+                                                    style={{ backgroundColor: `hsl(${hue}, 70%, 55%)` }}
+                                                />
+                                                
+                                                <span className="truncate max-w-[150px]">{node.data.label}</span>
+                                                
+                                                {/* Task count badge */}
+                                                {taskCount > 0 && (
+                                                    <span className="bg-white/5 text-[9px] px-1 rounded font-bold">
+                                                        {taskCount}
+                                                    </span>
+                                                )}
+
+                                                {isSelected && <Check size={11} className="text-white shrink-0 ml-0.5" />}
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+                            
+                            {/* Selected Node Path Subtext */}
+                            {selectedNodeId && (
+                                <div className="text-[10px] text-text-secondary/70 font-semibold pl-1">
+                                    Path: {resolveNodePath(selectedNodeId, nodes, edges)}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Submit Button */}
+                        <Button 
+                            type="submit" 
+                            className="w-full bg-accent hover:bg-accent-hover text-white font-bold h-14 rounded-2xl shadow-xl shadow-accent/15 transition-all text-base mt-2 flex items-center justify-center gap-2 active:scale-[0.98]"
+                        >
+                            <Zap size={16} className="fill-white" />
+                            <span>Capture Item</span>
+                        </Button>
+                    </form>
+                </div>
+
+                {/* Divider to separate folds */}
+                <div className="w-full py-8 flex items-center justify-center opacity-30 select-none">
+                    <div className="w-full h-[1px] bg-border" />
+                    <span className="px-3 text-[10px] uppercase font-bold tracking-widest text-text-secondary whitespace-nowrap flex items-center gap-1.5">
+                        <Clock size={10} /> Scroll for Recents
+                    </span>
+                    <div className="w-full h-[1px] bg-border" />
+                </div>
+
+                {/* SECOND FOLD: Recent Captures list (below the fold) */}
+                <div className="space-y-4 pb-12">
                     <div className="flex items-center gap-2 px-1">
-                        <Clock size={14} className="text-text-secondary" />
-                        <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider">Recent Captures (Top 20)</h3>
+                        <Clock size={16} className="text-text-secondary" />
+                        <h3 className="text-sm font-bold text-text-secondary uppercase tracking-widest">Recent Captures (Top 20)</h3>
                     </div>
 
-                    <div className="space-y-2.5">
+                    <div className="space-y-3">
                         {recentCaptures.length === 0 ? (
                             <div className="text-center p-8 bg-surface/30 border border-dashed border-border/40 rounded-2xl text-xs text-text-secondary">
                                 No items captured recently. Try capturing a task or link above!
                             </div>
                         ) : (
                             recentCaptures.map((item) => (
-                                <Card key={item.id} className="border-border/40 bg-surface/50 hover:bg-surface/75 backdrop-blur-sm rounded-xl p-3 flex.col transition-colors group shadow-sm">
+                                <Card key={item.id} className="border-border/40 bg-surface/50 hover:bg-surface/75 backdrop-blur-sm rounded-2xl p-4 flex.col transition-colors group shadow-sm">
                                     <div className="flex items-start justify-between gap-3">
-                                        <div className="flex items-start gap-2.5 min-w-0">
+                                        <div className="flex items-start gap-3 min-w-0">
                                             <div className="mt-0.5 shrink-0">
                                                 {item.type === 'task' ? (
-                                                    <div className="p-1.5 rounded-lg bg-green-500/10 text-green-400 border border-green-500/20">
-                                                        <CheckCircle2 size={13} />
+                                                    <div className="p-2 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20">
+                                                        <CheckCircle2 size={15} />
                                                     </div>
                                                 ) : (
-                                                    <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                                        <LinkIcon size={13} />
+                                                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                                        <LinkIcon size={15} />
                                                     </div>
                                                 )}
                                             </div>
@@ -481,23 +524,23 @@ const QuickCapture: FC = () => {
                                                         href={cleanUrl(item.details)} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer"
-                                                        className="text-[10px] text-accent hover:underline flex items-center gap-0.5 mt-1 select-none font-medium truncate max-w-[200px]"
+                                                        className="text-[10px] text-accent hover:underline inline-flex items-center gap-0.5 mt-1 select-none font-bold truncate max-w-[200px]"
                                                     >
                                                         <span>Open link</span>
-                                                        <ExternalLink size={8} />
+                                                        <ExternalLink size={9} />
                                                     </a>
                                                 )}
 
                                                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                                                    <Badge variant="secondary" className="text-[9px] font-bold px-1.5 py-0 bg-surface-elevated text-text-secondary border border-border/20 rounded">
+                                                    <Badge variant="secondary" className="text-[9px] font-bold px-2 py-0.5 bg-surface-elevated text-text-secondary border border-border/20 rounded-lg">
                                                         {item.nodeLabel}
                                                     </Badge>
-                                                    <span className="text-[9px] text-text-secondary font-medium">
+                                                    <span className="text-[10px] text-text-secondary font-medium">
                                                         &bull; {formatTimeAgo(item.createdAt)}
                                                     </span>
                                                 </div>
                                                 {item.path && item.nodeId !== 'subnode-inbox' && (
-                                                    <div className="text-[8px] text-text-secondary/60 font-semibold truncate mt-1">
+                                                    <div className="text-[9px] text-text-secondary/60 font-semibold truncate mt-1">
                                                         {item.path}
                                                     </div>
                                                 )}
@@ -508,10 +551,10 @@ const QuickCapture: FC = () => {
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => handleDeleteRecent(item.id, item.nodeId, item.type)}
-                                            className="h-7 w-7 text-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg shrink-0"
+                                            className="h-8 w-8 text-text-secondary hover:text-red-400 hover:bg-red-500/10 rounded-lg shrink-0"
                                             title="Delete Capture"
                                         >
-                                            <Trash2 size={13} />
+                                            <Trash2 size={14} />
                                         </Button>
                                     </div>
                                 </Card>
