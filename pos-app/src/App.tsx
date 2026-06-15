@@ -10,6 +10,7 @@ import ShoppingListPage from '@/modules/shopping/ShoppingListPage';
 import AuthWrapper from '@/modules/auth/AuthWrapper';
 import ThoughtIncubatorPage from '@/modules/incubator/ThoughtIncubatorPage';
 import FinancePage from '@/modules/finance/FinancePage';
+import QuickCapture from '@/modules/capture/QuickCapture';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
             <Route path="shopping" element={<ShoppingListPage />} />
             <Route path="incubator" element={<ThoughtIncubatorPage />} />
             <Route path="finance" element={<FinancePage />} />
+            <Route path="quick-capture" element={<QuickCapture />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

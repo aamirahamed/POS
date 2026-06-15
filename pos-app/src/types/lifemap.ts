@@ -11,6 +11,7 @@ export interface Resource {
     type: ResourceType;
     fileName?: string;  // for file attachments
     fileSize?: number;  // bytes, for attachments
+    createdAt?: number; // for tracking capture time
 }
 
 export interface ContextCanvas {
@@ -30,7 +31,7 @@ export interface LifeMapNode extends Node {
         parentId?: string;
         editing?: boolean;
         hue?: number;
-        tasks?: { id: string; text: string; completed: boolean }[];
+        tasks?: { id: string; text: string; completed: boolean; createdAt?: number }[];
         priority?: 'low' | 'medium' | 'high';
         notes?: string;
         contextRich?: string;

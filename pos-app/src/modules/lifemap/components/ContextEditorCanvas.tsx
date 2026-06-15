@@ -8,9 +8,9 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
-import { 
-    ArrowLeft, Bold, Italic, List, ListOrdered, CheckSquare, 
-    Heading1, Heading2, Link as LinkIcon, Image as ImageIcon, 
+import {
+    ArrowLeft, Bold, Italic, List, ListOrdered, CheckSquare,
+    Heading1, Heading2, Link as LinkIcon, Image as ImageIcon,
     Undo, Redo, CheckCircle2, Loader2
 } from 'lucide-react';
 
@@ -53,7 +53,7 @@ const MenuBar = ({ editor }: { editor: any }) => {
         editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     };
 
-    const toggleBtnClass = (isActive: boolean) => 
+    const toggleBtnClass = (isActive: boolean) =>
         `p-2 rounded-md transition-colors ${isActive ? 'bg-white/20 text-white' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`;
 
     return (
@@ -81,7 +81,7 @@ const ContextEditorCanvas: FC<ContextEditorCanvasProps> = ({ nodeId, canvasId, o
     const { nodes, updateNode } = useLifeMapStore();
     const node = nodes.find(n => n.id === nodeId);
     const canvas = node?.data.canvases?.find(c => c.id === canvasId);
-    
+
     const [saveState, setSaveState] = useState<'saved' | 'saving'>('saved');
     const [title, setTitle] = useState(canvas?.title || 'Untitled Canvas');
 
@@ -89,7 +89,7 @@ const ContextEditorCanvas: FC<ContextEditorCanvasProps> = ({ nodeId, canvasId, o
         setSaveState('saving');
         const timeout = setTimeout(() => {
             if (!node || !node.data.canvases) return;
-            const updatedCanvases = node.data.canvases.map(c => 
+            const updatedCanvases = node.data.canvases.map(c =>
                 c.id === canvasId ? { ...c, content: html, title: newTitle, lastEdited: Date.now() } : c
             );
             updateNode(nodeId, { canvases: updatedCanvases, lastUpdated: Date.now() });
@@ -131,7 +131,7 @@ const ContextEditorCanvas: FC<ContextEditorCanvasProps> = ({ nodeId, canvasId, o
         let timeout: NodeJS.Timeout;
         if (saveState === 'saving' && editor && node && node.data.canvases) {
             timeout = setTimeout(() => {
-                const updatedCanvases = node.data.canvases!.map(c => 
+                const updatedCanvases = node.data.canvases!.map(c =>
                     c.id === canvasId ? { ...c, content: editor.getHTML(), title, lastEdited: Date.now() } : c
                 );
                 updateNode(nodeId, { canvases: updatedCanvases, lastUpdated: Date.now() });
@@ -144,7 +144,7 @@ const ContextEditorCanvas: FC<ContextEditorCanvasProps> = ({ nodeId, canvasId, o
     if (!node || !canvas) return null;
 
     return (
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0, scale: 0.98, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 10 }}
@@ -154,7 +154,7 @@ const ContextEditorCanvas: FC<ContextEditorCanvasProps> = ({ nodeId, canvasId, o
             {/* Header */}
             <div className="sticky top-0 z-20 bg-[#0f172a]/90 backdrop-blur-xl border-b border-white/5 py-4 px-6 md:px-12 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button 
+                    <button
                         onClick={onClose}
                         className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
                     >
@@ -166,8 +166,8 @@ const ContextEditorCanvas: FC<ContextEditorCanvasProps> = ({ nodeId, canvasId, o
                         <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold mb-0.5">
                             Canvas • {node.data.label as string}
                         </span>
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={title}
                             onChange={handleTitleChange}
                             placeholder="Untitled Canvas"
@@ -175,7 +175,7 @@ const ContextEditorCanvas: FC<ContextEditorCanvasProps> = ({ nodeId, canvasId, o
                         />
                     </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2 text-xs font-medium">
                     {saveState === 'saving' ? (
                         <span className="flex items-center gap-1.5 text-slate-400 bg-white/5 px-3 py-1.5 rounded-full">

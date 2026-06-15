@@ -81,11 +81,69 @@ const initialEdges = [
     { id: 'e4', source: 'center', target: 'p4', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
 ];
 
+const ensureInboxExists = (nodes: LifeMapNode[], edges: any[]): { nodes: LifeMapNode[], edges: any[] } => {
+    const hasInboxSubnode = nodes.some(n => n.id === 'subnode-inbox');
+    if (hasInboxSubnode) return { nodes, edges };
+
+    const inboxPillar: LifeMapNode = {
+        id: 'pillar-inbox',
+        type: 'pillar',
+        position: { x: -350, y: 0 },
+        data: { label: 'Inbox', expanded: true, hue: 240 },
+        zIndex: 50,
+    };
+
+    const inboxThread: LifeMapNode = {
+        id: 'thread-inbox',
+        type: 'thread',
+        position: { x: -350, y: 280 },
+        data: { label: 'Quick captures', parentId: 'pillar-inbox', expanded: true, hue: 240 },
+        zIndex: 40,
+    };
+
+    const inboxInitiative: LifeMapNode = {
+        id: 'initiative-inbox',
+        type: 'initiative',
+        position: { x: -350, y: 560 },
+        data: { label: 'Inbox Focus', parentId: 'thread-inbox', expanded: true, hue: 240, status: 'active' },
+        zIndex: 30,
+    };
+
+    const inboxSubnode: LifeMapNode = {
+        id: 'subnode-inbox',
+        type: 'subnode',
+        position: { x: -350, y: 840 },
+        data: {
+            label: 'Quick Captures',
+            parentId: 'initiative-inbox',
+            status: 'active',
+            hue: 240,
+            priority: 'medium',
+            tasks: [],
+            resources: [],
+            notes: 'Capture area for untagged items.',
+            lastUpdated: Date.now(),
+        },
+        zIndex: 20,
+    };
+
+    const newNodes = [...nodes, inboxPillar, inboxThread, inboxInitiative, inboxSubnode];
+    const newEdges = [
+        ...edges,
+        { id: 'e-center-pillar-inbox', source: 'center', target: 'pillar-inbox', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+        { id: 'e-pillar-inbox-thread-inbox', source: 'pillar-inbox', target: 'thread-inbox', type: 'smoothstep', animated: false, zIndex: 5, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+        { id: 'e-thread-inbox-initiative-inbox', source: 'thread-inbox', target: 'initiative-inbox', type: 'smoothstep', animated: false, zIndex: 3, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+        { id: 'e-initiative-inbox-subnode-inbox', source: 'initiative-inbox', target: 'subnode-inbox', type: 'default', animated: false, zIndex: 1, sourceHandle: 'source-bottom', targetHandle: 'target-top' }
+    ];
+
+    return calculateRadialLayout(newNodes, newEdges);
+};
+
 export const useLifeMapStore = create<LifeMapState>()(
     persist(
         (set, get) => {
-            // Calculate initial layout to ensure sorting and zIndex are correct from start
-            const { nodes: initNodes, edges: initEdges } = calculateRadialLayout(initialNodes, initialEdges);
+            // Ensure system inbox exists and calculate initial layout
+            const { nodes: initNodes, edges: initEdges } = ensureInboxExists(initialNodes, initialEdges);
 
             return {
                 nodes: initNodes,
@@ -107,8 +165,11 @@ export const useLifeMapStore = create<LifeMapState>()(
                     if (!user) return;
                     const map = await fetchLifeMap(user.id);
                     if (map?.nodes?.length) {
-                        const layouted = calculateRadialLayout(map.nodes, map.edges || []);
-                        set({ nodes: layouted.nodes, edges: map.edges || [] });
+                        const { nodes: layoutedNodes, edges: layoutedEdges } = ensureInboxExists(map.nodes, map.edges || []);
+                        set({ nodes: layoutedNodes, edges: layoutedEdges });
+                        if (layoutedNodes.length > map.nodes.length) {
+                            await saveLifeMap(user.id, layoutedNodes, layoutedEdges);
+                        }
                     }
                 },
                 confirmDeleteNode: () => {
@@ -322,7 +383,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                                     ...node.data,
                                     tasks: [
                                         ...(node.data.tasks || []),
-                                        { id: `task-${Date.now()}`, text, completed: false }
+                                        { id: `task-${Date.now()}`, text, completed: false, createdAt: Date.now() }
                                     ]
                                 }
                             };
@@ -408,11 +469,15 @@ export const useLifeMapStore = create<LifeMapState>()(
                 addResource: (nodeId, resource) => {
                     const nodes = get().nodes.map(node => {
                         if (node.id === nodeId) {
+                            const newResource = {
+                                ...resource,
+                                createdAt: resource.createdAt || Date.now()
+                            };
                             return {
                                 ...node,
                                 data: {
                                     ...node.data,
-                                    resources: [...(node.data.resources || []), resource],
+                                    resources: [...(node.data.resources || []), newResource],
                                     lastUpdated: Date.now(),
                                 },
                             };
