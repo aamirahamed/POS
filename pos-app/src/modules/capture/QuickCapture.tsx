@@ -257,7 +257,7 @@ const QuickCapture: FC = () => {
     };
 
     return (
-        <div className="min-h-full bg-background pb-12 flex flex-col items-center">
+        <div className="min-h-full bg-background pb-12 flex flex-col items-center px-0 sm:px-4">
             
             {/* Top Bar Navigation */}
             <div className="w-full max-w-md px-4 py-4 flex items-center justify-between border-b border-border/40 backdrop-blur-md sticky top-0 bg-background/80 z-20 shrink-0">
@@ -276,11 +276,11 @@ const QuickCapture: FC = () => {
                 <div className="w-9 h-9" /> {/* Spacer for symmetry */}
             </div>
 
-            <div className="w-full max-w-md px-4 mt-6 space-y-6">
+            <div className="w-full max-w-md px-4 sm:px-0 mt-3 sm:mt-6 space-y-6">
                 
                 {/* Form Card */}
-                <Card className="border-border/60 bg-surface/80 backdrop-blur-sm shadow-xl rounded-2xl overflow-hidden relative">
-                    <CardHeader className="pb-4 pt-6">
+                <Card className="border-none sm:border border-border/60 bg-transparent sm:bg-surface/80 backdrop-blur-sm shadow-none sm:shadow-xl rounded-none sm:rounded-2xl overflow-hidden relative">
+                    <CardHeader className="px-0 sm:px-6 pb-2 pt-4 sm:pt-6">
                         <CardTitle className="text-lg font-bold flex items-center gap-2 text-white">
                             <Sparkles size={16} className="text-accent" />
                             <span>Capture Idea</span>
@@ -290,7 +290,7 @@ const QuickCapture: FC = () => {
                         </CardDescription>
                     </CardHeader>
                     
-                    <CardContent className="space-y-4">
+                    <CardContent className="px-0 sm:px-6 pb-4 sm:pb-6 space-y-4">
                         <form onSubmit={handleSubmit} className="space-y-4">
                             
                             {/* Segmented control for Type */}
@@ -301,7 +301,7 @@ const QuickCapture: FC = () => {
                                         type="button"
                                         onClick={() => handleTypeSelect('task')}
                                         className={cn(
-                                            "flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200",
+                                            "flex items-center justify-center gap-2 py-3 sm:py-2.5 rounded-lg text-xs font-semibold transition-all duration-200",
                                             captureType === 'task' 
                                                 ? "bg-accent text-white shadow-md" 
                                                 : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
@@ -314,7 +314,7 @@ const QuickCapture: FC = () => {
                                         type="button"
                                         onClick={() => handleTypeSelect('resource')}
                                         className={cn(
-                                            "flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold transition-all duration-200",
+                                            "flex items-center justify-center gap-2 py-3 sm:py-2.5 rounded-lg text-xs font-semibold transition-all duration-200",
                                             captureType === 'resource' 
                                                 ? "bg-accent text-white shadow-md" 
                                                 : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
@@ -337,7 +337,7 @@ const QuickCapture: FC = () => {
                                     placeholder={captureType === 'task' ? 'Buy groceries, code next layout...' : 'Paste youtube.com, medium.com or website URL...'}
                                     value={inputText}
                                     onChange={(e) => handleInputChange(e.target.value)}
-                                    className="bg-surface border-border/80 focus:border-accent text-sm rounded-xl py-5"
+                                    className="bg-surface border-border/80 focus:border-accent text-base md:text-sm rounded-xl py-6 sm:py-5"
                                 />
                             </div>
 
@@ -352,7 +352,7 @@ const QuickCapture: FC = () => {
                                         placeholder="Add a friendly title (e.g. NextJS Routing Video)..."
                                         value={resourceTitle}
                                         onChange={(e) => setResourceTitle(e.target.value)}
-                                        className="bg-surface border-border/80 focus:border-accent text-sm rounded-xl py-5"
+                                        className="bg-surface border-border/80 focus:border-accent text-base md:text-sm rounded-xl py-6 sm:py-5"
                                     />
                                 </div>
                             )}
@@ -366,7 +366,7 @@ const QuickCapture: FC = () => {
                                             variant="outline"
                                             role="combobox"
                                             aria-expanded={openSelect}
-                                            className="w-full justify-between bg-surface border-border/80 hover:bg-surface text-text-primary text-sm font-normal rounded-xl py-5 shadow-sm"
+                                            className="w-full justify-between bg-surface border-border/80 hover:bg-surface text-text-primary text-base md:text-sm font-normal rounded-xl py-6 sm:py-5 shadow-sm"
                                         >
                                             <span className="truncate">
                                                 {selectedNodeId === 'subnode-inbox' 
@@ -378,7 +378,7 @@ const QuickCapture: FC = () => {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[calc(100vw-32px)] max-w-sm p-0 border-border bg-surface shadow-2xl rounded-2xl overflow-hidden z-[1000]">
                                         <Command className="bg-surface text-text-primary">
-                                            <CommandInput placeholder="Search execution nodes..." className="text-sm py-3 border-none bg-surface-elevated text-text-primary" />
+                                            <CommandInput placeholder="Search execution nodes..." className="text-base md:text-sm py-3 border-none bg-surface-elevated text-text-primary" />
                                             <CommandList className="max-h-[200px] overflow-auto">
                                                 <CommandEmpty>No execution nodes found.</CommandEmpty>
                                                 <CommandGroup>
@@ -433,7 +433,7 @@ const QuickCapture: FC = () => {
                             {/* Submit Button */}
                             <Button 
                                 type="submit" 
-                                className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-5 rounded-xl shadow-lg shadow-accent/20 transition-all text-sm mt-2 flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                                className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-6 sm:py-5 rounded-xl shadow-lg shadow-accent/20 transition-all text-sm mt-2 flex items-center justify-center gap-1.5 active:scale-[0.98]"
                             >
                                 <Zap size={14} className="fill-white" />
                                 <span>Capture Item</span>

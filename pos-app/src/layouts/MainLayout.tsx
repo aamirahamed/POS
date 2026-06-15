@@ -139,16 +139,18 @@ const MainLayout: FC = () => {
             {/* ── Main Content ── */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Mobile Top Bar */}
-                <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface/80 backdrop-blur-md border-b border-border/50 shrink-0 z-30">
-                    <button
-                        onClick={() => setSidebarOpen(true)}
-                        className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors"
-                        aria-label="Open menu"
-                    >
-                        <Menu size={22} />
-                    </button>
-                    <span className="text-base font-bold text-text-primary tracking-tight">POS</span>
-                </header>
+                {location.pathname !== '/quick-capture' && (
+                    <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface/80 backdrop-blur-md border-b border-border/50 shrink-0 z-30">
+                        <button
+                            onClick={() => setSidebarOpen(true)}
+                            className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors"
+                            aria-label="Open menu"
+                        >
+                            <Menu size={22} />
+                        </button>
+                        <span className="text-base font-bold text-text-primary tracking-tight">POS</span>
+                    </header>
+                )}
 
                 <main className="flex-1 overflow-auto relative">
                     <Outlet />
