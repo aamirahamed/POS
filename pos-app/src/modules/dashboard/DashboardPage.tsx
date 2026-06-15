@@ -7,14 +7,23 @@ import { useTodayStore, BrainDumpItem, FocusItem } from '@/store/useTodayStore';
 import { processUserCommand } from '@/services/geminiService';
 import { useIncubatorStore } from '@/store/useIncubatorStore';
 import { CalendarSection } from './components/CalendarSection';
-import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, BrainCircuit, MessageSquare, Loader2, Bell, Clock, Calendar, Edit2, Trash2, RefreshCw, Check } from 'lucide-react';
+import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, BrainCircuit, MessageSquare, Loader2, Bell, Clock, Calendar, Edit2, Trash2, RefreshCw, Check, Inbox, ExternalLink, Link as LinkIcon } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const DashboardPage: FC = () => {
     const navigate = useNavigate();
     
     // Stores
-    const { nodes, setCommandCenterOpen } = useLifeMapStore();
+    const { 
+        nodes, 
+        edges, 
+        setCommandCenterOpen,
+        addTaskToNode,
+        addResource,
+        deleteTaskFromNode,
+        removeResource
+    } = useLifeMapStore();
     const { reminders } = useRemindersStore();
     const { items: shoppingItems, addItem: addShoppingItem } = useShoppingStore();
     const { focusItems, brainDumpHistory, addFocusNode, removeFocusNode, addFocusNote, deleteFocusNote, addBrainDump, updateBrainDump, deleteBrainDump } = useTodayStore();
@@ -113,6 +122,86 @@ const DashboardPage: FC = () => {
         n.data.status !== 'completed' && n.data.status !== 'archived' &&
         !focusItems.some(f => f.id === n.id)
     );
+
+    // Filter out target execution nodes
+    const executionNodes = nodes.filter(n => n.type === 'subnode' && n.id !== 'subnode-inbox');
+
+    // Get inbox subnode items
+    const inboxSubnode = nodes.find(n => n.id === 'subnode-inbox');
+    const inboxTasks = inboxSubnode?.data?.tasks || [];
+    const inboxResources = inboxSubnode?.data?.resources || [];
+    const inboxItems = [
+        ...inboxTasks.map(t => ({ ...t, type: 'task' as const })),
+        ...inboxResources.map(r => ({ ...r, type: 'resource' as const, text: r.title }))
+    ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    const handleMoveItem = (itemId: string, type: 'task' | 'resource', targetNodeId: string) => {
+        const targetNode = nodes.find(n => n.id === targetNodeId);
+        const targetNodeLabel = targetNode?.data?.label || 'Target Node';
+
+        if (type === 'task') {
+            const task = inboxTasks.find(t => t.id === itemId);
+            if (task) {
+                addTaskToNode(targetNodeId, task.text);
+                deleteTaskFromNode('subnode-inbox', itemId);
+                toast.success(`Moved task to "${targetNodeLabel}"`);
+            }
+        } else {
+            const resource = inboxResources.find(r => r.id === itemId);
+            if (resource) {
+                addResource(targetNodeId, resource);
+                removeResource('subnode-inbox', itemId);
+                toast.success(`Moved resource to "${targetNodeLabel}"`);
+            }
+        }
+    };
+
+    const handleDeleteInboxItem = (itemId: string, type: 'task' | 'resource') => {
+        if (type === 'task') {
+            deleteTaskFromNode('subnode-inbox', itemId);
+            toast.success("Discarded inbox task");
+        } else {
+            removeResource('subnode-inbox', itemId);
+            toast.success("Discarded inbox resource");
+        }
+    };
+
+    const resolveNodePath = (subnodeId: string, nodesList: typeof nodes, edgesList: typeof edges): string => {
+        if (subnodeId === 'subnode-inbox') return 'Inbox';
+        const subnode = nodesList.find(n => n.id === subnodeId);
+        if (!subnode) return '';
+
+        const edgeToSubnode = edgesList.find(e => e.target === subnodeId);
+        if (!edgeToSubnode) return '';
+
+        const parentNode = nodesList.find(n => n.id === edgeToSubnode.source);
+        if (!parentNode) return '';
+
+        if (parentNode.type === 'initiative') {
+            const edgeToInit = edgesList.find(e => e.target === parentNode.id);
+            const threadNode = edgeToInit ? nodesList.find(n => n.id === edgeToInit.source) : null;
+
+            if (threadNode && threadNode.type === 'thread') {
+                const edgeToThread = edgesList.find(e => e.target === threadNode.id);
+                const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
+
+                if (pillarNode && pillarNode.type === 'pillar') {
+                    return `${pillarNode.data.label} > ${threadNode.data.label} > ${parentNode.data.label}`;
+                }
+                return `${threadNode.data.label} > ${parentNode.data.label}`;
+            }
+            return parentNode.data.label;
+        } else if (parentNode.type === 'thread') {
+            const edgeToThread = edgesList.find(e => e.target === parentNode.id);
+            const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
+
+            if (pillarNode && pillarNode.type === 'pillar') {
+                return `${pillarNode.data.label} > ${parentNode.data.label}`;
+            }
+            return parentNode.data.label;
+        }
+        return parentNode.data.label;
+    };
 
     // Render Focus Items with Notes & Duration
     const renderFocusItem = (focus: FocusItem) => {
@@ -387,6 +476,81 @@ const DashboardPage: FC = () => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* ── HORIZONTAL DIVIDER ── */}
+                        <div className="border-t border-border/60 mx-6" />
+
+                        {/* ── BOTTOM ROW: INBOX TRIAGE (100%) ── */}
+                        <div className="p-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                    <Inbox size={16} className="text-accent shrink-0" />
+                                    <span>Inbox Triage</span>
+                                    {inboxItems.length > 0 && (
+                                        <span className="bg-accent/10 border border-accent/20 text-accent text-xs px-2 py-0.5 rounded-full font-bold ml-1">
+                                            {inboxItems.length}
+                                        </span>
+                                    )}
+                                </h2>
+                                <span className="text-xs text-text-secondary">Threadless captures needing execution nodes</span>
+                            </div>
+
+                            {inboxItems.length === 0 ? (
+                                <div className="py-8 text-center text-xs text-text-secondary/70 italic flex flex-col items-center gap-2 bg-surface-elevated/20 border border-dashed border-border/40 rounded-2xl">
+                                    <span>🎉 All captured items are assigned! Your Inbox is completely clean.</span>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1">
+                                    {inboxItems.map(item => (
+                                        <div key={item.id} className="flex items-center justify-between gap-3 p-3 bg-surface-elevated/40 border border-border/40 hover:bg-surface-elevated/60 transition-colors rounded-2xl shadow-sm min-w-0">
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                {/* Type icon */}
+                                                <div className={`p-2 rounded-xl shrink-0 ${item.type === 'task' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
+                                                    {item.type === 'task' ? <Check size={14} /> : <LinkIcon size={14} />}
+                                                </div>
+                                                {/* Content */}
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-semibold text-white truncate">{item.text}</p>
+                                                    {item.type === 'resource' && item.url && (
+                                                        <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent font-bold hover:underline inline-flex items-center gap-0.5 mt-0.5 select-none">
+                                                            <span>View Link</span>
+                                                            <ExternalLink size={8} />
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Dropdown & Actions */}
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <select
+                                                    value=""
+                                                    onChange={(e) => handleMoveItem(item.id, item.type, e.target.value)}
+                                                    className="bg-surface border border-border/80 text-text-secondary hover:text-white text-xs font-bold py-1.5 px-2.5 rounded-xl focus:outline-none focus:border-accent cursor-pointer max-w-[150px] truncate"
+                                                >
+                                                    <option value="" disabled>Assign Node...</option>
+                                                    {executionNodes.map(node => {
+                                                        const path = resolveNodePath(node.id, nodes, edges);
+                                                        return (
+                                                            <option key={node.id} value={node.id}>
+                                                                {path ? `${path} > ${node.data.label}` : node.data.label}
+                                                            </option>
+                                                        );
+                                                    })}
+                                                </select>
+
+                                                <button
+                                                    onClick={() => handleDeleteInboxItem(item.id, item.type)}
+                                                    className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors shrink-0"
+                                                    title="Discard Item"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
