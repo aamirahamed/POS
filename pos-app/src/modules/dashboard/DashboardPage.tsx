@@ -3,15 +3,88 @@ import { useNavigate } from 'react-router-dom';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { useRemindersStore } from '@/store/useRemindersStore';
 import { useShoppingStore } from '@/store/useShoppingStore';
-import { useTodayStore, BrainDumpItem, FocusItem } from '@/store/useTodayStore';
-import { processUserCommand } from '@/services/geminiService';
-import { useIncubatorStore } from '@/store/useIncubatorStore';
+import { useTodayStore, FocusItem } from '@/store/useTodayStore';
 import { CalendarSection } from './components/CalendarSection';
-import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, BrainCircuit, MessageSquare, Loader2, Bell, Clock, Calendar, Edit2, Trash2, RefreshCw, Check, Inbox, ExternalLink, Link as LinkIcon, Search } from 'lucide-react';
+import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar, Trash2, Check, Inbox, ExternalLink, Link as LinkIcon, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+// Helper: check if string is URL
+const isUrl = (str: string) => {
+    try {
+        const parsed = new URL(str);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch (_) {
+        return /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/gi.test(str);
+    }
+};
+
+// Helper: detect resource type
+const detectResourceType = (urlStr: string): 'youtube' | 'article' | 'link' => {
+    const lower = urlStr.toLowerCase();
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+        return 'youtube';
+    }
+    if (
+        lower.includes('medium.com') || 
+        lower.includes('wikipedia.org') || 
+        lower.includes('substack.com') || 
+        lower.includes('/article/') || 
+        lower.includes('/blog/')
+    ) {
+        return 'article';
+    }
+    return 'link';
+};
+
+// Helper: clean URL
+const cleanUrl = (urlStr: string) => {
+    if (!/^https?:\/\//i.test(urlStr)) {
+        return `https://${urlStr}`;
+    }
+    return urlStr;
+};
+
+// Helper: Resolve parent path for subnodes
+const resolveNodePath = (subnodeId: string, nodesList: any[], edgesList: any[]): string => {
+    if (subnodeId === 'subnode-inbox') return 'Inbox';
+    const subnode = nodesList.find(n => n.id === subnodeId);
+    if (!subnode) return '';
+
+    const edgeToSubnode = edgesList.find(e => e.target === subnodeId);
+    if (!edgeToSubnode) return '';
+
+    const parentNode = nodesList.find(n => n.id === edgeToSubnode.source);
+    if (!parentNode) return '';
+
+    if (parentNode.type === 'initiative') {
+        const edgeToInit = edgesList.find(e => e.target === parentNode.id);
+        const threadNode = edgeToInit ? nodesList.find(n => n.id === edgeToInit.source) : null;
+
+        if (threadNode && threadNode.type === 'thread') {
+            const edgeToThread = edgesList.find(e => e.target === threadNode.id);
+            const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
+
+            if (pillarNode && pillarNode.type === 'pillar') {
+                return `${pillarNode.data.label} > ${threadNode.data.label} > ${parentNode.data.label}`;
+            }
+            return `${threadNode.data.label} > ${parentNode.data.label}`;
+        }
+        return parentNode.data.label;
+    } else if (parentNode.type === 'thread') {
+        const edgeToThread = edgesList.find(e => e.target === parentNode.id);
+        const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
+
+        if (pillarNode && pillarNode.type === 'pillar') {
+            return `${pillarNode.data.label} > ${parentNode.data.label}`;
+        }
+        return parentNode.data.label;
+    }
+    return parentNode.data.label;
+};
 
 const DashboardPage: FC = () => {
     const navigate = useNavigate();
@@ -29,13 +102,20 @@ const DashboardPage: FC = () => {
     } = useLifeMapStore();
     const { reminders } = useRemindersStore();
     const { items: shoppingItems, addItem: addShoppingItem } = useShoppingStore();
-    const { focusItems, brainDumpHistory, addFocusNode, removeFocusNode, addFocusNote, deleteFocusNote, addBrainDump, updateBrainDump, deleteBrainDump } = useTodayStore();
+    const { focusItems, addFocusNode, removeFocusNode } = useTodayStore();
 
     // Local State
-    const [dumpInput, setDumpInput] = useState('');
-    const [isDumping, setIsDumping] = useState(false);
     const [showFocusSelector, setShowFocusSelector] = useState(false);
     const [itemSearchQueries, setItemSearchQueries] = useState<Record<string, string>>({});
+
+    // Quick Capture States
+    const [captureType, setCaptureType] = useState<'task' | 'resource'>('task');
+    const [captureInputText, setCaptureInputText] = useState('');
+    const [captureResourceTitle, setCaptureResourceTitle] = useState('');
+    const [captureSelectedNodeId, setCaptureSelectedNodeId] = useState<string>('subnode-inbox');
+    const [captureSearchQuery, setCaptureSearchQuery] = useState('');
+    const [showAllNodes, setShowAllNodes] = useState(false);
+    const [isManualOverride, setIsManualOverride] = useState(false);
 
     // Load life map from DB on mount
     useEffect(() => {
@@ -57,73 +137,94 @@ const DashboardPage: FC = () => {
     const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
-    // Brain Dump Logic
-    const { addThought: addToIncubator } = useIncubatorStore();
+    // Quick Capture Logic & Helpers
+    const handleCaptureInputChange = (val: string) => {
+        setCaptureInputText(val);
 
-    const executeAction = async (text: string, isRetry = false, existingId?: string) => {
-        try {
-            const action = await processUserCommand(text, nodes);
-            
-            if (action.actionType === 'shopping' && action.shoppingItem) {
-                await addShoppingItem(action.shoppingItem);
-            } else if (action.actionType === 'reminder' && action.reminderText) {
-                useRemindersStore.getState().addReminder(action.reminderText);
-            } else if (action.actionType === 'lifemap' && action.lifeMapAction) {
-                const { typeToCreate, name, parentName } = action.lifeMapAction;
-                const { addPillar, addThread, addInitiative, addSubnode, addTaskToNode, addInboxItem } = useLifeMapStore.getState();
-                
-                if (typeToCreate === 'pillar') {
-                    addPillar(name);
-                } else if (parentName) {
-                    const query = parentName.toLowerCase();
-                    const match = nodes.find(n => n.data.label?.toString().toLowerCase() === query) 
-                               || nodes.find(n => n.data.label?.toString().toLowerCase().includes(query));
-                    if (match) {
-                        const normalizedType = typeToCreate.toLowerCase().trim();
-                        if (normalizedType === 'thread') addThread(match.id, name);
-                        else if (normalizedType === 'initiative') addInitiative(match.id, name);
-                        else if (normalizedType === 'subnode' || normalizedType === 'execution node') addSubnode(match.id, name);
-                        else if (normalizedType === 'task') addTaskToNode(match.id, name);
-                        else addInitiative(match.id, name);
-                    } else {
-                        addInboxItem(`[Orphaned] ${name}`);
-                    }
-                }
-            } else if (action.actionType === 'inbox' || action.actionType === 'question') {
-                // Route to Thought Incubator — the human-controlled holding space
-                const note = action.actionType === 'question'
-                    ? action.reply  // AI's clarifying question
-                    : 'Could not confidently classify this thought.';
-                addToIncubator(text, note);
-            }
+        if (val.trim() === '') {
+            setIsManualOverride(false);
+            setCaptureType('task');
+            return;
+        }
 
-            if (isRetry && existingId) {
-                updateBrainDump(existingId, { actionType: action.actionType, actionResult: action.reply });
+        if (!isManualOverride) {
+            if (isUrl(val)) {
+                setCaptureType('resource');
             } else {
-                addBrainDump({ text, actionType: action.actionType, actionResult: action.reply });
-            }
-
-        } catch (error: any) {
-            console.error(error);
-            useLifeMapStore.getState().addInboxItem(text);
-            if (isRetry && existingId) {
-                updateBrainDump(existingId, { actionType: 'error', actionResult: 'Saved to Inbox (Error)' });
-            } else {
-                addBrainDump({ text, actionType: 'error', actionResult: 'Saved to Inbox (Error)' });
+                setCaptureType('task');
             }
         }
     };
 
-    const handleBrainDump = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const text = dumpInput.trim();
-        if (!text) return;
-
-        setDumpInput('');
-        setIsDumping(true);
-        await executeAction(text);
-        setIsDumping(false);
+    const handleCaptureTypeSelect = (type: 'task' | 'resource') => {
+        setCaptureType(type);
+        setIsManualOverride(true);
     };
+
+    const handleCaptureSubmit = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        
+        const content = captureInputText.trim();
+        if (!content) {
+            toast.error('Please enter content to capture');
+            return;
+        }
+
+        const targetNode = captureSelectedNodeId || 'subnode-inbox';
+        const targetNodeLabel = nodes.find(n => n.id === targetNode)?.data.label || 'Inbox';
+
+        if (captureType === 'task') {
+            addTaskToNode(targetNode, content);
+            toast.success(`Task added to "${targetNodeLabel}"`);
+        } else {
+            // Resource
+            const url = cleanUrl(content);
+            const resType = detectResourceType(url);
+            const title = captureResourceTitle.trim() || content;
+
+            addResource(targetNode, {
+                id: `res-${Date.now()}`,
+                title,
+                url,
+                type: resType,
+                createdAt: Date.now()
+            });
+            toast.success(`Resource added to "${targetNodeLabel}"`);
+        }
+
+        // Reset state
+        setCaptureInputText('');
+        setCaptureResourceTitle('');
+        setIsManualOverride(false);
+        setCaptureType('task');
+    };
+
+    // Filter nodes list to include only subnodes (execution nodes)
+    const subnodes = nodes.filter(n => n.type === 'subnode');
+
+    // Rank subnodes based on count of tasks they contain
+    // inbox captures always goes first
+    const inboxSubnode = subnodes.find(n => n.id === 'subnode-inbox');
+    const otherSubnodes = subnodes.filter(n => n.id !== 'subnode-inbox');
+    const rankedOtherSubnodes = [...otherSubnodes].sort((a, b) => {
+        const aCount = a.data.tasks?.length || 0;
+        const bCount = b.data.tasks?.length || 0;
+        return bCount - aCount;
+    });
+    const allRankedSubnodes = inboxSubnode ? [inboxSubnode, ...rankedOtherSubnodes] : rankedOtherSubnodes;
+
+    // Filter subnodes by search query
+    const filteredSubnodes = allRankedSubnodes.filter(node => {
+        const label = node.data.label.toLowerCase();
+        const path = resolveNodePath(node.id, nodes, edges).toLowerCase();
+        const query = captureSearchQuery.toLowerCase().trim();
+        return label.includes(query) || path.includes(query);
+    });
+
+    // Determine which subnodes to show as pills
+    const visibleSubnodes = captureSearchQuery.trim() !== ''
+        ? filteredSubnodes
+        : (showAllNodes ? filteredSubnodes : filteredSubnodes.slice(0, 10));
 
     // Focus Candidates
     const focusCandidates = nodes.filter(n => 
@@ -136,7 +237,6 @@ const DashboardPage: FC = () => {
     const executionNodes = nodes.filter(n => n.type === 'subnode' && n.id !== 'subnode-inbox');
 
     // Get inbox subnode items
-    const inboxSubnode = nodes.find(n => n.id === 'subnode-inbox');
     const inboxTasks = inboxSubnode?.data?.tasks || [];
     const inboxResources = inboxSubnode?.data?.resources || [];
     const inboxItems = [
@@ -175,42 +275,6 @@ const DashboardPage: FC = () => {
         }
     };
 
-    const resolveNodePath = (subnodeId: string, nodesList: typeof nodes, edgesList: typeof edges): string => {
-        if (subnodeId === 'subnode-inbox') return 'Inbox';
-        const subnode = nodesList.find(n => n.id === subnodeId);
-        if (!subnode) return '';
-
-        const edgeToSubnode = edgesList.find(e => e.target === subnodeId);
-        if (!edgeToSubnode) return '';
-
-        const parentNode = nodesList.find(n => n.id === edgeToSubnode.source);
-        if (!parentNode) return '';
-
-        if (parentNode.type === 'initiative') {
-            const edgeToInit = edgesList.find(e => e.target === parentNode.id);
-            const threadNode = edgeToInit ? nodesList.find(n => n.id === edgeToInit.source) : null;
-
-            if (threadNode && threadNode.type === 'thread') {
-                const edgeToThread = edgesList.find(e => e.target === threadNode.id);
-                const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
-
-                if (pillarNode && pillarNode.type === 'pillar') {
-                    return `${pillarNode.data.label} > ${threadNode.data.label} > ${parentNode.data.label}`;
-                }
-                return `${threadNode.data.label} > ${parentNode.data.label}`;
-            }
-            return parentNode.data.label;
-        } else if (parentNode.type === 'thread') {
-            const edgeToThread = edgesList.find(e => e.target === parentNode.id);
-            const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
-
-            if (pillarNode && pillarNode.type === 'pillar') {
-                return `${pillarNode.data.label} > ${parentNode.data.label}`;
-            }
-            return parentNode.data.label;
-        }
-        return parentNode.data.label;
-    };
 
     // Render Focus Items with Notes & Duration
     const renderFocusItem = (focus: FocusItem) => {
@@ -269,61 +333,7 @@ const DashboardPage: FC = () => {
     };
 
 
-    // Render Editable Brain Dump Item
-    const BrainDumpItemCard = ({ item }: { item: BrainDumpItem }) => {
-        const [isEditing, setIsEditing] = useState(false);
-        const [editText, setEditText] = useState(item.text);
 
-        const handleSave = () => {
-            if (editText.trim() && editText !== item.text) {
-                updateBrainDump(item.id, { text: editText.trim() });
-                executeAction(editText.trim(), true, item.id);
-            }
-            setIsEditing(false);
-        };
-
-        return (
-            <div className={`flex flex-col p-4 bg-surface border border-border rounded-2xl shadow-sm group transition-all ${item.reviewed ? 'opacity-60' : ''}`}>
-                <div className="flex items-start justify-between">
-                    {isEditing ? (
-                        <div className="flex-1 flex items-center gap-2 mr-2">
-                            <input autoFocus value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSave()} onBlur={handleSave} className="flex-1 bg-surface-elevated border border-border rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-accent/50" />
-                        </div>
-                    ) : (
-                        <div className="text-sm text-white mb-2 flex items-start gap-2.5 flex-1">
-                            <MessageSquare size={16} className="text-text-secondary mt-0.5 shrink-0" />
-                            <span className={item.reviewed ? 'line-through text-text-secondary leading-relaxed' : 'leading-relaxed'}>{item.text}</span>
-                        </div>
-                    )}
-                    
-                    <div className="flex items-center gap-1 opacity-0 lg:group-hover:opacity-100 transition-opacity shrink-0">
-                        {!isEditing && (
-                            <>
-                                <button onClick={() => updateBrainDump(item.id, { reviewed: !item.reviewed })} className="p-1.5 text-text-secondary hover:text-emerald-400 rounded-lg hover:bg-surface-elevated" title="Mark Reviewed">
-                                    <Check size={14} />
-                                </button>
-                                <button onClick={() => setIsEditing(true)} className="p-1.5 text-text-secondary hover:text-blue-400 rounded-lg hover:bg-surface-elevated" title="Edit">
-                                    <Edit2 size={14} />
-                                </button>
-                                <button onClick={() => { setIsDumping(true); executeAction(item.text, true, item.id).finally(() => setIsDumping(false)); }} className="p-1.5 text-text-secondary hover:text-amber-400 rounded-lg hover:bg-surface-elevated" title="Retry Processing">
-                                    <RefreshCw size={14} />
-                                </button>
-                                <button onClick={() => deleteBrainDump(item.id)} className="p-1.5 text-text-secondary hover:text-red-400 rounded-lg hover:bg-surface-elevated" title="Delete">
-                                    <Trash2 size={14} />
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-                {!isEditing && (
-                    <div className="text-xs text-text-secondary flex items-center gap-1.5 pl-6 pr-12">
-                        <Bot size={12} className="text-accent shrink-0" />
-                        <span className="text-accent/90 truncate font-medium">{item.actionResult}</span>
-                    </div>
-                )}
-            </div>
-        );
-    };
 
     // Generate lightweight suggestions
     const suggestions = [];
@@ -450,40 +460,171 @@ const DashboardPage: FC = () => {
                             <div className="hidden md:block w-px bg-border/60 my-5" />
                             <div className="md:hidden mx-5 border-t border-border/60" />
 
-                            {/* ── RIGHT: BRAIN DUMP (38%) ── */}
-                            <div className="flex-[38] p-5 space-y-3 min-w-0">
-                                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                                    <BrainCircuit size={16} className="text-pink-400 shrink-0" />
-                                    Brain Dump
-                                </h2>
-
-                                <form onSubmit={handleBrainDump}>
-                                    <div className="relative flex items-center">
-                                        <input
-                                            type="text"
-                                            value={dumpInput}
-                                            onChange={(e) => setDumpInput(e.target.value)}
-                                            placeholder="Capture a thought..."
-                                            disabled={isDumping}
-                                            className="w-full bg-surface-elevated border border-border rounded-xl pl-4 pr-12 py-3 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-pink-500/40 focus:ring-1 focus:ring-pink-500/40 transition-all shadow-inner disabled:opacity-50"
-                                        />
+                            {/* ── RIGHT: QUICK CAPTURE (38%) ── */}
+                            <div className="flex-[38] p-5 space-y-4 min-w-0">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                        <Zap size={16} className="text-accent shrink-0 fill-accent/15" />
+                                        Quick Capture
+                                    </h2>
+                                    {captureSearchQuery.trim() === '' && subnodes.length > 10 && (
                                         <button
-                                            type="submit"
-                                            disabled={!dumpInput.trim() || isDumping}
-                                            className="absolute right-2 w-8 h-8 bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white rounded-lg flex items-center justify-center transition-colors shadow-sm"
+                                            type="button"
+                                            onClick={() => setShowAllNodes(!showAllNodes)}
+                                            className="text-accent hover:text-accent-hover text-xs font-bold flex items-center gap-0.5 transition-colors py-1 px-1.5 rounded hover:bg-accent/5"
                                         >
-                                            {isDumping ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+                                            <span>{showAllNodes ? 'Show Less' : `Show All (${subnodes.length})`}</span>
+                                            {showAllNodes ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                                        </button>
+                                    )}
+                                </div>
+
+                                <form onSubmit={handleCaptureSubmit} className="space-y-4">
+                                    {/* Segmented control for Type */}
+                                    <div className="grid grid-cols-2 gap-1 p-1 bg-surface-elevated border border-border/40 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCaptureTypeSelect('task')}
+                                            className={cn(
+                                                "flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all duration-200 active:scale-98",
+                                                captureType === 'task' 
+                                                    ? "bg-accent text-white shadow-md shadow-accent/10" 
+                                                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                                            )}
+                                        >
+                                            <FileText size={13} />
+                                            <span>Task / Todo</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCaptureTypeSelect('resource')}
+                                            className={cn(
+                                                "flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all duration-200 active:scale-98",
+                                                captureType === 'resource' 
+                                                    ? "bg-accent text-white shadow-md shadow-accent/10" 
+                                                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                                            )}
+                                        >
+                                            <LinkIcon size={13} />
+                                            <span>Link / Resource</span>
                                         </button>
                                     </div>
-                                </form>
 
-                                {brainDumpHistory.length > 0 && (
-                                    <div className="flex flex-col gap-2 pt-1">
-                                        {brainDumpHistory.slice(0, 6).map(item => (
-                                            <BrainDumpItemCard key={item.id} item={item} />
-                                        ))}
+                                    {/* Main Text Input */}
+                                    <div className="space-y-1">
+                                        <label htmlFor="captureInputText" className="text-[10px] font-bold text-text-secondary uppercase tracking-widest pl-0.5">
+                                            {captureType === 'task' ? 'Task Description' : 'Resource URL'}
+                                        </label>
+                                        <Input
+                                            id="captureInputText"
+                                            placeholder={captureType === 'task' ? '' : 'Paste link or URL...'}
+                                            value={captureInputText}
+                                            onChange={(e) => handleCaptureInputChange(e.target.value)}
+                                            className="bg-surface-elevated border-border/60 focus:border-accent text-sm rounded-xl h-10 px-3 shadow-inner"
+                                        />
                                     </div>
-                                )}
+
+                                    {/* Optional Title Input for resources */}
+                                    {captureType === 'resource' && (
+                                        <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                                            <label htmlFor="captureResourceTitle" className="text-[10px] font-bold text-text-secondary uppercase tracking-widest pl-0.5">
+                                                Resource Title <span className="text-text-secondary/40 font-normal lowercase">(optional)</span>
+                                            </label>
+                                            <Input
+                                                id="captureResourceTitle"
+                                                placeholder="Add a friendly title..."
+                                                value={captureResourceTitle}
+                                                onChange={(e) => setCaptureResourceTitle(e.target.value)}
+                                                className="bg-surface-elevated border-border/60 focus:border-accent text-sm rounded-xl h-10 px-3 shadow-inner"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Pill-based Execution Node Selector */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest pl-0.5">Target Execution Node</label>
+                                        </div>
+
+                                        {/* Search Filter for Pills */}
+                                        <div className="relative">
+                                            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-text-secondary h-3 w-3" />
+                                            <Input
+                                                placeholder="Filter nodes..."
+                                                value={captureSearchQuery}
+                                                onChange={(e) => setCaptureSearchQuery(e.target.value)}
+                                                className="pl-8 bg-surface-elevated/40 border-border/40 focus:border-accent text-xs rounded-lg h-8 text-white focus-visible:ring-0"
+                                            />
+                                        </div>
+
+                                        {/* Pills Grid Container */}
+                                        <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1 py-0.5 custom-scrollbar">
+                                            {visibleSubnodes.length === 0 ? (
+                                                <div className="w-full text-center py-2 text-[10px] text-text-secondary italic">
+                                                    No matching execution nodes.
+                                                </div>
+                                            ) : (
+                                                visibleSubnodes.map((node) => {
+                                                    const hue = node.data.hue || 210;
+                                                    const isSelected = captureSelectedNodeId === node.id;
+                                                    const taskCount = node.data.tasks?.length || 0;
+                                                    const path = resolveNodePath(node.id, nodes, edges);
+
+                                                    return (
+                                                        <button
+                                                            key={node.id}
+                                                            type="button"
+                                                            onClick={() => setCaptureSelectedNodeId(node.id)}
+                                                            style={{
+                                                                borderColor: isSelected ? `hsl(${hue}, 70%, 50%)` : 'rgba(255,255,255,0.06)',
+                                                                backgroundColor: isSelected ? `hsla(${hue}, 75%, 15%, 0.35)` : 'rgba(255,255,255,0.02)',
+                                                                color: isSelected ? 'white' : 'var(--text-secondary)'
+                                                            }}
+                                                            className={cn(
+                                                                "inline-flex items-center gap-1.5 py-1 px-2.5 rounded-lg border text-[10px] font-semibold transition-all duration-150 active:scale-95 hover:text-white",
+                                                                isSelected ? "shadow-sm" : "hover:border-white/10 hover:bg-white/5"
+                                                            )}
+                                                            title={path ? `${path} > ${node.data.label}` : node.data.label}
+                                                        >
+                                                            {/* Left Hue Dot */}
+                                                            <span 
+                                                                className="w-1.5 h-1.5 rounded-full shrink-0" 
+                                                                style={{ backgroundColor: `hsl(${hue}, 70%, 55%)` }}
+                                                            />
+                                                            
+                                                            <span className="truncate max-w-[120px]">{node.data.label}</span>
+                                                            
+                                                            {/* Task count badge */}
+                                                            {taskCount > 0 && (
+                                                                <span className="bg-white/5 text-[8px] px-1 rounded font-bold">
+                                                                    {taskCount}
+                                                                </span>
+                                                            )}
+
+                                                            {isSelected && <Check size={9} className="text-white shrink-0 ml-0.5" />}
+                                                        </button>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                        
+                                        {/* Selected Node Path Subtext */}
+                                        {captureSelectedNodeId && (
+                                            <div className="text-[9px] text-text-secondary/60 font-semibold pl-0.5 truncate">
+                                                Path: {resolveNodePath(captureSelectedNodeId, nodes, edges)}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Submit Button */}
+                                    <Button 
+                                        type="submit" 
+                                        className="w-full bg-accent hover:bg-accent-hover text-white font-bold h-10 rounded-xl shadow-md shadow-accent/10 transition-all text-xs flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                                    >
+                                        <Zap size={13} className="fill-white" />
+                                        <span>Capture Item</span>
+                                    </Button>
+                                </form>
                             </div>
                         </div>
 
