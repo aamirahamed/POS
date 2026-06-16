@@ -1,6 +1,6 @@
 import { FC, useEffect, useState } from 'react';
 import { useCalendarStore, YDShiftSnapshot } from '@/store/useCalendarStore';
-import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
+import { supabase } from '@/lib/supabase';
 import { Calendar, Clock, Briefcase, RefreshCw, TrendingUp, TrendingDown, Minus, BarChart2, DollarSign, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { format, isSameDay, addDays, startOfWeek } from 'date-fns';
 import {
@@ -223,23 +223,33 @@ const YDHoursTrend: FC<{ ydShifts: YDShiftSnapshot[] }> = ({ ydShifts }) => {
 
 
 const CalendarConnect: FC<{ compact?: boolean }> = ({ compact = false }) => {
-    const { setToken, fetchEvents } = useCalendarStore();
     const [isConnecting, setIsConnecting] = useState(false);
 
-    const login = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            setToken(tokenResponse.access_token, tokenResponse.expires_in);
-            await fetchEvents();
+    const handleConnect = async () => {
+        setIsConnecting(true);
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin,
+                    scopes: 'https://www.googleapis.com/auth/calendar.readonly',
+                    queryParams: {
+                        access_type: 'offline',
+                        prompt: 'consent'
+                    }
+                }
+            });
+            if (error) throw error;
+        } catch (err) {
+            console.error('Failed to connect Google Calendar:', err);
             setIsConnecting(false);
-        },
-        onError: () => setIsConnecting(false),
-        scope: 'https://www.googleapis.com/auth/calendar.readonly',
-    });
+        }
+    };
 
     if (compact) {
         return (
             <button
-                onClick={() => { setIsConnecting(true); login(); }}
+                onClick={handleConnect}
                 disabled={isConnecting}
                 className="flex items-center gap-1.5 text-xs font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 shrink-0"
             >
@@ -252,7 +262,7 @@ const CalendarConnect: FC<{ compact?: boolean }> = ({ compact = false }) => {
     return (
         <section className="bg-surface border border-border rounded-3xl p-6 shadow-sm">
             <button
-                onClick={() => { setIsConnecting(true); login(); }}
+                onClick={handleConnect}
                 disabled={isConnecting}
                 className="w-full py-8 border border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-3 text-text-secondary hover:text-white hover:border-white/40 transition-all bg-surface-elevated/50"
             >
@@ -557,7 +567,7 @@ const generateRosterSummary = (shifts: YDShiftSnapshot[]) => {
 };
 
 export const CalendarSection: FC<{ embedded?: boolean }> = ({ embedded = false }) => {
-    const { accessToken, events, ydShifts, fetchEvents, loading, error, clearToken, lastFetched, loadFromDB } = useCalendarStore();
+    const { isCalendarConnected, events, ydShifts, fetchEvents, loading, error, clearToken, lastFetched, loadFromDB } = useCalendarStore();
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     // On mount: load persisted snapshot from Supabase (works even without a fresh Google token)
@@ -565,12 +575,12 @@ export const CalendarSection: FC<{ embedded?: boolean }> = ({ embedded = false }
         loadFromDB();
     }, []);
 
-    // Auto-refresh when token becomes available
+    // Auto-refresh when calendar connection is active
     useEffect(() => {
-        if (accessToken) {
+        if (isCalendarConnected) {
             fetchEvents();
         }
-    }, [accessToken]);
+    }, [isCalendarConnected]);
 
     if (!CLIENT_ID) {
         return (
@@ -581,7 +591,7 @@ export const CalendarSection: FC<{ embedded?: boolean }> = ({ embedded = false }
     }
 
     // Token state — used only for the reconnect banner, NOT to gate the entire UI
-    const hasToken = !!accessToken;
+    const hasToken = isCalendarConnected;
 
     // Process Events for Today
     const now = new Date();
@@ -636,7 +646,6 @@ export const CalendarSection: FC<{ embedded?: boolean }> = ({ embedded = false }
     const dividerCls = embedded ? 'mx-0 border-t border-border/40' : 'hidden';
 
     return (
-        <GoogleOAuthProvider clientId={CLIENT_ID}>
         <>
             {error && <div className={`text-sm font-bold text-red-400 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex justify-between items-center ${embedded ? 'mx-6 mb-2' : 'mb-6'}`}>Sync failed: {error} <button onClick={clearToken} className="underline text-xs opacity-80 hover:opacity-100">Disconnect</button></div>}
 
@@ -762,7 +771,6 @@ export const CalendarSection: FC<{ embedded?: boolean }> = ({ embedded = false }
                 <YDHoursTrend ydShifts={ydShifts} />
             </section>
         </>
-        </GoogleOAuthProvider>
     );
 };
 

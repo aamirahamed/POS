@@ -35,6 +35,7 @@ export interface YDShiftSnapshot {
 interface CalendarState {
     accessToken: string | null;
     tokenExpiry: number | null;
+    isCalendarConnected: boolean;
     events: CalendarEvent[];
     ydShifts: YDShiftSnapshot[];
     loading: boolean;
@@ -44,6 +45,7 @@ interface CalendarState {
     clearToken: () => void;
     fetchEvents: () => Promise<void>;
     loadFromDB: () => Promise<void>;
+    getOrRefreshToken: () => Promise<string | null>;
 }
 
 // ─── Paid Hours Calculation ────────────────────────────────────────────────────
@@ -57,6 +59,7 @@ const getPaidHrs = (scheduledHrs: number): number => {
 export const useCalendarStore = create<CalendarState>()((set, get) => ({
     accessToken: null,
     tokenExpiry: null,
+    isCalendarConnected: false,
     events: [],
     ydShifts: [],
     loading: false,
@@ -64,57 +67,106 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
     lastFetched: null,
 
     setToken: (token, expiresIn) => {
-        // Also persist token to localStorage so it survives a page refresh
-        localStorage.setItem('pos-calendar-token', JSON.stringify({ token, expiry: Date.now() + expiresIn * 1000 }));
         set({ accessToken: token, tokenExpiry: Date.now() + expiresIn * 1000 });
     },
 
-    clearToken: () => {
-        localStorage.removeItem('pos-calendar-token');
-        set({ accessToken: null, tokenExpiry: null, events: [], ydShifts: [] });
+    clearToken: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            await supabase.from('user_google_tokens').delete().eq('user_id', user.id);
+        }
+        set({ accessToken: null, tokenExpiry: null, events: [], ydShifts: [], isCalendarConnected: false });
+    },
+
+    getOrRefreshToken: async (): Promise<string | null> => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+
+        try {
+            // Query DB for current token
+            const { data: tokenRes, error } = await supabase
+                .from('user_google_tokens')
+                .select('access_token, expires_at, refresh_token')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (error || !tokenRes) {
+                set({ isCalendarConnected: false, accessToken: null, tokenExpiry: null });
+                return null;
+            }
+
+            const expiresAt = new Date(tokenRes.expires_at).getTime();
+            const fiveMinutesFromNow = Date.now() + 5 * 60 * 1000;
+
+            // If token is still valid, return it
+            if (expiresAt > fiveMinutesFromNow && tokenRes.access_token) {
+                set({
+                    accessToken: tokenRes.access_token,
+                    tokenExpiry: expiresAt,
+                    isCalendarConnected: true
+                });
+                return tokenRes.access_token;
+            }
+
+            // Otherwise, invoke Edge Function to refresh
+            const { data, error: fnError } = await supabase.functions.invoke('refresh-google-token');
+            if (fnError || !data?.access_token) {
+                console.error('Failed to invoke refresh-google-token edge function:', fnError);
+                set({ isCalendarConnected: false, accessToken: null, tokenExpiry: null });
+                return null;
+            }
+
+            const newExpiry = new Date(data.expires_at).getTime();
+            set({
+                accessToken: data.access_token,
+                tokenExpiry: newExpiry,
+                isCalendarConnected: true
+            });
+            return data.access_token;
+        } catch (err) {
+            console.error('Error in getOrRefreshToken:', err);
+            return null;
+        }
     },
 
     /** Load persisted snapshot from Supabase on app start (no Google token needed) */
     loadFromDB: async () => {
-        // Restore token from localStorage if still valid
-        try {
-            const raw = localStorage.getItem('pos-calendar-token');
-            if (raw) {
-                const { token, expiry } = JSON.parse(raw);
-                if (Date.now() < expiry) {
-                    set({ accessToken: token, tokenExpiry: expiry });
-                } else {
-                    localStorage.removeItem('pos-calendar-token');
-                }
-            }
-        } catch (_) { /* ignore */ }
-
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const [events, shifts, lastFetched] = await Promise.all([
+        // Restore token/connection metadata from Supabase
+        const [events, shifts, lastFetched, tokenRes] = await Promise.all([
             fetchCalendarEvents(user.id),
             fetchYDShifts(user.id),
             fetchSyncMeta(user.id),
+            supabase.from('user_google_tokens').select('expires_at, access_token').eq('user_id', user.id).maybeSingle()
         ]);
+
+        const hasToken = !!tokenRes.data;
+        const accessToken = tokenRes.data?.access_token || null;
+        const tokenExpiry = tokenRes.data ? new Date(tokenRes.data.expires_at).getTime() : null;
 
         set({
             events: events ?? [],
             ydShifts: shifts ?? [],
             lastFetched: lastFetched ?? null,
+            accessToken,
+            tokenExpiry,
+            isCalendarConnected: hasToken
         });
     },
 
     fetchEvents: async () => {
-        const { accessToken, tokenExpiry, ydShifts } = get();
-        if (!accessToken || (tokenExpiry && Date.now() > tokenExpiry)) {
-            set({ error: 'Not authenticated or token expired', accessToken: null });
-            localStorage.removeItem('pos-calendar-token');
-            return;
-        }
-
         set({ loading: true, error: null });
         try {
+            const accessToken = await get().getOrRefreshToken();
+            if (!accessToken) {
+                set({ error: 'Google Calendar not connected. Please connect your calendar.', loading: false });
+                return;
+            }
+
+            const { ydShifts } = get();
+
             const now = new Date();
 
             // Start of current week (Monday)
@@ -144,8 +196,7 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    set({ accessToken: null, error: 'Token expired', loading: false });
-                    localStorage.removeItem('pos-calendar-token');
+                    set({ accessToken: null, isCalendarConnected: false, error: 'Calendar connection expired. Please reconnect.', loading: false });
                     return;
                 }
                 throw new Error(`Calendar API Error: ${response.statusText}`);
