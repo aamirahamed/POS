@@ -1,7 +1,7 @@
 import { FC, useEffect, useState } from 'react';
 import { useCalendarStore, YDShiftSnapshot } from '@/store/useCalendarStore';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
-import { Calendar, Clock, Briefcase, RefreshCw, TrendingUp, TrendingDown, Minus, BarChart2, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, Briefcase, RefreshCw, TrendingUp, TrendingDown, Minus, BarChart2, DollarSign, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { format, isSameDay, addDays, startOfWeek } from 'date-fns';
 import {
     ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -443,11 +443,20 @@ const WeekCard: FC<{ weekIndex: number; shifts: YDShiftSnapshot[]; startOfWeek: 
                                         {breakText && !shiftEnded && <span className="text-[11px] font-medium text-text-secondary/70 mt-1">({breakText})</span>}
                                         
                                         {shift.status === 'modified' && (
-                                            <div className="mt-2.5 pt-2.5 border-t border-border flex flex-col">
-                                                <span className="text-xs font-medium text-text-secondary line-through">Previously {formatEventTime(shift.previousStartTime!)} – {formatEventTime(shift.previousEndTime!)}</span>
-                                                <span className="text-sm font-bold text-amber-400 mt-1">
-                                                    {((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)) > 0 ? '+' : ''}{((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)).toFixed(1).replace('.0', '')} hr{Math.abs((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)) !== 1 ? 's' : ''} {((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)) > 0 ? 'added' : 'removed'}
-                                                </span>
+                                            <div className="mt-2.5 pt-2.5 border-t border-border flex flex-col gap-1">
+                                                <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                                                    <span>Was:</span>
+                                                    <span className="line-through">{formatEventTime(shift.previousStartTime!)} – {formatEventTime(shift.previousEndTime!)}</span>
+                                                    <span className="opacity-70">({(shift.previousPaidHrs || shift.previousDurationHrs || 0).toFixed(1).replace('.0', '')} hrs)</span>
+                                                </div>
+                                                {((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)) !== 0 && (
+                                                    <div className={`text-xs font-bold ${
+                                                        ((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)) > 0 ? 'text-emerald-400' : 'text-amber-400'
+                                                    }`}>
+                                                        {((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)) > 0 ? '+' : ''}
+                                                        {((shift.paidHrs || shift.durationHrs || 0) - (shift.previousPaidHrs || shift.previousDurationHrs || 0)).toFixed(1).replace('.0', '')} Hours
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                     </div>
@@ -459,6 +468,92 @@ const WeekCard: FC<{ weekIndex: number; shifts: YDShiftSnapshot[]; startOfWeek: 
             </div>
         </div>
     );
+};
+
+// Helper: Generate Roster Change Summary
+const generateRosterSummary = (shifts: YDShiftSnapshot[]) => {
+    const now = new Date();
+    const currentMonday = startOfWeek(now, { weekStartsOn: 1 });
+    currentMonday.setHours(0, 0, 0, 0);
+
+    const changedShifts = shifts.filter(s => {
+        if (s.status === 'unchanged') return false;
+        const shiftTime = new Date(s.startTime).getTime();
+        return shiftTime >= currentMonday.getTime();
+    });
+
+    if (changedShifts.length === 0) return null;
+
+    const changesByWeek: { [weekStartStr: string]: YDShiftSnapshot[] } = {};
+    changedShifts.forEach(s => {
+        const date = new Date(s.startTime);
+        const mon = startOfWeek(date, { weekStartsOn: 1 });
+        const monKey = format(mon, 'yyyy-MM-dd');
+        if (!changesByWeek[monKey]) changesByWeek[monKey] = [];
+        changesByWeek[monKey].push(s);
+    });
+
+    const weekSummaries = Object.keys(changesByWeek).sort().map(monKey => {
+        const weekShifts = changesByWeek[monKey];
+        const weekStart = new Date(monKey);
+        const weekLabel = `Week of ${format(weekStart, 'MMM d')}`;
+
+        const descriptions = weekShifts.map(s => {
+            const dayName = format(new Date(s.startTime), 'EEEE');
+            const currentPaid = s.paidHrs || s.durationHrs || 0;
+            const prevPaid = s.previousPaidHrs || s.previousDurationHrs || 0;
+
+            if (s.status === 'added') {
+                return `${dayName} shift added worth ${currentPaid.toFixed(1).replace('.0', '')} hours`;
+            } else if (s.status === 'removed') {
+                return `${dayName} shift of ${currentPaid.toFixed(1).replace('.0', '')} hours removed`;
+            } else if (s.status === 'modified') {
+                const diff = currentPaid - prevPaid;
+                if (diff === 0) return ''; // Skip callout if hours didn't change
+                const direction = diff > 0 ? 'increased' : 'reduced';
+                return `${dayName} shift ${direction} by ${Math.abs(diff).toFixed(1).replace('.0', '')} hour${Math.abs(diff) !== 1 ? 's' : ''}`;
+            }
+            return '';
+        }).filter(Boolean);
+
+        let netHrs = 0;
+        weekShifts.forEach(s => {
+            const currentPaid = s.paidHrs || s.durationHrs || 0;
+            const prevPaid = s.previousPaidHrs || s.previousDurationHrs || 0;
+            if (s.status === 'added') netHrs += currentPaid;
+            else if (s.status === 'removed') netHrs -= currentPaid;
+            else if (s.status === 'modified') netHrs += (currentPaid - prevPaid);
+        });
+
+        let netText = '';
+        if (netHrs > 0) {
+            netText = `you gained ${netHrs.toFixed(1).replace('.0', '')} extra hour${netHrs !== 1 ? 's' : ''}`;
+        } else if (netHrs < 0) {
+            netText = `you lost ${Math.abs(netHrs).toFixed(1).replace('.0', '')} hour${Math.abs(netHrs) !== 1 ? 's' : ''} of the week`;
+        } else {
+            netText = `no net change in hours`;
+        }
+
+        let combinedDesc = '';
+        if (descriptions.length === 1) {
+            combinedDesc = `${descriptions[0]}, so ${netText}.`;
+        } else if (descriptions.length === 2) {
+            combinedDesc = `${descriptions[0]} and ${descriptions[1]}, so ${netText}.`;
+        } else {
+            combinedDesc = `${descriptions.slice(0, -1).join(', ')}, and ${descriptions[descriptions.length - 1]}, so ${netText}.`;
+        }
+
+        combinedDesc = combinedDesc.charAt(0).toUpperCase() + combinedDesc.slice(1);
+
+        return {
+            weekLabel,
+            summaryText: combinedDesc,
+            netHrs,
+            hasChanges: descriptions.length > 0
+        };
+    });
+
+    return weekSummaries.filter(s => s.hasChanges);
 };
 
 export const CalendarSection: FC<{ embedded?: boolean }> = ({ embedded = false }) => {
@@ -625,6 +720,30 @@ export const CalendarSection: FC<{ embedded?: boolean }> = ({ embedded = false }
                         </button>
                     </div>
                 </div>
+
+                {/* Roster Update Summary Card */}
+                {(() => {
+                    const summaries = generateRosterSummary(ydShifts);
+                    if (!summaries || summaries.length === 0) return null;
+
+                    return (
+                        <div className="bg-indigo-500/5 border border-indigo-500/10 rounded-2xl p-4.5 space-y-2.5">
+                            <div className="flex items-center gap-2">
+                                <Sparkles size={16} className="text-indigo-400 animate-pulse" />
+                                <h3 className="text-sm font-bold text-white">Latest Roster Updates</h3>
+                            </div>
+                            <div className="space-y-2">
+                                {summaries.map((s, idx) => (
+                                    <div key={idx} className="text-xs text-text-secondary leading-relaxed flex flex-col sm:flex-row sm:items-start gap-1.5 sm:gap-3">
+                                        <span className="font-bold text-indigo-300 shrink-0 min-w-[100px]">{s.weekLabel}:</span>
+                                        <span>{s.summaryText}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 <div id="roster-carousel" className="flex gap-4 overflow-x-auto custom-scrollbar pb-3 pt-1 snap-x snap-mandatory scroll-smooth items-stretch">
                     {[0, 1, 2, 3].map(weekIndex => {
                         const shifts = weeks[weekIndex] || [];

@@ -170,52 +170,174 @@ export const useCalendarStore = create<CalendarState>()((set, get) => ({
                 };
             });
 
-            // ── Snapshot Logic for YD Retail ──────────────────────────────────
+            // ── Snapshot Logic for YD Retail (Date-Based Lookup) ──────────────
             const newYDEvents = parsedEvents.filter(e => e.title.includes('RETAIL SALES ASSISTANT'));
             const newSnapshot: YDShiftSnapshot[] = [];
 
-            newYDEvents.forEach(newShift => {
-                const existing = ydShifts.find(s => s.id === newShift.id);
-                const paidHrs = getPaidHrs(newShift.durationHrs);
+            const getLocalDateKey = (isoStr: string) => {
+                const d = new Date(isoStr);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
 
-                if (!existing) {
-                    newSnapshot.push({ ...newShift, paidHrs, status: 'added' });
-                } else if (existing.startTime !== newShift.startTime || existing.endTime !== newShift.endTime) {
-                    newSnapshot.push({
-                        ...newShift,
-                        paidHrs,
-                        status: 'modified',
-                        previousStartTime: existing.startTime,
-                        previousEndTime: existing.endTime,
-                        previousDurationHrs: existing.durationHrs,
-                        previousPaidHrs: existing.paidHrs,
-                    });
-                } else {
-                    newSnapshot.push({ ...newShift, paidHrs, status: 'unchanged' });
+            // Map new events by dateKey
+            const newEventsByDate: Record<string, CalendarEvent> = {};
+            newYDEvents.forEach(event => {
+                const dateKey = getLocalDateKey(event.startTime);
+                newEventsByDate[dateKey] = event;
+            });
+
+            // Map previous active shifts by dateKey
+            const prevActiveShiftsByDate: Record<string, YDShiftSnapshot> = {};
+            ydShifts.forEach(shift => {
+                if (shift.status !== 'removed') {
+                    const dateKey = getLocalDateKey(shift.startTime);
+                    prevActiveShiftsByDate[dateKey] = shift;
                 }
             });
 
-            // Mark removed shifts (within the fetch window)
-            ydShifts.forEach(oldShift => {
-                const oldTime = new Date(oldShift.startTime).getTime();
-                if (oldTime >= fetchFrom.getTime() && oldTime <= endRange.getTime()) {
-                    if (!newYDEvents.some(n => n.id === oldShift.id)) {
+            // Map previous removed shifts by dateKey
+            const prevRemovedShiftsByDate: Record<string, YDShiftSnapshot> = {};
+            ydShifts.forEach(shift => {
+                if (shift.status === 'removed') {
+                    const dateKey = getLocalDateKey(shift.startTime);
+                    prevRemovedShiftsByDate[dateKey] = shift;
+                }
+            });
+
+            // Determine all unique date keys within the fetch window
+            const datesToProcess = new Set<string>();
+            Object.keys(newEventsByDate).forEach(d => datesToProcess.add(d));
+            
+            ydShifts.forEach(shift => {
+                const shiftTime = new Date(shift.startTime).getTime();
+                if (shiftTime >= fetchFrom.getTime() && shiftTime <= endRange.getTime()) {
+                    const dateKey = getLocalDateKey(shift.startTime);
+                    datesToProcess.add(dateKey);
+                }
+            });
+
+            // Process each date key
+            const nowTime = Date.now();
+            datesToProcess.forEach(dateKey => {
+                const newEvent = newEventsByDate[dateKey];
+                const prevActive = prevActiveShiftsByDate[dateKey];
+                const prevRemoved = prevRemovedShiftsByDate[dateKey];
+                const prevAny = prevActive || prevRemoved;
+
+                if (newEvent) {
+                    const paidHrs = getPaidHrs(newEvent.durationHrs);
+                    const isPast = new Date(newEvent.endTime).getTime() < nowTime;
+
+                    if (isPast) {
+                        // Past shift: always unchanged
                         newSnapshot.push({
-                            ...oldShift,
-                            status: 'removed',
+                            id: dateKey,
+                            title: newEvent.title,
+                            startTime: newEvent.startTime,
+                            endTime: newEvent.endTime,
+                            durationHrs: newEvent.durationHrs,
+                            paidHrs,
+                            status: 'unchanged'
                         });
+                    } else if (prevAny) {
+                        // Compare start and end times in absolute epoch milliseconds to ignore timezone format differences
+                        const timesMatch = new Date(prevAny.startTime).getTime() === new Date(newEvent.startTime).getTime() &&
+                                           new Date(prevAny.endTime).getTime() === new Date(newEvent.endTime).getTime();
+                        if (timesMatch) {
+                            newSnapshot.push({
+                                id: dateKey,
+                                title: newEvent.title,
+                                startTime: newEvent.startTime,
+                                endTime: newEvent.endTime,
+                                durationHrs: newEvent.durationHrs,
+                                paidHrs,
+                                status: 'unchanged'
+                            });
+                        } else {
+                            // Modified
+                            newSnapshot.push({
+                                id: dateKey,
+                                title: newEvent.title,
+                                startTime: newEvent.startTime,
+                                endTime: newEvent.endTime,
+                                durationHrs: newEvent.durationHrs,
+                                paidHrs,
+                                status: 'modified',
+                                previousStartTime: prevAny.startTime,
+                                previousEndTime: prevAny.endTime,
+                                previousDurationHrs: prevAny.durationHrs,
+                                previousPaidHrs: prevAny.paidHrs
+                            });
+                        }
+                    } else {
+                        // Added
+                        newSnapshot.push({
+                            id: dateKey,
+                            title: newEvent.title,
+                            startTime: newEvent.startTime,
+                            endTime: newEvent.endTime,
+                            durationHrs: newEvent.durationHrs,
+                            paidHrs,
+                            status: 'added'
+                        });
+                    }
+                } else {
+                    // No new shift on this date
+                    if (prevActive) {
+                        const isPast = new Date(prevActive.endTime).getTime() < nowTime;
+                        if (isPast) {
+                            // Past shift: always unchanged
+                            newSnapshot.push({
+                                ...prevActive,
+                                id: dateKey,
+                                status: 'unchanged'
+                            });
+                        } else {
+                            // Was active, now removed
+                            newSnapshot.push({
+                                id: dateKey,
+                                title: prevActive.title,
+                                startTime: prevActive.startTime,
+                                endTime: prevActive.endTime,
+                                durationHrs: prevActive.durationHrs,
+                                paidHrs: prevActive.paidHrs,
+                                status: 'removed'
+                            });
+                        }
+                    } else if (prevRemoved) {
+                        const isPast = new Date(prevRemoved.endTime).getTime() < nowTime;
+                        if (isPast) {
+                            // Past shift: always unchanged
+                            newSnapshot.push({
+                                ...prevRemoved,
+                                id: dateKey,
+                                status: 'unchanged'
+                            });
+                        } else {
+                            // Was already removed, carry it forward
+                            newSnapshot.push({
+                                ...prevRemoved,
+                                id: dateKey,
+                                status: 'removed'
+                            });
+                        }
                     }
                 }
             });
 
-            // Carry forward any shifts OLDER than the fetch window so historical
-            // trend data is never lost across refreshes
+            // Carry forward historical shifts outside the fetch window, normalizing their ID
             ydShifts.forEach(oldShift => {
                 const oldTime = new Date(oldShift.startTime).getTime();
                 if (oldTime < fetchFrom.getTime()) {
-                    // Only keep if not already added (avoid duplicates)
-                    if (!newSnapshot.some(s => s.id === oldShift.id)) {
-                        newSnapshot.push(oldShift);
+                    const dateKey = getLocalDateKey(oldShift.startTime);
+                    if (!newSnapshot.some(s => s.id === dateKey)) {
+                        newSnapshot.push({
+                            ...oldShift,
+                            id: dateKey
+                        });
                     }
                 }
             });
