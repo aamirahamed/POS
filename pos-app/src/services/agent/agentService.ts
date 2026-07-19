@@ -404,47 +404,57 @@ async function executeLifeMapAgent(
   const statusLog: string[] = [];
 
   if (calls && calls.length > 0) {
-    const call = calls[0];
-    const args = call.args as any;
-    let executionMessage = "";
+    const functionResponses = [];
 
-    onStatusUpdate(`Architect executing: ${call.name}...`);
-    statusLog.push(`Calling tool: ${call.name}`);
+    for (const call of calls) {
+      const args = call.args as any;
+      let executionMessage = "";
 
-    // Dispatch stores actions
-    if (call.name === 'add_pillar') {
-      await useLifeMapStore.getState().addPillar(args.label);
-      executionMessage = `✓ Added Pillar "${args.label}" to Life Map.`;
-    } else if (call.name === 'add_thread') {
-      await useLifeMapStore.getState().addThread(args.parent_id, args.label);
-      executionMessage = `✓ Added Thread "${args.label}" under parent ID "${args.parent_id}".`;
-    } else if (call.name === 'add_initiative') {
-      await useLifeMapStore.getState().addInitiative(args.parent_id, args.label);
-      executionMessage = `✓ Added Initiative "${args.label}" under parent ID "${args.parent_id}".`;
-    } else if (call.name === 'add_subnode') {
-      await useLifeMapStore.getState().addSubnode(args.parent_id, args.label);
-      executionMessage = `✓ Added Subnode "${args.label}" under parent ID "${args.parent_id}".`;
-    } else if (call.name === 'add_task_to_node') {
-      await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-      executionMessage = `✓ Added task "${args.text}" into Execution Node ID "${args.node_id}".`;
-    } else if (call.name === 'add_inbox_item') {
-      await useLifeMapStore.getState().addInboxItem(args.text);
-      executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
-    } else if (call.name === 'delete_node') {
-      await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
-      executionMessage = `✓ Deleted node ID "${args.node_id}".`;
-    } else if (call.name === 'move_node') {
-      await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
-      executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
-    } else if (call.name === 'rename_node') {
-      await useLifeMapStore.getState().renameNode(args.node_id, args.label);
-      executionMessage = `✓ Renamed node ID "${args.node_id}" to "${args.label}".`;
-    } else if (call.name === 'change_node_type') {
-      await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
-      executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+      onStatusUpdate(`Architect executing: ${call.name}...`);
+      statusLog.push(`Calling tool: ${call.name}`);
+
+      // Dispatch stores actions
+      if (call.name === 'add_pillar') {
+        await useLifeMapStore.getState().addPillar(args.label);
+        executionMessage = `✓ Added Pillar "${args.label}" to Life Map.`;
+      } else if (call.name === 'add_thread') {
+        await useLifeMapStore.getState().addThread(args.parent_id, args.label);
+        executionMessage = `✓ Added Thread "${args.label}" under parent ID "${args.parent_id}".`;
+      } else if (call.name === 'add_initiative') {
+        await useLifeMapStore.getState().addInitiative(args.parent_id, args.label);
+        executionMessage = `✓ Added Initiative "${args.label}" under parent ID "${args.parent_id}".`;
+      } else if (call.name === 'add_subnode') {
+        await useLifeMapStore.getState().addSubnode(args.parent_id, args.label);
+        executionMessage = `✓ Added Subnode "${args.label}" under parent ID "${args.parent_id}".`;
+      } else if (call.name === 'add_task_to_node') {
+        await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
+        executionMessage = `✓ Added task "${args.text}" into Execution Node ID "${args.node_id}".`;
+      } else if (call.name === 'add_inbox_item') {
+        await useLifeMapStore.getState().addInboxItem(args.text);
+        executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
+      } else if (call.name === 'delete_node') {
+        await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
+        executionMessage = `✓ Deleted node ID "${args.node_id}".`;
+      } else if (call.name === 'move_node') {
+        await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
+        executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
+      } else if (call.name === 'rename_node') {
+        await useLifeMapStore.getState().renameNode(args.node_id, args.label);
+        executionMessage = `✓ Renamed node ID "${args.node_id}" to "${args.label}".`;
+      } else if (call.name === 'change_node_type') {
+        await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
+        executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+      }
+
+      statusLog.push(executionMessage);
+
+      functionResponses.push({
+        functionResponse: {
+          name: call.name,
+          response: { result: executionMessage }
+        }
+      });
     }
-
-    statusLog.push(executionMessage);
 
     // Feed back result to get natural response
     const finalResult = await lifemapAgent.generateContent({
@@ -453,12 +463,7 @@ async function executeLifeMapAgent(
         result.response.candidates![0].content,
         {
           role: 'user',
-          parts: [{
-            functionResponse: {
-              name: call.name,
-              response: { result: executionMessage }
-            }
-          }]
+          parts: functionResponses
         }
       ]
     });
@@ -560,50 +565,60 @@ ${outlineText || "No nodes currently exist."}`;
   const statusLog: string[] = [];
 
   if (calls && calls.length > 0) {
-    const call = calls[0];
-    const args = call.args as any;
-    let executionMessage = "";
+    const functionResponses = [];
 
-    onStatusUpdate(`Mentor executing: ${call.name}...`);
-    statusLog.push(`Calling tool: ${call.name}`);
+    for (const call of calls) {
+      const args = call.args as any;
+      let executionMessage = "";
 
-    // Dispatch stores actions
-    if (call.name === 'add_pillar') {
-      await useLifeMapStore.getState().addPillar(args.label);
-      executionMessage = `✓ Added Pillar "${args.label}" to Life Map.`;
-    } else if (call.name === 'add_thread') {
-      await useLifeMapStore.getState().addThread(args.parent_id, args.label);
-      executionMessage = `✓ Added Thread "${args.label}" under parent ID "${args.parent_id}".`;
-    } else if (call.name === 'add_initiative') {
-      await useLifeMapStore.getState().addInitiative(args.parent_id, args.label);
-      executionMessage = `✓ Added Initiative "${args.label}" under parent ID "${args.parent_id}".`;
-    } else if (call.name === 'add_subnode') {
-      await useLifeMapStore.getState().addSubnode(args.parent_id, args.label);
-      executionMessage = `✓ Added Subnode "${args.label}" under parent ID "${args.parent_id}".`;
-    } else if (call.name === 'add_task_to_node') {
-      await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-      executionMessage = `✓ Added task "${args.text}" into Execution Node ID "${args.node_id}".`;
-    } else if (call.name === 'add_inbox_item') {
-      await useLifeMapStore.getState().addInboxItem(args.text);
-      executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
-    } else if (call.name === 'delete_node') {
-      await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
-      executionMessage = `✓ Deleted node ID "${args.node_id}".`;
-    } else if (call.name === 'move_node') {
-      await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
-      executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
-    } else if (call.name === 'rename_node') {
-      await useLifeMapStore.getState().renameNode(args.node_id, args.label);
-      executionMessage = `✓ Renamed node ID "${args.node_id}" to "${args.label}".`;
-    } else if (call.name === 'change_node_type') {
-      await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
-      executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
-    } else if (call.name === 'update_mentor_profile') {
-      await useMentorStore.getState().updateProfileMemory(args.content);
-      executionMessage = `✓ Updated dynamic profile memory.`;
+      onStatusUpdate(`Mentor executing: ${call.name}...`);
+      statusLog.push(`Calling tool: ${call.name}`);
+
+      // Dispatch stores actions
+      if (call.name === 'add_pillar') {
+        await useLifeMapStore.getState().addPillar(args.label);
+        executionMessage = `✓ Added Pillar "${args.label}" to Life Map.`;
+      } else if (call.name === 'add_thread') {
+        await useLifeMapStore.getState().addThread(args.parent_id, args.label);
+        executionMessage = `✓ Added Thread "${args.label}" under parent ID "${args.parent_id}".`;
+      } else if (call.name === 'add_initiative') {
+        await useLifeMapStore.getState().addInitiative(args.parent_id, args.label);
+        executionMessage = `✓ Added Initiative "${args.label}" under parent ID "${args.parent_id}".`;
+      } else if (call.name === 'add_subnode') {
+        await useLifeMapStore.getState().addSubnode(args.parent_id, args.label);
+        executionMessage = `✓ Added Subnode "${args.label}" under parent ID "${args.parent_id}".`;
+      } else if (call.name === 'add_task_to_node') {
+        await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
+        executionMessage = `✓ Added task "${args.text}" into Execution Node ID "${args.node_id}".`;
+      } else if (call.name === 'add_inbox_item') {
+        await useLifeMapStore.getState().addInboxItem(args.text);
+        executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
+      } else if (call.name === 'delete_node') {
+        await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
+        executionMessage = `✓ Deleted node ID "${args.node_id}".`;
+      } else if (call.name === 'move_node') {
+        await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
+        executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
+      } else if (call.name === 'rename_node') {
+        await useLifeMapStore.getState().renameNode(args.node_id, args.label);
+        executionMessage = `✓ Renamed node ID "${args.node_id}" to "${args.label}".`;
+      } else if (call.name === 'change_node_type') {
+        await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
+        executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+      } else if (call.name === 'update_mentor_profile') {
+        await useMentorStore.getState().updateProfileMemory(args.content);
+        executionMessage = `✓ Updated dynamic profile memory.`;
+      }
+
+      statusLog.push(executionMessage);
+
+      functionResponses.push({
+        functionResponse: {
+          name: call.name,
+          response: { result: executionMessage }
+        }
+      });
     }
-
-    statusLog.push(executionMessage);
 
     // Feed back result to get natural response
     const finalResult = await mentorAgent.generateContent({
@@ -612,12 +627,7 @@ ${outlineText || "No nodes currently exist."}`;
         result.response.candidates![0].content,
         {
           role: 'user',
-          parts: [{
-            functionResponse: {
-              name: call.name,
-              response: { result: executionMessage }
-            }
-          }]
+          parts: functionResponses
         }
       ]
     });
@@ -678,25 +688,35 @@ async function executeShoppingAgent(
   const statusLog: string[] = [];
 
   if (calls && calls.length > 0) {
-    const call = calls[0];
-    const args = call.args as any;
-    let executionMessage = "";
+    const functionResponses = [];
 
-    onStatusUpdate(`Clerk executing: ${call.name}...`);
-    statusLog.push(`Calling tool: ${call.name}`);
+    for (const call of calls) {
+      const args = call.args as any;
+      let executionMessage = "";
 
-    if (call.name === 'add_shopping_item') {
-      await useShoppingStore.getState().addItem(args.text);
-      executionMessage = `✓ Added "${args.text}" to Shopping List.`;
-    } else if (call.name === 'toggle_shopping_item') {
-      await useShoppingStore.getState().toggleComplete(args.item_id);
-      executionMessage = `✓ Toggled completed state of item ID "${args.item_id}".`;
-    } else if (call.name === 'delete_shopping_item') {
-      await useShoppingStore.getState().deleteItem(args.item_id);
-      executionMessage = `✓ Deleted item ID "${args.item_id}" from Shopping List.`;
+      onStatusUpdate(`Clerk executing: ${call.name}...`);
+      statusLog.push(`Calling tool: ${call.name}`);
+
+      if (call.name === 'add_shopping_item') {
+        await useShoppingStore.getState().addItem(args.text);
+        executionMessage = `✓ Added "${args.text}" to Shopping List.`;
+      } else if (call.name === 'toggle_shopping_item') {
+        await useShoppingStore.getState().toggleComplete(args.item_id);
+        executionMessage = `✓ Toggled completed state of item ID "${args.item_id}".`;
+      } else if (call.name === 'delete_shopping_item') {
+        await useShoppingStore.getState().deleteItem(args.item_id);
+        executionMessage = `✓ Deleted item ID "${args.item_id}" from Shopping List.`;
+      }
+
+      statusLog.push(executionMessage);
+
+      functionResponses.push({
+        functionResponse: {
+          name: call.name,
+          response: { result: executionMessage }
+        }
+      });
     }
-
-    statusLog.push(executionMessage);
 
     const finalResult = await shoppingAgent.generateContent({
       contents: [
@@ -704,12 +724,7 @@ async function executeShoppingAgent(
         result.response.candidates![0].content,
         {
           role: 'user',
-          parts: [{
-            functionResponse: {
-              name: call.name,
-              response: { result: executionMessage }
-            }
-          }]
+          parts: functionResponses
         }
       ]
     });
