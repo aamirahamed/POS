@@ -69,7 +69,16 @@ const AccountCards: FC<{ onSync: () => void; isSyncing: boolean; lastSynced: str
               </span>
             </div>
             <p className="text-slate-500 text-[10px] uppercase tracking-wider mb-0.5">{account.institutionName}</p>
-            <p className="text-xs text-slate-400 capitalize">{account.type} account · {account.currency}</p>
+            <div className="flex items-end justify-between mt-2">
+              <p className="text-xs text-slate-400 capitalize">{account.type} · {account.currency}</p>
+              {account.balance != null && account.balance !== 0 ? (
+                <p className="text-lg font-bold text-white">
+                  ${account.balance.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              ) : (
+                <p className="text-sm text-slate-600 italic">Sync to load balance</p>
+              )}
+            </div>
           </motion.div>
         ))}
       </div>

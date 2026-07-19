@@ -33,12 +33,14 @@ function mapCategory(raw: string | null): string {
   return CATEGORY_MAP[raw.toUpperCase()] ?? 'Other';
 }
 
-// Determine if a transaction looks like salary income
+// Determine if a credit transaction is a salary/payroll credit
 function detectIncome(description: string, direction: string, amount: number): string {
-  if (direction !== 'credit') return mapCategory(null);
+  if (direction !== 'credit') return 'Other';
   const desc = description.toLowerCase();
-  if (desc.includes('salary') || desc.includes('payroll') || desc.includes('pay ')) return 'Income';
-  if (amount > 1000 && direction === 'credit') return 'Income';
+  // Explicitly mark payroll as 'YD Salary' for financeUtils pay cycle detection
+  if (/payroll|salary|wages/i.test(desc)) return 'YD Salary';
+  // Peer transfers, rent income, large credits
+  if (amount > 500 && direction === 'credit') return 'Income';
   return 'Transfers';
 }
 
@@ -93,7 +95,23 @@ Deno.serve(async (req) => {
       return Response.json({ message: 'No bank accounts found in Redbark', synced: 0 });
     }
 
-    // Upsert accounts into bank_accounts table
+    // ── Step 1b: Fetch balances for all accounts ───────────────────────────
+    const accountIds = accounts.map((a: any) => a.id).join(',');
+    const connectionId = accounts[0]?.connectionId;
+    let balanceMap: Record<string, number> = {};
+
+    try {
+      const balancesResponse = await redbarkFetch(
+        `/balances?accountIds=${accountIds}&connectionId=${connectionId}`
+      );
+      for (const b of balancesResponse.data ?? []) {
+        balanceMap[b.accountId] = parseFloat(b.currentBalance ?? '0');
+      }
+    } catch (e) {
+      console.warn('Could not fetch balances', e);
+    }
+
+    // Upsert accounts into bank_accounts table (with balances)
     const accountRows = accounts.map((a: any) => ({
       id: a.id,
       user_id: userId,
@@ -103,6 +121,7 @@ Deno.serve(async (req) => {
       account_number: a.accountNumber,
       type: a.type ?? 'transaction',
       currency: a.currency ?? 'AUD',
+      balance: balanceMap[a.id] ?? 0,
       last_synced_at: new Date().toISOString(),
     }));
 

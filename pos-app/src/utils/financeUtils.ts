@@ -619,27 +619,46 @@ function addDays(dateStr: string, n: number): string {
 }
 
 export function detectPayCycles(transactions: Transaction[]): PayCycle[] {
-  // Find salary credits
-  const salaryCreds = transactions.filter(
-    (t) =>
-      t.isIncome &&
-      (t.transactionType.trim().toLowerCase() === 'salary' ||
-        t.category === 'YD Salary')
-  ).sort((a, b) => a.date.localeCompare(b.date));
+  // Identify salary credits — supports both legacy CSV (transactionType='salary')
+  // and Redbark live transactions (category='YD Salary'/'Income', description contains 'payroll')
+  const isSalaryTxn = (t: Transaction) => {
+    if (!t.isIncome) return false;
+    const type = (t.transactionType ?? '').trim().toLowerCase();
+    const cat = (t.category ?? '').trim().toLowerCase();
+    const desc = (t.transactionDetails ?? '').toLowerCase();
+    const merchant = (t.merchantName ?? '').toLowerCase();
+
+    // Must be an explicit salary/payroll signal — generic 'income' alone is not enough
+    // (rent received, transfers etc. can also be INCOME category)
+    return (
+      type === 'salary' ||
+      cat === 'yd salary' ||
+      /payroll|salary|wages/i.test(desc) ||
+      /payroll|salary|wages/i.test(merchant)
+    );
+  };
+
+  const salaryCreds = transactions
+    .filter(isSalaryTxn)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
   if (salaryCreds.length === 0) return [];
 
-  return salaryCreds.map((salary) => {
-    const cycleStart = addDays(salary.date, 1); // Thursday after Wednesday salary
-    const cycleEnd = addDays(cycleStart, 6);    // following Wednesday
+  return salaryCreds.map((salary, idx) => {
+    // Cycle starts on pay day, ends the day before next pay (or 13 days later for last cycle)
+    const nextSalary = salaryCreds[idx + 1];
+    const cycleStart = salary.date;
+    const cycleEnd = nextSalary ? addDays(nextSalary.date, -1) : addDays(cycleStart, 13);
 
     // Find the $350 TRANSFER DEBIT within 3 days of salary date
+    // Supports both legacy CSV (transactionType contains 'transfer') and Redbark (category='Transfers')
     const windowEnd = addDays(salary.date, 3);
     const lockedTxn = transactions.find(
       (t) =>
         !t.isIncome &&
         Math.abs(t.amount) === LOCKED_AMOUNT &&
-        t.transactionType.toLowerCase().includes('transfer') &&
+        (t.transactionType.toLowerCase().includes('transfer') ||
+          t.category.toLowerCase() === 'transfers') &&
         t.date >= salary.date &&
         t.date <= windowEnd
     ) ?? null;
