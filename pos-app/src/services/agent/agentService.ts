@@ -1,8 +1,9 @@
 import { GoogleGenerativeAI, FunctionDeclaration, Tool, Content, SchemaType } from "@google/generative-ai";
-import { ORCHESTRATOR_PROMPT, LIFEMAP_PROMPT, SHOPPING_PROMPT, MENTOR_PROMPT } from "./prompts";
+import { ORCHESTRATOR_PROMPT, LIFEMAP_PROMPT, SHOPPING_PROMPT, MENTOR_PROMPT, FINANCE_MENTOR_PROMPT } from "./prompts";
 import { useLifeMapStore } from "@/store/useLifeMapStore";
 import { useShoppingStore } from "@/store/useShoppingStore";
 import { useMentorStore } from "@/store/useMentorStore";
+import { useFinanceStore } from "@/store/useFinanceStore";
 import { supabase } from "@/lib/supabase";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -51,8 +52,20 @@ const routeToMentorDeclaration: FunctionDeclaration = {
   }
 };
 
+const routeToFinanceDeclaration: FunctionDeclaration = {
+  name: 'route_to_finance_agent',
+  description: 'Delegate the user request to the Finance Manager sub-agent to handle spending analysis, budget queries, transaction category updates, financial health reviews, and banking questions.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      query: { type: SchemaType.STRING, description: 'The financial question or command for the Finance Manager agent.' }
+    },
+    required: ['query']
+  }
+};
+
 const orchestratorTools: Tool[] = [{
-  functionDeclarations: [routeToLifeMapDeclaration, routeToShoppingDeclaration, routeToMentorDeclaration]
+  functionDeclarations: [routeToLifeMapDeclaration, routeToShoppingDeclaration, routeToMentorDeclaration, routeToFinanceDeclaration]
 }];
 
 // ──────────────────────────────────────────────────────────
@@ -349,6 +362,11 @@ export async function executeAgentCommand(
     if (call.name === 'route_to_mentor_agent') {
       onStatusUpdate("Forwarding to Personal Mentor...");
       return await executeMentorAgent(genAI, targetQuery, onStatusUpdate);
+    }
+
+    if (call.name === 'route_to_finance_agent') {
+      onStatusUpdate("Forwarding to Finance Manager...");
+      return await executeFinanceAgent(genAI, targetQuery, onStatusUpdate);
     }
   }
 
@@ -744,4 +762,129 @@ async function executeShoppingAgent(
 // Workaround function for hoisting tools definition
 function lifemapAgentTools(): Tool[] {
   return lifemapTools;
+}
+
+// ──────────────────────────────────────────────────────────
+// 7. Finance Manager Sub-Agent Runner
+// ──────────────────────────────────────────────────────────
+async function executeFinanceAgent(
+  genAI: GoogleGenerativeAI,
+  query: string,
+  onStatusUpdate: (status: string) => void
+): Promise<AgentResponse> {
+  const { transactions, bankAccounts, updateTransactionCategory } = useFinanceStore.getState();
+
+  // Compact transaction summary for context (latest 100, most relevant fields)
+  const txSummary = transactions.slice(0, 100).map(t => ({
+    id: t.id,
+    date: t.date,
+    amount: t.amount,
+    merchant: t.merchantName || t.transactionDetails,
+    category: t.category,
+    direction: t.isIncome ? 'credit' : 'debit',
+    account: t.accountName,
+  }));
+
+  // Compact account summary
+  const accountSummary = bankAccounts.map(a => ({
+    name: a.name,
+    accountNumber: a.accountNumber,
+    type: a.type,
+  }));
+
+  const systemInstruction = `${FINANCE_MENTOR_PROMPT}
+
+Connected Bank Accounts:
+${JSON.stringify(accountSummary, null, 2)}
+
+Recent Transactions (latest ${txSummary.length}):
+${JSON.stringify(txSummary, null, 2)}`;
+
+  // Finance agent tool: update category
+  const financeTools: Tool[] = [{
+    functionDeclarations: [{
+      name: 'update_transaction_category',
+      description: 'Update the category label of a specific transaction.',
+      parameters: {
+        type: SchemaType.OBJECT,
+        properties: {
+          transaction_id: { type: SchemaType.STRING, description: 'The ID of the transaction to update.' },
+          category: { type: SchemaType.STRING, description: 'The new category label (e.g. Groceries, Transport, Food & Drinks, Subscriptions, Income, Transfers, Other).' },
+        },
+        required: ['transaction_id', 'category']
+      }
+    }]
+  }];
+
+  onStatusUpdate("Finance Manager analysing your transactions...");
+
+  let financeAgent: any = null;
+  let result: any = null;
+  const financeModels = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-flash-latest"];
+  let lastError: any = null;
+
+  for (const modelName of financeModels) {
+    try {
+      financeAgent = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction,
+        tools: financeTools
+      });
+      result = await financeAgent.generateContent({
+        contents: [{ role: "user", parts: [{ text: query }] }]
+      });
+      break;
+    } catch (e) {
+      console.warn(`Finance agent failed with ${modelName}, trying fallback.`, e);
+      lastError = e;
+    }
+  }
+
+  if (!result) {
+    throw new Error(`All finance models failed. Last error: ${lastError?.message ?? lastError}`);
+  }
+
+  const calls = result.response.functionCalls();
+  const statusLog: string[] = [];
+
+  if (calls && calls.length > 0) {
+    const functionResponses = [];
+
+    for (const call of calls) {
+      const args = call.args as any;
+      let executionMessage = "";
+
+      if (call.name === 'update_transaction_category') {
+        await updateTransactionCategory(args.transaction_id, args.category);
+        executionMessage = `✓ Updated transaction ${args.transaction_id} to category "${args.category}".`;
+        onStatusUpdate(`Finance Manager updated category → ${args.category}`);
+      }
+
+      statusLog.push(executionMessage);
+      functionResponses.push({
+        functionResponse: {
+          name: call.name,
+          response: { result: executionMessage }
+        }
+      });
+    }
+
+    const finalResult = await financeAgent.generateContent({
+      contents: [
+        { role: 'user', parts: [{ text: query }] },
+        result.response.candidates![0].content,
+        { role: 'user', parts: functionResponses }
+      ]
+    });
+
+    return {
+      text: finalResult.response.text(),
+      statusLog
+    };
+  }
+
+  return {
+    text: result.response.text(),
+    statusLog: []
+  };
 }

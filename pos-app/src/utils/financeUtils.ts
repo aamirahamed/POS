@@ -183,6 +183,7 @@ export function parseNABCsv(
       date,
       amount,
       accountNumber,
+      accountName: '',
       transactionType,
       transactionDetails,
       balance,
