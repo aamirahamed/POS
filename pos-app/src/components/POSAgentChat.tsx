@@ -43,7 +43,7 @@ export const POSAgentChat: FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="fixed inset-0 md:absolute md:bottom-16 md:right-0 w-screen md:w-[400px] h-[100dvh] md:h-[520px] bg-surface/95 md:bg-surface/90 backdrop-blur-xl border-0 md:border border-border/80 md:rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-0 md:mb-4"
+            className="fixed inset-0 md:absolute md:top-auto md:left-auto md:bottom-16 md:right-0 w-screen md:w-[400px] h-[100dvh] md:h-[520px] bg-surface/95 md:bg-surface/90 backdrop-blur-xl border-0 md:border border-border/80 md:rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-0 md:mb-4"
           >
             {/* Header */}
             <div className="px-4 py-3 bg-surface border-b border-border/60 flex items-center justify-between">
