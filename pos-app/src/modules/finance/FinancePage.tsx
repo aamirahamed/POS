@@ -2,9 +2,9 @@ import { FC, useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RefreshCw, ChevronLeft, ChevronRight, Search, X, Trash2,
-  Building2, CheckCircle2, AlertCircle, Loader2, Banknote
+  Building2, CheckCircle2, AlertCircle, Loader2, Banknote, Wallet
 } from 'lucide-react';
-import { useFinanceStore } from '@/store/useFinanceStore';
+import { useFinanceStore, BankAccount } from '@/store/useFinanceStore';
 import {
   detectPayCycles,
   getCurrentPayCycle,
@@ -24,90 +24,108 @@ import WeeklyInsights from './components/WeeklyInsights';
 import DailyTimeline from './components/DailyTimeline';
 import TransactionList from './components/TransactionList';
 
-// ── Bank Account Cards ────────────────────────────────────────────────────────
-const AccountCards: FC<{ onSync: () => void; isSyncing: boolean; lastSynced: string | null }> = ({
+// ── Account Tab Selector ──────────────────────────────────────────────────────
+const AccountSelector: FC<{
+  accounts: BankAccount[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}> = ({ accounts, selectedId, onSelect }) => {
+  if (accounts.length === 0) return null;
+
+  return (
+    <div className="flex gap-2 p-1 bg-white/4 border border-white/6 rounded-2xl">
+      {accounts.map((account) => {
+        const isSelected = selectedId === account.id;
+        // Short label: "Personal" or "Savings" from account name
+        const shortName = account.name.replace(/Account\s*#\d+/i, '').trim() || account.name;
+        return (
+          <motion.button
+            key={account.id}
+            onClick={() => onSelect(account.id)}
+            layout
+            className={`relative flex-1 flex flex-col items-start px-4 py-3 rounded-xl transition-all duration-200 text-left ${
+              isSelected
+                ? 'bg-[#1e2d45] border border-emerald-500/25 shadow-[0_0_16px_rgba(52,211,153,0.08)]'
+                : 'hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            {isSelected && (
+              <motion.div
+                layoutId="account-tab-indicator"
+                className="absolute inset-0 rounded-xl bg-emerald-500/5"
+              />
+            )}
+            <div className="relative flex items-center gap-2 w-full">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                isSelected ? 'bg-emerald-500/20' : 'bg-white/8'
+              }`}>
+                {account.type === 'savings' || account.name.toLowerCase().includes('saving') ? (
+                  <Wallet size={13} className={isSelected ? 'text-emerald-400' : 'text-slate-400'} />
+                ) : (
+                  <Building2 size={13} className={isSelected ? 'text-emerald-400' : 'text-slate-400'} />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-semibold truncate leading-tight ${isSelected ? 'text-white' : 'text-slate-400'}`}>
+                  {shortName}
+                </p>
+                <p className="text-[10px] text-slate-600 uppercase tracking-wider">
+                  {account.accountNumber}
+                </p>
+              </div>
+              {isSelected && (
+                <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              )}
+            </div>
+            {/* Balance */}
+            <div className="relative mt-2 pl-9">
+              {account.balance != null && account.balance !== 0 ? (
+                <p className={`text-base font-bold tracking-tight ${isSelected ? 'text-white' : 'text-slate-500'}`}>
+                  ${account.balance.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-600 italic">—</p>
+              )}
+            </div>
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── Sync Status Bar ───────────────────────────────────────────────────────────
+const SyncBar: FC<{ onSync: () => void; isSyncing: boolean; lastSynced: string | null }> = ({
   onSync, isSyncing, lastSynced
 }) => {
-  const { bankAccounts, transactions } = useFinanceStore();
-
-  const totalBalance = bankAccounts.reduce((sum, a) => sum + (a.balance ?? 0), 0);
   const lastSyncLabel = lastSynced
     ? new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(lastSynced))
     : null;
 
-  // Calculate total spend across all txns this calendar month
-  const thisMonth = new Date().toISOString().slice(0, 7);
-  const monthSpend = transactions
-    .filter(t => t.date.startsWith(thisMonth) && t.isSpending)
-    .reduce((s, t) => s + Math.abs(t.amount), 0);
-
   return (
-    <div className="space-y-3">
-      {/* Connected accounts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {bankAccounts.map((account) => (
-          <motion.div
-            key={account.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-[#1a2235] to-[#141d2e] border border-white/8 rounded-2xl p-4 relative overflow-hidden"
-          >
-            {/* Background glow */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -translate-y-6 translate-x-6" />
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 flex items-center justify-center">
-                  <Building2 size={15} className="text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-white leading-tight">{account.name}</p>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider">{account.accountNumber}</p>
-                </div>
-              </div>
-              <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[10px] text-emerald-400 font-medium">
-                Live
-              </span>
-            </div>
-            <p className="text-slate-500 text-[10px] uppercase tracking-wider mb-0.5">{account.institutionName}</p>
-            <div className="flex items-end justify-between mt-2">
-              <p className="text-xs text-slate-400 capitalize">{account.type} · {account.currency}</p>
-              {account.balance != null && account.balance !== 0 ? (
-                <p className="text-lg font-bold text-white">
-                  ${account.balance.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              ) : (
-                <p className="text-sm text-slate-600 italic">Sync to load balance</p>
-              )}
-            </div>
-          </motion.div>
-        ))}
+    <div className="flex items-center justify-between bg-white/3 border border-white/6 rounded-xl px-4 py-2.5">
+      <div className="flex items-center gap-2">
+        {isSyncing ? (
+          <Loader2 size={13} className="text-emerald-400 animate-spin" />
+        ) : (
+          <CheckCircle2 size={13} className="text-emerald-400" />
+        )}
+        <span className="text-xs text-slate-400">
+          {isSyncing
+            ? 'Syncing transactions from NAB...'
+            : lastSyncLabel
+            ? `Last synced ${lastSyncLabel}`
+            : 'Connected to National Australia Bank'}
+        </span>
       </div>
-
-      {/* Sync status bar */}
-      <div className="flex items-center justify-between bg-white/3 border border-white/6 rounded-xl px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          {isSyncing ? (
-            <Loader2 size={13} className="text-emerald-400 animate-spin" />
-          ) : (
-            <CheckCircle2 size={13} className="text-emerald-400" />
-          )}
-          <span className="text-xs text-slate-400">
-            {isSyncing
-              ? 'Syncing transactions from NAB...'
-              : lastSyncLabel
-              ? `Last synced ${lastSyncLabel}`
-              : 'Connected to National Australia Bank'}
-          </span>
-        </div>
-        <button
-          onClick={onSync}
-          disabled={isSyncing}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RefreshCw size={11} className={isSyncing ? 'animate-spin' : ''} />
-          {isSyncing ? 'Syncing...' : 'Sync Now'}
-        </button>
-      </div>
+      <button
+        onClick={onSync}
+        disabled={isSyncing}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <RefreshCw size={11} className={isSyncing ? 'animate-spin' : ''} />
+        {isSyncing ? 'Syncing...' : 'Sync Now'}
+      </button>
     </div>
   );
 };
@@ -153,11 +171,11 @@ const EmptyState: FC<{ onSync: () => void; isSyncing: boolean; error: string | n
 );
 
 // ── No Pay Cycle Banner ───────────────────────────────────────────────────────
-const NoCycleBanner: FC = () => (
+const NoCycleBanner: FC<{ accountName: string }> = ({ accountName }) => (
   <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-4 text-sm text-amber-300">
-    <p className="font-medium mb-0.5">No salary transactions detected</p>
+    <p className="font-medium mb-0.5">No salary deposits detected in {accountName}</p>
     <p className="text-amber-400/70 text-xs">
-      Looking for salary credits to define pay cycles. Showing all transactions grouped by calendar week as a fallback.
+      Looking for payroll credits to define pay cycles. Showing all transactions for this account as a fallback.
     </p>
   </div>
 );
@@ -181,6 +199,32 @@ const FinancePage: FC = () => {
   const [filterType, setFilterType] = useState<'All' | 'Spending' | 'Income'>('All');
   const [syncSuccess, setSyncSuccess] = useState<number | null>(null);
 
+  // ── Account selection: default to first (Personal) account ───────────────
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+
+  // Auto-select first account once accounts load
+  useEffect(() => {
+    if (bankAccounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(bankAccounts[0].id);
+    }
+  }, [bankAccounts]);
+
+  // When account changes, reset cycle navigation
+  const handleSelectAccount = (id: string) => {
+    setSelectedAccountId(id);
+    setManualIdx(null);
+    setSearch('');
+    setFilterType('All');
+  };
+
+  const selectedAccount = bankAccounts.find(a => a.id === selectedAccountId) ?? bankAccounts[0] ?? null;
+
+  // ── Transactions scoped to selected account ───────────────────────────────
+  const accountTxns = useMemo(() => {
+    if (!selectedAccount) return transactions;
+    return transactions.filter(t => t.accountName === selectedAccount.name);
+  }, [transactions, selectedAccount?.id]);
+
   // Load from Supabase on mount
   useEffect(() => {
     loadFromSupabase();
@@ -195,8 +239,8 @@ const FinancePage: FC = () => {
     }
   };
 
-  // ── Detect pay cycles ─────────────────────────────────────────────────────
-  const payCycles = useMemo(() => detectPayCycles(transactions), [transactions]);
+  // ── Detect pay cycles (scoped to selected account) ────────────────────────
+  const payCycles = useMemo(() => detectPayCycles(accountTxns), [accountTxns]);
   const hasPayCycles = payCycles.length > 0;
 
   const sortedCycles = useMemo(
@@ -220,8 +264,8 @@ const FinancePage: FC = () => {
 
   // ── Derive this cycle's data ──────────────────────────────────────────────
   const thisCycleTxns = useMemo(
-    () => (activeCycle ? getPayCycleTransactions(transactions, activeCycle) : []),
-    [transactions, activeCycle?.id]
+    () => (activeCycle ? getPayCycleTransactions(accountTxns, activeCycle) : []),
+    [accountTxns, activeCycle?.id]
   );
 
   const discretionaryTxns = useMemo(
@@ -254,12 +298,12 @@ const FinancePage: FC = () => {
   const twoCyclesAgo = sortedCycles[activeCycleIdx + 2] ?? null;
 
   const prevCycleTxns = useMemo(
-    () => (prevCycle ? getPayCycleTransactions(transactions, prevCycle) : []),
-    [transactions, prevCycle?.id]
+    () => (prevCycle ? getPayCycleTransactions(accountTxns, prevCycle) : []),
+    [accountTxns, prevCycle?.id]
   );
   const twoCyclesAgoTxns = useMemo(
-    () => (twoCyclesAgo ? getPayCycleTransactions(transactions, twoCyclesAgo) : []),
-    [transactions, twoCyclesAgo?.id]
+    () => (twoCyclesAgo ? getPayCycleTransactions(accountTxns, twoCyclesAgo) : []),
+    [accountTxns, twoCyclesAgo?.id]
   );
 
   const prevCycleCats = useMemo(
@@ -283,7 +327,7 @@ const FinancePage: FC = () => {
 
   // ── Filtered transactions ─────────────────────────────────────────────────
   const filteredTxns = useMemo(() => {
-    const haystack = hasPayCycles && activeCycle ? thisCycleTxns : transactions.slice(0, 200);
+    const haystack = hasPayCycles && activeCycle ? thisCycleTxns : accountTxns.slice(0, 200);
     return haystack.filter((t) => {
       if (
         search &&
@@ -294,7 +338,7 @@ const FinancePage: FC = () => {
       if (filterType === 'Income' && !t.isIncome) return false;
       return true;
     });
-  }, [thisCycleTxns, transactions, search, filterType, hasPayCycles, activeCycle]);
+  }, [thisCycleTxns, accountTxns, search, filterType, hasPayCycles, activeCycle]);
 
   const handleUpdateCategory = useCallback(updateTransactionCategory, [updateTransactionCategory]);
   const hasData = transactions.length > 0;
@@ -421,80 +465,97 @@ const FinancePage: FC = () => {
 
       {/* ── Content ── */}
       <div className="max-w-3xl mx-auto px-4 py-5 pb-24 space-y-5">
-        {/* Bank account cards — always show if connected */}
+
+        {/* ── Account Selector + Sync Bar ── always visible when accounts exist */}
         {hasBankAccounts && (
-          <AccountCards onSync={handleSync} isSyncing={isSyncing} lastSynced={lastSyncedAt} />
+          <>
+            <AccountSelector
+              accounts={bankAccounts}
+              selectedId={selectedAccountId}
+              onSelect={handleSelectAccount}
+            />
+            <SyncBar onSync={handleSync} isSyncing={isSyncing} lastSynced={lastSyncedAt} />
+          </>
         )}
 
         {!hasData ? (
           <EmptyState onSync={handleSync} isSyncing={isSyncing} error={syncError} />
         ) : (
-          <>
-            {!hasPayCycles && <NoCycleBanner />}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedAccountId ?? 'all'}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 }}
+              className="space-y-5"
+            >
+              {!hasPayCycles && <NoCycleBanner accountName={selectedAccount?.name ?? 'this account'} />}
 
-            {/* 1 — Pay Cycle Snapshot */}
-            <WeeklySnapshot
-              cycleLabel={cycleLabel}
-              salaryAmount={activeCycle?.salaryAmount ?? 0}
-              lockedAmount={activeCycle?.lockedAmount ?? 0}
-              usableIncome={usableIncome}
-              spent={spent}
-              healthStatus={healthStatus}
-              hasPayData={hasPayCycles}
-            />
-
-            {/* 2 — Cycle-over-Cycle Comparison */}
-            <WeekComparison rows={comparisonRows} hasTwoWeeksAgo={twoCyclesAgoTxns.length > 0} />
-
-            {/* 3 — Cycle Insights */}
-            {insights.length > 0 && <WeeklyInsights insights={insights} />}
-
-            {/* 4 — Daily Timeline */}
-            <DailyTimeline days={dailyDays} />
-
-            {/* 5 — Transactions */}
-            <div className="bg-[#1a2235] border border-white/8 rounded-2xl p-4">
-              <div className="flex flex-col sm:flex-row gap-2.5 mb-4">
-                <div className="relative flex-1">
-                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Search transactions…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-8 pr-8 py-2.5 bg-white/4 border border-white/8 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/40 transition-colors"
-                  />
-                  {search && (
-                    <button
-                      onClick={() => setSearch('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-1 bg-white/4 rounded-xl p-1 shrink-0">
-                  {(['All', 'Spending', 'Income'] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFilterType(f)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        filterType === f ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <TransactionList
-                transactions={filteredTxns}
-                onUpdateCategory={handleUpdateCategory}
-                initialCount={12}
+              {/* 1 — Pay Cycle Snapshot */}
+              <WeeklySnapshot
+                cycleLabel={cycleLabel}
+                salaryAmount={activeCycle?.salaryAmount ?? 0}
+                lockedAmount={activeCycle?.lockedAmount ?? 0}
+                usableIncome={usableIncome}
+                spent={spent}
+                healthStatus={healthStatus}
+                hasPayData={hasPayCycles}
               />
-            </div>
-          </>
+
+              {/* 2 — Cycle-over-Cycle Comparison */}
+              <WeekComparison rows={comparisonRows} hasTwoWeeksAgo={twoCyclesAgoTxns.length > 0} />
+
+              {/* 3 — Cycle Insights */}
+              {insights.length > 0 && <WeeklyInsights insights={insights} />}
+
+              {/* 4 — Daily Timeline */}
+              <DailyTimeline days={dailyDays} />
+
+              {/* 5 — Transactions */}
+              <div className="bg-[#1a2235] border border-white/8 rounded-2xl p-4">
+                <div className="flex flex-col sm:flex-row gap-2.5 mb-4">
+                  <div className="relative flex-1">
+                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder={`Search ${selectedAccount?.name ?? 'transactions'}…`}
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full pl-8 pr-8 py-2.5 bg-white/4 border border-white/8 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/40 transition-colors"
+                    />
+                    {search && (
+                      <button
+                        onClick={() => setSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-1 bg-white/4 rounded-xl p-1 shrink-0">
+                    {(['All', 'Spending', 'Income'] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setFilterType(f)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          filterType === f ? 'bg-white/10 text-white' : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <TransactionList
+                  transactions={filteredTxns}
+                  onUpdateCategory={handleUpdateCategory}
+                  initialCount={12}
+                />
+              </div>
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
     </div>
