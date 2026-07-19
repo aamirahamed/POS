@@ -11,6 +11,7 @@ import AuthWrapper from '@/modules/auth/AuthWrapper';
 import ThoughtIncubatorPage from '@/modules/incubator/ThoughtIncubatorPage';
 import FinancePage from '@/modules/finance/FinancePage';
 import QuickCapture from '@/modules/capture/QuickCapture';
+import MentorPage from '@/modules/mentor/MentorPage';
 import { Toaster } from '@/components/ui/sonner';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
             <Route path="incubator" element={<ThoughtIncubatorPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="quick-capture" element={<QuickCapture />} />
+            <Route path="mentor" element={<MentorPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
