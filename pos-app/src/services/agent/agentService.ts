@@ -306,7 +306,7 @@ export async function executeAgentCommand(
   
   // 1. Initialize Orchestrator Router
   const orchestrator = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     systemInstruction: ORCHESTRATOR_PROMPT,
     tools: orchestratorTools
   });
@@ -368,7 +368,7 @@ async function executeLifeMapAgent(
   const systemInstruction = `${LIFEMAP_PROMPT}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
 
   const lifemapAgent = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     systemInstruction,
     tools: lifemapAgentTools()
   });
@@ -516,7 +516,7 @@ ${outlineText || "No nodes currently exist."}`;
   } catch (e) {
     console.warn("gemini-2.5-pro model initialization failed, falling back to gemini-2.5-flash", e);
     mentorAgent = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       systemInstruction,
       tools: mentorAgentTools()
     });
@@ -530,7 +530,7 @@ ${outlineText || "No nodes currently exist."}`;
   } catch (e: any) {
     console.warn("gemini-2.5-pro query failed, retrying with gemini-2.5-flash", e);
     mentorAgent = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       systemInstruction,
       tools: mentorAgentTools()
     });
@@ -635,7 +635,7 @@ async function executeShoppingAgent(
   const systemInstruction = `${SHOPPING_PROMPT}\n\nCurrent Shopping List:\n${listText || "No items currently on the list."}`;
 
   const shoppingAgent = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: "gemini-2.0-flash",
     systemInstruction,
     tools: shoppingTools
   });
