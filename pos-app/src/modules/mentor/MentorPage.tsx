@@ -29,7 +29,8 @@ const MentorPage: FC = () => {
     sendMessage,
     clearMessages,
     runAudit,
-    applySuggestion
+    applySuggestion,
+    loadHistoryFromDB
   } = useMentorStore();
 
   const { reminders, addReminder, toggleReminder, deleteReminder } = useRemindersStore();
@@ -43,6 +44,11 @@ const MentorPage: FC = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
+
+  // Load chat history on mount
+  useEffect(() => {
+    loadHistoryFromDB();
+  }, []);
 
   // Run audit on mount if empty
   useEffect(() => {

@@ -421,7 +421,7 @@ async function executeLifeMapAgent(
 // ──────────────────────────────────────────────────────────
 // 5.5. Personal Mentor Sub-Agent Runner
 // ──────────────────────────────────────────────────────────
-async function executeMentorAgent(
+export async function executeMentorAgent(
   genAI: GoogleGenerativeAI,
   query: string,
   onStatusUpdate: (status: string) => void
@@ -433,7 +433,17 @@ async function executeMentorAgent(
     return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}`;
   }).join('\n');
 
-  const systemInstruction = `${MENTOR_PROMPT}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
+  let mentorMemo = "";
+  try {
+    const res = await fetch('/MENTOR.md');
+    if (res.ok) {
+      mentorMemo = await res.text();
+    }
+  } catch (e) {
+    console.warn("Could not load MENTOR.md profile memo", e);
+  }
+
+  const systemInstruction = `${MENTOR_PROMPT}\n\nPersonal Strategy Profile (MENTOR.md):\n${mentorMemo}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
 
   // Try gemini-2.5-pro first as requested; fallback to gemini-2.5-flash if needed
   let mentorAgent;

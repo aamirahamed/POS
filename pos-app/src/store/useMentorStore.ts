@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { executeMentorAgent } from '@/services/agent/agentService';
 import { useLifeMapStore } from './useLifeMapStore';
+import { supabase } from '@/lib/supabase';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -38,6 +39,7 @@ interface MentorState {
   clearMessages: () => void;
   runAudit: () => Promise<void>;
   applySuggestion: (suggestionId: string) => Promise<void>;
+  loadHistoryFromDB: () => Promise<void>;
 }
 
 export const useMentorStore = create<MentorState>()(
@@ -75,6 +77,17 @@ export const useMentorStore = create<MentorState>()(
           currentStatus: 'Mentor thinking...'
         }));
 
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('mentor_chat_history').insert({
+            id: userMsg.id,
+            user_id: user.id,
+            role: userMsg.role,
+            text: userMsg.text,
+            status_log: []
+          });
+        }
+
         try {
           const genAI = new GoogleGenerativeAI(API_KEY || '');
 
@@ -99,6 +112,16 @@ export const useMentorStore = create<MentorState>()(
             currentStatus: ''
           }));
 
+          if (user) {
+            await supabase.from('mentor_chat_history').insert({
+              id: assistantMsg.id,
+              user_id: user.id,
+              role: assistantMsg.role,
+              text: assistantMsg.text,
+              status_log: assistantMsg.statusLog || []
+            });
+          }
+
           // Trigger a silent audit update in the background when the map changes
           if (response.statusLog && response.statusLog.length > 0) {
             get().runAudit();
@@ -121,16 +144,60 @@ export const useMentorStore = create<MentorState>()(
         }
       },
 
-      clearMessages: () => set({
-        messages: [
-          {
-            id: 'welcome',
-            role: 'assistant',
-            text: "Hello Aamir. I am your Personal Lifemap Mentor. I have analyzed your pillars, threads, initiatives, and execution nodes. I am here to help you strategize, prioritize, call out stagnation, and ensure you make continuous progress in life. Ask me anything about your roadmap, what you should focus on today, or ask me to review your balance.",
-            timestamp: Date.now()
-          }
-        ]
-      }),
+      clearMessages: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from('mentor_chat_history').delete().eq('user_id', user.id);
+        }
+        set({
+          messages: [
+            {
+              id: 'welcome',
+              role: 'assistant',
+              text: "Hello Aamir. I am your Personal Lifemap Mentor. I have analyzed your pillars, threads, initiatives, and execution nodes. I am here to help you strategize, prioritize, call out stagnation, and ensure you make continuous progress in life. Ask me anything about your roadmap, what you should focus on today, or ask me to review your balance.",
+              timestamp: Date.now()
+            }
+          ]
+        });
+      },
+
+      loadHistoryFromDB: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('mentor_chat_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+        
+        if (error) {
+          console.error("Error loading chat history:", error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const formatted: ChatMessage[] = data.map((row: any) => ({
+            id: row.id,
+            role: row.role,
+            text: row.text,
+            statusLog: row.status_log || [],
+            timestamp: new Date(row.created_at).getTime()
+          }));
+          
+          const hasWelcome = formatted.some(m => m.id === 'welcome');
+          const finalMessages = hasWelcome ? formatted : [
+            {
+              id: 'welcome',
+              role: 'assistant',
+              text: "Hello Aamir. I am your Personal Lifemap Mentor. I have analyzed your pillars, threads, initiatives, and execution nodes. I am here to help you strategize, prioritize, call out stagnation, and ensure you make continuous progress in life. Ask me anything about your roadmap, what you should focus on today, or ask me to review your balance.",
+              timestamp: Date.now()
+            },
+            ...formatted
+          ] as ChatMessage[];
+
+          set({ messages: finalMessages });
+        }
+      },
 
       runAudit: async () => {
         if (!API_KEY) return;
