@@ -2,6 +2,8 @@ import { GoogleGenerativeAI, FunctionDeclaration, Tool, Content, SchemaType } fr
 import { ORCHESTRATOR_PROMPT, LIFEMAP_PROMPT, SHOPPING_PROMPT, MENTOR_PROMPT } from "./prompts";
 import { useLifeMapStore } from "@/store/useLifeMapStore";
 import { useShoppingStore } from "@/store/useShoppingStore";
+import { useMentorStore } from "@/store/useMentorStore";
+import { supabase } from "@/lib/supabase";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -200,6 +202,38 @@ const lifemapTools: Tool[] = [{
     changeNodeTypeDecl
   ]
 }];
+
+const updateMentorProfileDecl: FunctionDeclaration = {
+  name: 'update_mentor_profile',
+  description: 'Update the persistent dynamic coaching profile memo / memory of Aamir. Use this to remember his target companies, preferred schedule constraints, or long term decisions.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      content: { type: SchemaType.STRING, description: 'The updated full content for the persistent profile memory.' }
+    },
+    required: ['content']
+  }
+};
+
+const mentorTools: Tool[] = [{
+  functionDeclarations: [
+    addPillarDecl, 
+    addThreadDecl, 
+    addInitiativeDecl, 
+    addSubnodeDecl, 
+    addTaskToNodeDecl, 
+    addInboxItemDecl,
+    deleteNodeDecl,
+    moveNodeDecl,
+    renameNodeDecl,
+    changeNodeTypeDecl,
+    updateMentorProfileDecl
+  ]
+}];
+
+function mentorAgentTools(): Tool[] {
+  return mentorTools;
+}
 
 // ──────────────────────────────────────────────────────────
 // 3. Tool Definitions for Shopping Agent
@@ -443,7 +477,33 @@ export async function executeMentorAgent(
     console.warn("Could not load MENTOR.md profile memo", e);
   }
 
-  const systemInstruction = `${MENTOR_PROMPT}\n\nPersonal Strategy Profile (MENTOR.md):\n${mentorMemo}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
+  let cloudMemory = "";
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('mentor_profile_memory')
+        .select('content')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data) {
+        cloudMemory = data.content;
+      }
+    }
+  } catch (e) {
+    console.warn("Could not load cloud profile memory", e);
+  }
+
+  const systemInstruction = `${MENTOR_PROMPT}
+
+Personal Strategy Profile (MENTOR.md):
+${mentorMemo}
+
+Dynamic Cloud Memory:
+${cloudMemory || "No additional dynamic notes saved."}
+
+Current Life Map Outline:
+${outlineText || "No nodes currently exist."}`;
 
   // Try gemini-2.5-pro first as requested; fallback to gemini-2.5-flash if needed
   let mentorAgent;
@@ -451,14 +511,14 @@ export async function executeMentorAgent(
     mentorAgent = genAI.getGenerativeModel({
       model: "gemini-2.5-pro",
       systemInstruction,
-      tools: lifemapAgentTools()
+      tools: mentorAgentTools()
     });
   } catch (e) {
     console.warn("gemini-2.5-pro model initialization failed, falling back to gemini-2.5-flash", e);
     mentorAgent = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       systemInstruction,
-      tools: lifemapAgentTools()
+      tools: mentorAgentTools()
     });
   }
 
@@ -472,7 +532,7 @@ export async function executeMentorAgent(
     mentorAgent = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
       systemInstruction,
-      tools: lifemapAgentTools()
+      tools: mentorAgentTools()
     });
     result = await mentorAgent.generateContent({
       contents: [{ role: "user", parts: [{ text: query }] }]
@@ -521,6 +581,9 @@ export async function executeMentorAgent(
     } else if (call.name === 'change_node_type') {
       await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
       executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+    } else if (call.name === 'update_mentor_profile') {
+      await useMentorStore.getState().updateProfileMemory(args.content);
+      executionMessage = `✓ Updated dynamic profile memory.`;
     }
 
     statusLog.push(executionMessage);

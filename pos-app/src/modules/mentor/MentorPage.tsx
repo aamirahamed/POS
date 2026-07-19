@@ -26,11 +26,14 @@ const MentorPage: FC = () => {
     isGenerating,
     isAuditing,
     currentStatus,
+    profileMemory,
     sendMessage,
     clearMessages,
     runAudit,
     applySuggestion,
-    loadHistoryFromDB
+    loadHistoryFromDB,
+    loadProfileMemory,
+    updateProfileMemory
   } = useMentorStore();
 
   const { reminders, addReminder, toggleReminder, deleteReminder } = useRemindersStore();
@@ -38,6 +41,8 @@ const MentorPage: FC = () => {
   
   const [input, setInput] = useState('');
   const [newReminderText, setNewReminderText] = useState('');
+  const [localMemoryText, setLocalMemoryText] = useState('');
+  const [isSavingMemory, setIsSavingMemory] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll chat
@@ -48,7 +53,19 @@ const MentorPage: FC = () => {
   // Load chat history on mount
   useEffect(() => {
     loadHistoryFromDB();
+    loadProfileMemory();
   }, []);
+
+  // Sync store profile memory to local textarea input
+  useEffect(() => {
+    setLocalMemoryText(profileMemory);
+  }, [profileMemory]);
+
+  const handleSaveMemory = async () => {
+    setIsSavingMemory(true);
+    await updateProfileMemory(localMemoryText);
+    setIsSavingMemory(false);
+  };
 
   // Run audit on mount if empty
   useEffect(() => {
@@ -283,6 +300,36 @@ const MentorPage: FC = () => {
               </AnimatePresence>
             )}
           </div>
+        </div>
+
+        {/* Mentor Dynamic Memory Card */}
+        <div className="bg-surface/50 border border-border/60 rounded-2xl p-5 shadow-sm backdrop-blur-md flex flex-col gap-3">
+          <div className="flex items-center justify-between border-b border-border/30 pb-2">
+            <div className="flex items-center gap-2 text-accent">
+              <Sparkles size={16} />
+              <h3 className="text-xs font-bold tracking-wider uppercase">Mentor Dynamic Memory</h3>
+            </div>
+            <button
+              onClick={handleSaveMemory}
+              disabled={isSavingMemory}
+              className="text-[10px] font-semibold text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
+            >
+              {isSavingMemory ? (
+                <>
+                  <Loader2 size={10} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <span>Save Note</span>
+              )}
+            </button>
+          </div>
+          <textarea
+            value={localMemoryText}
+            onChange={(e) => setLocalMemoryText(e.target.value)}
+            placeholder="Mentor saves notes here automatically when asked, or you can edit/append details manually..."
+            className="w-full h-28 bg-surface-hover/50 border border-border/40 rounded-xl p-3 text-xs text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent/60 resize-none scrollbar-thin"
+          />
         </div>
 
         {/* Weekly Focus Checklist (Syncs with Reminders) */}

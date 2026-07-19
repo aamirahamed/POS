@@ -34,12 +34,15 @@ interface MentorState {
   isGenerating: boolean;
   isAuditing: boolean;
   currentStatus: string;
+  profileMemory: string;
   
   sendMessage: (text: string) => Promise<void>;
   clearMessages: () => void;
   runAudit: () => Promise<void>;
   applySuggestion: (suggestionId: string) => Promise<void>;
   loadHistoryFromDB: () => Promise<void>;
+  loadProfileMemory: () => Promise<void>;
+  updateProfileMemory: (content: string) => Promise<void>;
 }
 
 export const useMentorStore = create<MentorState>()(
@@ -59,6 +62,7 @@ export const useMentorStore = create<MentorState>()(
       isGenerating: false,
       isAuditing: false,
       currentStatus: '',
+      profileMemory: '',
 
       sendMessage: async (text) => {
         const trimmed = text.trim();
@@ -197,6 +201,36 @@ export const useMentorStore = create<MentorState>()(
 
           set({ messages: finalMessages });
         }
+      },
+
+      loadProfileMemory: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase
+          .from('mentor_profile_memory')
+          .select('content')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (error) {
+          console.error("Error loading profile memory:", error);
+          return;
+        }
+        if (data) {
+          set({ profileMemory: data.content });
+        }
+      },
+
+      updateProfileMemory: async (content: string) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { error } = await supabase
+          .from('mentor_profile_memory')
+          .upsert({ user_id: user.id, content, updated_at: new Date().toISOString() });
+        if (error) {
+          console.error("Error updating profile memory:", error);
+          return;
+        }
+        set({ profileMemory: content });
       },
 
       runAudit: async () => {
@@ -343,7 +377,8 @@ Rules:
         messages: state.messages,
         activeCritique: state.activeCritique,
         balanceRatios: state.balanceRatios,
-        suggestions: state.suggestions
+        suggestions: state.suggestions,
+        profileMemory: state.profileMemory
       })
     }
   )
