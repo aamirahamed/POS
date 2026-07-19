@@ -202,7 +202,7 @@ export async function executeAgentCommand(
   
   // 1. Initialize Orchestrator Router
   const orchestrator = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: ORCHESTRATOR_PROMPT,
     tools: orchestratorTools
   });
@@ -259,7 +259,7 @@ async function executeLifeMapAgent(
   const systemInstruction = `${LIFEMAP_PROMPT}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
 
   const lifemapAgent = genAI.getGenerativeModel({
-    model: "gemini-1.5-pro",
+    model: "gemini-2.5-flash",
     systemInstruction,
     tools: lifemapAgentTools()
   });
@@ -349,7 +349,7 @@ async function executeShoppingAgent(
   const systemInstruction = `${SHOPPING_PROMPT}\n\nCurrent Shopping List:\n${listText || "No items currently on the list."}`;
 
   const shoppingAgent = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     systemInstruction,
     tools: shoppingTools
   });
