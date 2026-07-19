@@ -77,6 +77,8 @@ export interface LifeMapState {
     toggleNodeExpansion: (id: string) => void;
     deleteNodeImmediately: (id: string) => void;
     moveNode: (id: string, newParentId: string) => void;
+    renameNode: (id: string, label: string) => void;
+    changeNodeType: (id: string, type: NodeType) => void;
 
     // Task actions
     addTaskToNode: (nodeId: string, text: string) => void;

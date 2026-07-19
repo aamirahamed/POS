@@ -145,6 +145,35 @@ const moveNodeDecl: FunctionDeclaration = {
   }
 };
 
+const renameNodeDecl: FunctionDeclaration = {
+  name: 'rename_node',
+  description: 'Change/update the display label of a specific node in the Life Map (rename it).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      node_id: { type: SchemaType.STRING, description: 'The exact ID of the node to rename.' },
+      label: { type: SchemaType.STRING, description: 'The new name/label for the node.' }
+    },
+    required: ['node_id', 'label']
+  }
+};
+
+const changeNodeTypeDecl: FunctionDeclaration = {
+  name: 'change_node_type',
+  description: 'Change the type level of a node in the Life Map structure (e.g. promoting a subnode to an initiative, or demoting an initiative to a subnode).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      node_id: { type: SchemaType.STRING, description: 'The exact ID of the node.' },
+      type: { 
+        type: SchemaType.STRING, 
+        description: 'The new type level. Must be one of: pillar, thread, initiative, subnode.' 
+      }
+    },
+    required: ['node_id', 'type']
+  }
+};
+
 const lifemapTools: Tool[] = [{
   functionDeclarations: [
     addPillarDecl, 
@@ -154,7 +183,9 @@ const lifemapTools: Tool[] = [{
     addTaskToNodeDecl, 
     addInboxItemDecl,
     deleteNodeDecl,
-    moveNodeDecl
+    moveNodeDecl,
+    renameNodeDecl,
+    changeNodeTypeDecl
   ]
 }];
 
@@ -331,6 +362,12 @@ async function executeLifeMapAgent(
     } else if (call.name === 'move_node') {
       await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
       executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
+    } else if (call.name === 'rename_node') {
+      await useLifeMapStore.getState().renameNode(args.node_id, args.label);
+      executionMessage = `✓ Renamed node ID "${args.node_id}" to "${args.label}".`;
+    } else if (call.name === 'change_node_type') {
+      await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
+      executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
     }
 
     statusLog.push(executionMessage);

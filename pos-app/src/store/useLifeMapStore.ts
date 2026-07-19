@@ -629,6 +629,42 @@ export const useLifeMapStore = create<LifeMapState>()(
                     immediateSync(nodes, edges);
                 },
 
+                renameNode: (id, label) => {
+                    if (id.endsWith('-inbox')) return;
+                    const state = get();
+                    const nodes = state.nodes.map(node => {
+                        if (node.id === id) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    label
+                                }
+                            };
+                        }
+                        return node;
+                    });
+                    set({ nodes });
+                    immediateSync(nodes, state.edges);
+                },
+
+                changeNodeType: (id, type) => {
+                    if (id.endsWith('-inbox')) return;
+                    const state = get();
+                    const nodes = state.nodes.map(node => {
+                        if (node.id === id) {
+                            return {
+                                ...node,
+                                type
+                            };
+                        }
+                        return node;
+                    });
+                    const layouted = calculateRadialLayout(nodes, state.edges);
+                    set({ nodes: layouted.nodes });
+                    immediateSync(layouted.nodes, state.edges);
+                },
+
                 setNodes: (nodes) => set({ nodes }),
                 setEdges: (edges) => set({ edges }),
 
