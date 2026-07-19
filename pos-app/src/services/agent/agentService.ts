@@ -120,6 +120,31 @@ const addInboxItemDecl: FunctionDeclaration = {
   }
 };
 
+const deleteNodeDecl: FunctionDeclaration = {
+  name: 'delete_node',
+  description: 'Delete a node and all of its sub-nodes/descendants from the Life Map.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      node_id: { type: SchemaType.STRING, description: 'The exact ID of the node to delete.' }
+    },
+    required: ['node_id']
+  }
+};
+
+const moveNodeDecl: FunctionDeclaration = {
+  name: 'move_node',
+  description: 'Move a node to a different parent node in the Life Map (re-parenting/moving).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      node_id: { type: SchemaType.STRING, description: 'The exact ID of the node to move.' },
+      new_parent_id: { type: SchemaType.STRING, description: 'The exact ID of the new parent node.' }
+    },
+    required: ['node_id', 'new_parent_id']
+  }
+};
+
 const lifemapTools: Tool[] = [{
   functionDeclarations: [
     addPillarDecl, 
@@ -127,7 +152,9 @@ const lifemapTools: Tool[] = [{
     addInitiativeDecl, 
     addSubnodeDecl, 
     addTaskToNodeDecl, 
-    addInboxItemDecl
+    addInboxItemDecl,
+    deleteNodeDecl,
+    moveNodeDecl
   ]
 }];
 
@@ -298,6 +325,12 @@ async function executeLifeMapAgent(
     } else if (call.name === 'add_inbox_item') {
       await useLifeMapStore.getState().addInboxItem(args.text);
       executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
+    } else if (call.name === 'delete_node') {
+      await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
+      executionMessage = `✓ Deleted node ID "${args.node_id}".`;
+    } else if (call.name === 'move_node') {
+      await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
+      executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
     }
 
     statusLog.push(executionMessage);

@@ -577,6 +577,58 @@ export const useLifeMapStore = create<LifeMapState>()(
                     set({ nodeToDelete: id });
                 },
 
+                deleteNodeImmediately: (id) => {
+                    if (id.endsWith('-inbox')) return;
+                    const state = get();
+                    const getAllDescendants = (nodeId: string): string[] => {
+                        const children = state.nodes.filter(n => n.data.parentId === nodeId).map(n => n.id);
+                        let descendants = [...children];
+                        children.forEach(childId => {
+                            descendants = descendants.concat(getAllDescendants(childId));
+                        });
+                        return descendants;
+                    };
+                    const nodesToDelete = [id, ...getAllDescendants(id)];
+                    const newNodes = state.nodes.filter((node) => !nodesToDelete.includes(node.id));
+                    const newEdges = state.edges.filter((edge) => !nodesToDelete.includes(edge.source) && !nodesToDelete.includes(edge.target));
+                    
+                    const layouted = calculateRadialLayout(newNodes, newEdges);
+                    set({ nodes: layouted.nodes, edges: newEdges });
+                    immediateSync(newNodes, newEdges);
+                },
+
+                moveNode: (id, newParentId) => {
+                    if (id.endsWith('-inbox')) return;
+                    const state = get();
+                    const nodes = state.nodes.map(node => {
+                        if (node.id === id) {
+                            return {
+                                ...node,
+                                data: {
+                                    ...node.data,
+                                    parentId: newParentId
+                                }
+                            };
+                        }
+                        return node;
+                    });
+
+                    const edges = state.edges.map(edge => {
+                        if (edge.target === id) {
+                            return {
+                                ...edge,
+                                id: `e-${newParentId}-${id}`,
+                                source: newParentId
+                            };
+                        }
+                        return edge;
+                    });
+
+                    const layouted = calculateRadialLayout(nodes, edges);
+                    set({ nodes: layouted.nodes, edges });
+                    immediateSync(nodes, edges);
+                },
+
                 setNodes: (nodes) => set({ nodes }),
                 setEdges: (edges) => set({ edges }),
 
