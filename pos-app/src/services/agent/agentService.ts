@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, FunctionDeclaration, Tool, Content, SchemaType } from "@google/generative-ai";
-import { ORCHESTRATOR_PROMPT, LIFEMAP_PROMPT, SHOPPING_PROMPT } from "./prompts";
+import { ORCHESTRATOR_PROMPT, LIFEMAP_PROMPT, SHOPPING_PROMPT, MENTOR_PROMPT } from "./prompts";
 import { useLifeMapStore } from "@/store/useLifeMapStore";
 import { useShoppingStore } from "@/store/useShoppingStore";
 
@@ -37,8 +37,20 @@ const routeToShoppingDeclaration: FunctionDeclaration = {
   }
 };
 
+const routeToMentorDeclaration: FunctionDeclaration = {
+  name: 'route_to_mentor_agent',
+  description: 'Delegate the user request to the Personal Lifemap Mentor sub-agent to handle strategy sessions, roadmaps, prioritizations, accountability critiques, and coaching reviews.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      query: { type: SchemaType.STRING, description: 'The coaching request or strategy query for the Mentor agent.' }
+    },
+    required: ['query']
+  }
+};
+
 const orchestratorTools: Tool[] = [{
-  functionDeclarations: [routeToLifeMapDeclaration, routeToShoppingDeclaration]
+  functionDeclarations: [routeToLifeMapDeclaration, routeToShoppingDeclaration, routeToMentorDeclaration]
 }];
 
 // ──────────────────────────────────────────────────────────
@@ -289,6 +301,11 @@ export async function executeAgentCommand(
       onStatusUpdate("Forwarding to Shopping Assistant...");
       return await executeShoppingAgent(genAI, targetQuery, onStatusUpdate);
     }
+
+    if (call.name === 'route_to_mentor_agent') {
+      onStatusUpdate("Forwarding to Personal Mentor...");
+      return await executeMentorAgent(genAI, targetQuery, onStatusUpdate);
+    }
   }
 
   // Fallback to direct general response
@@ -374,6 +391,132 @@ async function executeLifeMapAgent(
 
     // Feed back result to get natural response
     const finalResult = await lifemapAgent.generateContent({
+      contents: [
+        { role: 'user', parts: [{ text: query }] },
+        result.response.candidates![0].content,
+        {
+          role: 'user',
+          parts: [{
+            functionResponse: {
+              name: call.name,
+              response: { result: executionMessage }
+            }
+          }]
+        }
+      ]
+    });
+
+    return {
+      text: finalResult.response.text(),
+      statusLog
+    };
+  }
+
+  return {
+    text: result.response.text(),
+    statusLog: []
+  };
+}
+
+// ──────────────────────────────────────────────────────────
+// 5.5. Personal Mentor Sub-Agent Runner
+// ──────────────────────────────────────────────────────────
+async function executeMentorAgent(
+  genAI: GoogleGenerativeAI,
+  query: string,
+  onStatusUpdate: (status: string) => void
+): Promise<AgentResponse> {
+  const { nodes } = useLifeMapStore.getState();
+  
+  const outlineText = nodes.map(n => {
+    const parent = n.data?.parentId ? ` (parent ID: "${n.data.parentId}")` : '';
+    return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}`;
+  }).join('\n');
+
+  const systemInstruction = `${MENTOR_PROMPT}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
+
+  // Try gemini-2.5-pro first as requested; fallback to gemini-2.5-flash if needed
+  let mentorAgent;
+  try {
+    mentorAgent = genAI.getGenerativeModel({
+      model: "gemini-2.5-pro",
+      systemInstruction,
+      tools: lifemapAgentTools()
+    });
+  } catch (e) {
+    console.warn("gemini-2.5-pro model initialization failed, falling back to gemini-2.5-flash", e);
+    mentorAgent = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction,
+      tools: lifemapAgentTools()
+    });
+  }
+
+  let result;
+  try {
+    result = await mentorAgent.generateContent({
+      contents: [{ role: "user", parts: [{ text: query }] }]
+    });
+  } catch (e: any) {
+    console.warn("gemini-2.5-pro query failed, retrying with gemini-2.5-flash", e);
+    mentorAgent = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction,
+      tools: lifemapAgentTools()
+    });
+    result = await mentorAgent.generateContent({
+      contents: [{ role: "user", parts: [{ text: query }] }]
+    });
+  }
+
+  const calls = result.response.functionCalls();
+  const statusLog: string[] = [];
+
+  if (calls && calls.length > 0) {
+    const call = calls[0];
+    const args = call.args as any;
+    let executionMessage = "";
+
+    onStatusUpdate(`Mentor executing: ${call.name}...`);
+    statusLog.push(`Calling tool: ${call.name}`);
+
+    // Dispatch stores actions
+    if (call.name === 'add_pillar') {
+      await useLifeMapStore.getState().addPillar(args.label);
+      executionMessage = `✓ Added Pillar "${args.label}" to Life Map.`;
+    } else if (call.name === 'add_thread') {
+      await useLifeMapStore.getState().addThread(args.parent_id, args.label);
+      executionMessage = `✓ Added Thread "${args.label}" under parent ID "${args.parent_id}".`;
+    } else if (call.name === 'add_initiative') {
+      await useLifeMapStore.getState().addInitiative(args.parent_id, args.label);
+      executionMessage = `✓ Added Initiative "${args.label}" under parent ID "${args.parent_id}".`;
+    } else if (call.name === 'add_subnode') {
+      await useLifeMapStore.getState().addSubnode(args.parent_id, args.label);
+      executionMessage = `✓ Added Subnode "${args.label}" under parent ID "${args.parent_id}".`;
+    } else if (call.name === 'add_task_to_node') {
+      await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
+      executionMessage = `✓ Added task "${args.text}" into Execution Node ID "${args.node_id}".`;
+    } else if (call.name === 'add_inbox_item') {
+      await useLifeMapStore.getState().addInboxItem(args.text);
+      executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
+    } else if (call.name === 'delete_node') {
+      await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
+      executionMessage = `✓ Deleted node ID "${args.node_id}".`;
+    } else if (call.name === 'move_node') {
+      await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
+      executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
+    } else if (call.name === 'rename_node') {
+      await useLifeMapStore.getState().renameNode(args.node_id, args.label);
+      executionMessage = `✓ Renamed node ID "${args.node_id}" to "${args.label}".`;
+    } else if (call.name === 'change_node_type') {
+      await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
+      executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+    }
+
+    statusLog.push(executionMessage);
+
+    // Feed back result to get natural response
+    const finalResult = await mentorAgent.generateContent({
       contents: [
         { role: 'user', parts: [{ text: query }] },
         result.response.candidates![0].content,
