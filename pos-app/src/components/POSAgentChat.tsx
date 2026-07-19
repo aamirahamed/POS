@@ -43,7 +43,7 @@ export const POSAgentChat: FC = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="w-[360px] md:w-[400px] h-[520px] bg-surface/90 backdrop-blur-xl border border-border/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-4"
+            className="fixed inset-0 md:absolute md:bottom-16 md:right-0 w-screen md:w-[400px] h-[100dvh] md:h-[520px] bg-surface/95 md:bg-surface/90 backdrop-blur-xl border-0 md:border border-border/80 md:rounded-2xl shadow-2xl flex flex-col overflow-hidden mb-0 md:mb-4"
           >
             {/* Header */}
             <div className="px-4 py-3 bg-surface border-b border-border/60 flex items-center justify-between">
@@ -127,10 +127,9 @@ export const POSAgentChat: FC = () => {
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Area */}
             <form
               onSubmit={handleSubmit}
-              className="p-3 bg-surface border-t border-border/60 flex items-center gap-2"
+              className="p-3 bg-surface border-t border-border/60 flex items-center gap-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:pb-3"
             >
               <input
                 type="text"
@@ -138,7 +137,7 @@ export const POSAgentChat: FC = () => {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask me to do something..."
                 disabled={isGenerating}
-                className="flex-1 bg-surface-hover border border-border/80 rounded-xl px-3 py-2 text-sm text-text-primary placeholder-text-secondary/60 focus:outline-none focus:border-accent/60 disabled:opacity-50"
+                className="flex-1 bg-surface-hover border border-border/80 rounded-xl px-3 py-2.5 text-[16px] md:text-sm text-text-primary placeholder-text-secondary/60 focus:outline-none focus:border-accent/60 disabled:opacity-50"
               />
               <button
                 type="submit"
