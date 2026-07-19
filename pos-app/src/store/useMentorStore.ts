@@ -246,55 +246,48 @@ export const useMentorStore = create<MentorState>()(
 
           const genAI = new GoogleGenerativeAI(API_KEY);
           
-          // Request structured JSON audit from Gemini 2.5 Flash for speed & cost
-          const auditorModel = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash",
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: SchemaType.OBJECT,
-                properties: {
-                  activeCritique: {
-                    type: SchemaType.STRING,
-                    description: "High-level professional strategic audit critique. Highlight imbalances, stagnation, or neglect. Be direct and structured."
+          const auditSchema: any = {
+            type: SchemaType.OBJECT,
+            properties: {
+              activeCritique: {
+                type: SchemaType.STRING,
+                description: "High-level professional strategic audit critique. Highlight imbalances, stagnation, or neglect. Be direct and structured."
+              },
+              balanceRatios: {
+                type: SchemaType.ARRAY,
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    label: { type: SchemaType.STRING, description: "Name of the Pillar (Health, Career, Growth, Relationships, Masters)" },
+                    count: { type: SchemaType.INTEGER, description: "Number of active nodes under this pillar" }
                   },
-                  balanceRatios: {
-                    type: SchemaType.ARRAY,
-                    items: {
+                  required: ["label", "count"]
+                }
+              },
+              suggestions: {
+                type: SchemaType.ARRAY,
+                description: "List of 3 concrete, actionable changes to improve the life map structure.",
+                items: {
+                  type: SchemaType.OBJECT,
+                  properties: {
+                    description: { type: SchemaType.STRING, description: "Mentor explanation of what to add/edit and why." },
+                    actionType: { type: SchemaType.STRING, description: "Type of action to perform. Must be one of: add_subnode, add_initiative, add_task" },
+                    payload: {
                       type: SchemaType.OBJECT,
                       properties: {
-                        label: { type: SchemaType.STRING, description: "Name of the Pillar (Health, Career, Growth, Relationships, Masters)" },
-                        count: { type: SchemaType.INTEGER, description: "Number of active nodes under this pillar" }
+                        parentId: { type: SchemaType.STRING, description: "Target ID of the existing parent node." },
+                        label: { type: SchemaType.STRING, description: "Label/Title for the new node (required for add_subnode/add_initiative)." },
+                        text: { type: SchemaType.STRING, description: "Task text (required for add_task)." }
                       },
-                      required: ["label", "count"]
+                      required: ["parentId"]
                     }
                   },
-                  suggestions: {
-                    type: SchemaType.ARRAY,
-                    description: "List of 3 concrete, actionable changes to improve the life map structure.",
-                    items: {
-                      type: SchemaType.OBJECT,
-                      properties: {
-                        description: { type: SchemaType.STRING, description: "Mentor explanation of what to add/edit and why." },
-                        actionType: { type: SchemaType.STRING, description: "Type of action to perform. Must be one of: add_subnode, add_initiative, add_task" },
-                        payload: {
-                          type: SchemaType.OBJECT,
-                          properties: {
-                            parentId: { type: SchemaType.STRING, description: "Target ID of the existing parent node." },
-                            label: { type: SchemaType.STRING, description: "Label/Title for the new node (required for add_subnode/add_initiative)." },
-                            text: { type: SchemaType.STRING, description: "Task text (required for add_task)." }
-                          },
-                          required: ["parentId"]
-                        }
-                      },
-                      required: ["description", "actionType", "payload"]
-                    }
-                  }
-                },
-                required: ["activeCritique", "balanceRatios", "suggestions"]
+                  required: ["description", "actionType", "payload"]
+                }
               }
-            }
-          });
+            },
+            required: ["activeCritique", "balanceRatios", "suggestions"]
+          };
 
           const prompt = `
 You are the auditing engine for Aamir's Personal Lifemap Mentor.
@@ -309,7 +302,27 @@ Rules:
 3. Suggest exactly 3 concrete roadmap improvements (creating initiatives, subnodes, or tasks). Provide the exact parent node IDs from the outline.
 `;
 
-          const result = await auditorModel.generateContent(prompt);
+          let result;
+          try {
+            const auditorModel = genAI.getGenerativeModel({
+              model: "gemini-2.5-flash",
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: auditSchema
+              }
+            });
+            result = await auditorModel.generateContent(prompt);
+          } catch (e) {
+            console.warn("Audit failed with gemini-2.5-flash, trying gemini-flash-latest", e);
+            const auditorModel = genAI.getGenerativeModel({
+              model: "gemini-flash-latest",
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: auditSchema
+              }
+            });
+            result = await auditorModel.generateContent(prompt);
+          }
           const responseText = result.response.text();
           const auditData = JSON.parse(responseText);
 

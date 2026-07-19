@@ -304,20 +304,30 @@ export async function executeAgentCommand(
 
   const genAI = new GoogleGenerativeAI(API_KEY);
   
-  // 1. Initialize Orchestrator Router
-  const orchestrator = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction: ORCHESTRATOR_PROMPT,
-    tools: orchestratorTools
-  });
-
   const formattedHistory = formatHistory(history);
   onStatusUpdate("Secretary checking request...");
 
-  // Send request to Orchestrator
-  const result = await orchestrator.generateContent({
-    contents: [...formattedHistory, { role: "user", parts: [{ text: userInput }] }]
-  });
+  let result;
+  try {
+    const orchestrator = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: ORCHESTRATOR_PROMPT,
+      tools: orchestratorTools
+    });
+    result = await orchestrator.generateContent({
+      contents: [...formattedHistory, { role: "user", parts: [{ text: userInput }] }]
+    });
+  } catch (e) {
+    console.warn("Orchestrator failed with gemini-2.5-flash, trying gemini-flash-latest", e);
+    const orchestrator = genAI.getGenerativeModel({
+      model: "gemini-flash-latest",
+      systemInstruction: ORCHESTRATOR_PROMPT,
+      tools: orchestratorTools
+    });
+    result = await orchestrator.generateContent({
+      contents: [...formattedHistory, { role: "user", parts: [{ text: userInput }] }]
+    });
+  }
 
   const orchestratorCalls = result.response.functionCalls();
 
@@ -367,15 +377,28 @@ async function executeLifeMapAgent(
 
   const systemInstruction = `${LIFEMAP_PROMPT}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
 
-  const lifemapAgent = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction,
-    tools: lifemapAgentTools()
-  });
-
-  const result = await lifemapAgent.generateContent({
-    contents: [{ role: "user", parts: [{ text: query }] }]
-  });
+  let lifemapAgent;
+  let result;
+  try {
+    lifemapAgent = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction,
+      tools: lifemapAgentTools()
+    });
+    result = await lifemapAgent.generateContent({
+      contents: [{ role: "user", parts: [{ text: query }] }]
+    });
+  } catch (e) {
+    console.warn("Life Map Agent failed with gemini-2.5-flash, trying gemini-flash-latest", e);
+    lifemapAgent = genAI.getGenerativeModel({
+      model: "gemini-flash-latest",
+      systemInstruction,
+      tools: lifemapAgentTools()
+    });
+    result = await lifemapAgent.generateContent({
+      contents: [{ role: "user", parts: [{ text: query }] }]
+    });
+  }
 
   const calls = result.response.functionCalls();
   const statusLog: string[] = [];
@@ -505,38 +528,32 @@ ${cloudMemory || "No additional dynamic notes saved."}
 Current Life Map Outline:
 ${outlineText || "No nodes currently exist."}`;
 
-  // Try gemini-2.5-pro first as requested; fallback to gemini-2.5-flash if needed
-  let mentorAgent;
-  try {
-    mentorAgent = genAI.getGenerativeModel({
-      model: "gemini-2.5-pro",
-      systemInstruction,
-      tools: mentorAgentTools()
-    });
-  } catch (e) {
-    console.warn("gemini-2.5-pro model initialization failed, falling back to gemini-2.5-flash", e);
-    mentorAgent = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      systemInstruction,
-      tools: mentorAgentTools()
-    });
+  let mentorAgent: any = null;
+  let result: any = null;
+  const mentorModels = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-flash-latest"];
+  let success = false;
+  let lastError: any = null;
+
+  for (const modelName of mentorModels) {
+    try {
+      mentorAgent = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction,
+        tools: mentorAgentTools()
+      });
+      result = await mentorAgent.generateContent({
+        contents: [{ role: "user", parts: [{ text: query }] }]
+      });
+      success = true;
+      break;
+    } catch (e) {
+      console.warn(`Mentor query failed with ${modelName}, trying next fallback.`, e);
+      lastError = e;
+    }
   }
 
-  let result;
-  try {
-    result = await mentorAgent.generateContent({
-      contents: [{ role: "user", parts: [{ text: query }] }]
-    });
-  } catch (e: any) {
-    console.warn("gemini-2.5-pro query failed, retrying with gemini-2.5-flash", e);
-    mentorAgent = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
-      systemInstruction,
-      tools: mentorAgentTools()
-    });
-    result = await mentorAgent.generateContent({
-      contents: [{ role: "user", parts: [{ text: query }] }]
-    });
+  if (!success || !result) {
+    throw new Error(`All mentor models failed. Last error: ${lastError?.message || lastError}`);
   }
 
   const calls = result.response.functionCalls();
@@ -634,15 +651,28 @@ async function executeShoppingAgent(
 
   const systemInstruction = `${SHOPPING_PROMPT}\n\nCurrent Shopping List:\n${listText || "No items currently on the list."}`;
 
-  const shoppingAgent = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    systemInstruction,
-    tools: shoppingTools
-  });
-
-  const result = await shoppingAgent.generateContent({
-    contents: [{ role: "user", parts: [{ text: query }] }]
-  });
+  let shoppingAgent;
+  let result;
+  try {
+    shoppingAgent = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction,
+      tools: shoppingTools
+    });
+    result = await shoppingAgent.generateContent({
+      contents: [{ role: "user", parts: [{ text: query }] }]
+    });
+  } catch (e) {
+    console.warn("Shopping Agent failed with gemini-2.5-flash, trying gemini-flash-latest", e);
+    shoppingAgent = genAI.getGenerativeModel({
+      model: "gemini-flash-latest",
+      systemInstruction,
+      tools: shoppingTools
+    });
+    result = await shoppingAgent.generateContent({
+      contents: [{ role: "user", parts: [{ text: query }] }]
+    });
+  }
 
   const calls = result.response.functionCalls();
   const statusLog: string[] = [];
