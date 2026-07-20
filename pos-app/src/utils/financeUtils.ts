@@ -92,8 +92,8 @@ const CATEGORY_RULES: Array<{ patterns: RegExp[]; category: string }> = [
   // Utilities
   { patterns: [/energy australia/i, /agl\b/i, /origin energy/i, /sydney water/i, /optus/i, /telstra/i, /vodafone/i, /tpg/i, /internet/i, /electricity/i, /water/i, /gas\b/i], category: 'Utilities' },
 
-  // Health
-  { patterns: [/pharmacy/i, /chemist/i, /priceline/i, /doctor/i, /medical/i, /dental/i, /gym/i, /fitness/i, /anytime fitness/i, /healthscope/i], category: 'Health' },
+  // Health & Lifestyle
+  { patterns: [/pharmacy/i, /chemist/i, /priceline/i, /doctor/i, /medical/i, /dental/i, /gym/i, /fitness/i, /anytime fitness/i, /healthscope/i, /haircut/i, /barber/i, /salon/i, /massage/i, /spa\b/i], category: 'Health & Lifestyle' },
 
   // Shopping
   { patterns: [/paymate/i, /ebay/i, /amazon/i, /kmart/i, /target/i, /big w/i, /bunnings/i, /officeworks/i, /jb hi.fi/i, /harvey norman/i, /myer/i, /david jones/i, /cotton on/i], category: 'Shopping' },
@@ -153,7 +153,8 @@ function normaliseCsvCategory(cat: string): string | null {
     'shopping': 'Shopping',
     'retail': 'Shopping',
     'entertainment': 'Entertainment',
-    'health': 'Health',
+    'health': 'Health & Lifestyle',
+    'health & lifestyle': 'Health & Lifestyle',
     'utilities': 'Utilities',
     'subscriptions': 'Subscriptions',
     'rent': 'Rent',
