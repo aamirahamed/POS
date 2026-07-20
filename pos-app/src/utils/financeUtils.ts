@@ -98,8 +98,14 @@ const CATEGORY_RULES: Array<{ patterns: RegExp[]; category: string }> = [
   // Shopping
   { patterns: [/paymate/i, /ebay/i, /amazon/i, /kmart/i, /target/i, /big w/i, /bunnings/i, /officeworks/i, /jb hi.fi/i, /harvey norman/i, /myer/i, /david jones/i, /cotton on/i], category: 'Shopping' },
 
+  // Rent
+  { patterns: [/rent/i, /rental/i, /landlord/i, /real estate/i, /property mgmt/i, /tenancy/i], category: 'Rent' },
+
+  // Bills
+  { patterns: [/bill/i, /invoice/i, /rates/i, /insurance/i, /council/i, /bpay/i, /linkt/i, /e-toll/i], category: 'Bills' },
+
   // Transfers
-  { patterns: [/transfer/i, /bpay/i, /direct debit/i, /reversal/i, /refund/i], category: 'Transfers' },
+  { patterns: [/transfer/i, /direct debit/i, /reversal/i, /refund/i], category: 'Transfers' },
 ];
 
 function detectCategory(
@@ -150,6 +156,8 @@ function normaliseCsvCategory(cat: string): string | null {
     'health': 'Health',
     'utilities': 'Utilities',
     'subscriptions': 'Subscriptions',
+    'rent': 'Rent',
+    'bills': 'Bills',
     'transfer': 'Transfers',
     'transfers': 'Transfers',
     'income': 'Income',

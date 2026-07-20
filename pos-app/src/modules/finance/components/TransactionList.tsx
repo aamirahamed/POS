@@ -7,7 +7,7 @@ import { TxnTag } from '@/utils/financeUtils';
 
 const ALL_CATEGORIES = [
   'Groceries', 'Food & Drinks', 'Transport', 'Shopping', 'Entertainment',
-  'Health', 'Income', 'YD Salary', 'Utilities', 'Subscriptions', 'Transfers', 'Other',
+  'Health', 'Income', 'YD Salary', 'Utilities', 'Subscriptions', 'Rent', 'Bills', 'Transfers', 'Other',
 ];
 
 // Visual badge metadata for non-discretionary tags

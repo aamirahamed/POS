@@ -26,6 +26,8 @@ const CATEGORY_MAP: Record<string, string> = {
   HEALTHCARE: 'Health',
   EDUCATION: 'Other',
   INCOME: 'Income',
+  RENT: 'Rent',
+  BILLS: 'Bills',
 };
 
 function mapCategory(raw: string | null): string {

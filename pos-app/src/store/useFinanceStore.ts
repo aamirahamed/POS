@@ -69,6 +69,8 @@ export const CATEGORY_ICONS: Record<string, string> = {
   'YD Salary': '💼',
   'Utilities': '⚡',
   'Subscriptions': '📱',
+  'Rent': '🏠',
+  'Bills': '🧾',
   'Transfers': '🔄',
   'Other': '📦',
 };
@@ -84,6 +86,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   'YD Salary': '#10b981',
   'Utilities': '#fb923c',
   'Subscriptions': '#818cf8',
+  'Rent': '#6366f1',
+  'Bills': '#f43f5e',
   'Transfers': '#94a3b8',
   'Other': '#64748b',
 };
