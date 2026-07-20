@@ -13,9 +13,8 @@ const ALL_CATEGORIES = [
 // Visual badge metadata for non-discretionary tags
 const TAG_LABELS: Partial<Record<TxnTag, { label: string; color: string }>> = {
   internal:          { label: 'Internal Transfer', color: '#64748b' },
-  rent:              { label: 'Rent',               color: '#818cf8' },
-  committed_savings: { label: 'Savings',            color: '#34d399' },
-  income_committed:  { label: 'Rent Contribution',  color: '#a78bfa' },
+  rent_payment:      { label: 'Rent Payment',      color: '#818cf8' },
+  rent_contribution: { label: 'Rent Contribution', color: '#a78bfa' },
 };
 
 interface TransactionListProps {

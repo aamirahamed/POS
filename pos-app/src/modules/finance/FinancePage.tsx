@@ -17,7 +17,6 @@ import {
   buildWeekComparison,
   generateCycleInsights,
   classifyTransactions,
-  getCommittedCosts,
   PayCycle,
 } from '@/utils/financeUtils';
 
@@ -231,15 +230,10 @@ const FinancePage: FC = () => {
       ? transactions.filter(t => t.accountName === selectedAccount.name)
       : transactions;
     return classifyTransactions(allAccountTxns, {
-      rentKeywords: settings.rentKeywords,
-      monthlyRentShare: settings.monthlyRentShare,
-      weeklySavingsTransfer: settings.weeklySavingsTransfer,
-      savingsTransferKeywords: settings.savingsTransferKeywords,
-      autoDetectInternals: settings.autoDetectInternals,
-      internalMatchWindowDays: settings.internalMatchWindowDays,
-      internalMatchToleranceAUD: settings.internalMatchToleranceAUD,
+      fullRent: settings.fullRent,
+      rentShare: settings.rentShare,
     });
-  }, [transactions, selectedAccount?.id, settings]);
+  }, [transactions, selectedAccount?.id, settings.fullRent, settings.rentShare]);
 
   // Backwards-compat alias
   const accountTxns = classifiedTxns;
@@ -359,9 +353,9 @@ const FinancePage: FC = () => {
 
       const tag = (t as any).tag as string | undefined;
 
-      if (filterType === 'Spending') return t.isSpending && tag !== 'internal';
-      if (filterType === 'Income') return t.isIncome && tag !== 'internal';
-      if (filterType === 'Internal') return tag === 'internal' || tag === 'rent' || tag === 'committed_savings' || tag === 'income_committed';
+      if (filterType === 'Spending') return t.isSpending && tag !== 'rent_payment';
+      if (filterType === 'Income') return t.isIncome && tag !== 'rent_contribution' && tag !== 'internal';
+      if (filterType === 'Internal') return tag === 'internal' || tag === 'rent_payment' || tag === 'rent_contribution';
       return true; // 'All'
     });
   }, [accountTxns, search, filterType]);
@@ -370,15 +364,6 @@ const FinancePage: FC = () => {
   const hasData = transactions.length > 0;
   const hasBankAccounts = bankAccounts.length > 0;
   const cycleLabel = activeCycle?.label ?? '—';
-
-  // Committed costs for snapshot display
-  const cycleDays = activeCycle
-    ? Math.max(1, (new Date(activeCycle.cycleEnd + 'T00:00:00').getTime() - new Date(activeCycle.cycleStart + 'T00:00:00').getTime()) / 86400000 + 1)
-    : 14;
-  const committedCosts = useMemo(
-    () => getCommittedCosts(settings.monthlyRentShare, settings.weeklySavingsTransfer, cycleDays),
-    [settings.monthlyRentShare, settings.weeklySavingsTransfer, cycleDays]
-  );
 
   return (
     <div className="min-h-full bg-[#0d1525]">
@@ -477,7 +462,7 @@ const FinancePage: FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Finance Settings Popover ── */}
+      {/* ── Rent Settings Popover ── */}
       <AnimatePresence>
         {showSettings && (
           <motion.div
@@ -489,70 +474,57 @@ const FinancePage: FC = () => {
             <div className="bg-[#1a2235] border border-white/10 rounded-2xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-white">Committed Costs</p>
-                  <p className="text-xs text-slate-500 mt-0.5">Excluded from your weekly discretionary spend</p>
+                  <p className="text-sm font-semibold text-white">Rent Settings</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Used to hide the rent debit and flag roommate payments correctly
+                  </p>
                 </div>
-                <button onClick={() => setShowSettings(false)} className="text-slate-500 hover:text-white"><X size={15}/></button>
+                <button onClick={() => setShowSettings(false)} className="text-slate-500 hover:text-white">
+                  <X size={15} />
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Rent share */}
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">Monthly Rent Share</label>
+                  <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
+                    Full Monthly Rent
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
                     <input
                       type="number"
-                      value={settings.monthlyRentShare}
-                      onChange={e => settings.update({ monthlyRentShare: parseFloat(e.target.value) || 0 })}
+                      value={settings.fullRent}
+                      onChange={e => settings.update({ fullRent: parseFloat(e.target.value) || 0 })}
+                      className="w-full pl-7 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500/40 transition-colors"
+                      placeholder="2934"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1">Total rent both shares (hidden from expenses)</p>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">
+                    Your Rent Share
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      value={settings.rentShare}
+                      onChange={e => settings.update({ rentShare: parseFloat(e.target.value) || 0 })}
                       className="w-full pl-7 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500/40 transition-colors"
                       placeholder="1467"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-600 mt-1">Your share of monthly rent (prorated per cycle)</p>
-                </div>
-
-                {/* Savings transfer */}
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">Weekly Savings Transfer</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                    <input
-                      type="number"
-                      value={settings.weeklySavingsTransfer}
-                      onChange={e => settings.update({ weeklySavingsTransfer: parseFloat(e.target.value) || 0 })}
-                      className="w-full pl-7 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500/40 transition-colors"
-                      placeholder="410"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-600 mt-1">Weekly committed transfer to savings account</p>
+                  <p className="text-[10px] text-slate-600 mt-1">Roommate payments & savings transfers of this amount are hidden</p>
                 </div>
               </div>
 
-              {/* Auto-detect toggle */}
-              <div className="flex items-center justify-between pt-1 border-t border-white/6">
-                <div>
-                  <p className="text-xs font-medium text-slate-300">Auto-detect internal transfers</p>
-                  <p className="text-[10px] text-slate-600">Automatically hide round-trips between your own accounts</p>
-                </div>
-                <button
-                  onClick={() => settings.update({ autoDetectInternals: !settings.autoDetectInternals })}
-                  className={`w-10 h-5.5 rounded-full transition-all relative ${
-                    settings.autoDetectInternals ? 'bg-emerald-500' : 'bg-white/10'
-                  }`}
-                >
-                  <span className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${
-                    settings.autoDetectInternals ? 'left-5' : 'left-0.5'
-                  }`} />
-                </button>
-              </div>
-
-              {/* Summary */}
-              <div className="bg-white/3 border border-white/6 rounded-xl px-4 py-3 text-xs text-slate-400 flex justify-between items-center">
-                <span>Per-cycle committed cost</span>
-                <span className="font-semibold text-white">
-                  ${Math.round(settings.monthlyRentShare / (30.44 / 14) + settings.weeklySavingsTransfer).toLocaleString()}
-                </span>
+              <div className="bg-white/3 border border-white/6 rounded-xl px-4 py-3 text-xs text-slate-400 space-y-1">
+                <div className="flex justify-between"><span>$2,934 rent debit</span><span className="text-slate-500">Hidden from spending ✓</span></div>
+                <div className="flex justify-between"><span>Nasih's ~$1,467 credit</span><span className="text-slate-500">Hidden from income ✓</span></div>
+                <div className="flex justify-between"><span>Savings→Personal ~$1,467</span><span className="text-slate-500">Hidden from income ✓</span></div>
+                <div className="flex justify-between"><span>$410/wk to Savings</span><span className="text-emerald-400">Shown as Rent & Bills ✓</span></div>
               </div>
             </div>
           </motion.div>
@@ -627,7 +599,7 @@ const FinancePage: FC = () => {
                 spent={spent}
                 healthStatus={healthStatus}
                 hasPayData={hasPayCycles}
-                committedCosts={committedCosts}
+
               />
 
               {/* 2 — Cycle-over-Cycle Comparison */}

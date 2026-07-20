@@ -1,139 +1,74 @@
 import { Transaction, CategoryCorrection } from '@/store/useFinanceStore';
 
 // ── Transaction Classification ─────────────────────────────────────────────────
+//
+// Three simple rules based purely on amounts:
+//
+//  1. rent_payment    — The full rent debit (~$2,934) on Personal.
+//                       Already pre-funded by weekly $410 savings. Hidden from spend.
+//
+//  2. rent_contribution — Nasih's credit (~$1,467) on Personal.
+//                         Not Aamir's income — it's the rent pool. Hidden from income.
+//
+//  3. internal        — Savings→Personal credit (~$1,467) around the 15th.
+//                       Aamir moving his own rent share back. Hidden from income.
+//
+//  Everything else is discretionary (including the $410/week which IS a real expense,
+//  just labelled as "Rent & Bills").
 
 export type TxnTag =
-  | 'discretionary'       // Normal spend — counts toward weekly budget
-  | 'rent'                // Monthly rent debit — excluded from weekly, shown as prorated committed cost
-  | 'committed_savings'   // Weekly savings transfer to own savings account
-  | 'internal'            // Round-trip between own accounts (Personal ↔ Savings)
-  | 'income'              // Salary / external income
-  | 'income_committed';   // Roommate rent contribution — earmarked, not free cash
+  | 'discretionary'      // Normal spend or income — counts in budget
+  | 'rent_payment'       // Full $2,934 rent debit — hidden from spend
+  | 'rent_contribution'  // Nasih's ~$1,467 credit — hidden from income
+  | 'internal';          // Savings→Personal ~$1,467 credit — hidden from income
 
 export interface ClassifiedTransaction extends Transaction {
   tag: TxnTag;
 }
 
-export interface CommittedCosts {
-  rentMonthly: number;         // User's monthly rent share
-  rentProrated: number;        // Prorated per pay cycle (÷ cycles per month)
-  weeklySavings: number;       // Weekly savings transfer amount
-  totalCommitted: number;      // rentProrated + weeklySavings
-}
-
-interface ClassifyOptions {
-  rentKeywords: string[];
-  monthlyRentShare: number;
-  weeklySavingsTransfer: number;
-  savingsTransferKeywords: string[];
-  autoDetectInternals: boolean;
-  internalMatchWindowDays: number;
-  internalMatchToleranceAUD: number;
+export interface ClassifyOptions {
+  fullRent: number;   // Full monthly rent e.g. $2,934
+  rentShare: number;  // One share e.g. $1,467
 }
 
 /**
- * Tags every transaction with a semantic role.
- * Internally, a transaction is "internal" if there is a matching transaction
- * in the opposite direction on another account within the tolerance window.
+ * Tags transactions using 3 amount-based rules.
+ * All internal/own-account detection uses the description to distinguish
+ * "linked account" transfers from external person payments.
  */
 export function classifyTransactions(
   transactions: Transaction[],
-  opts: ClassifyOptions
+  { fullRent, rentShare }: ClassifyOptions
 ): ClassifiedTransaction[] {
-  const {
-    rentKeywords,
-    monthlyRentShare,
-    weeklySavingsTransfer,
-    savingsTransferKeywords,
-    autoDetectInternals,
-    internalMatchWindowDays,
-    internalMatchToleranceAUD,
-  } = opts;
+  const tolerance = 0.08; // ±8% tolerance on amounts
 
-  // Build a set of transaction IDs that are internal (round-trips)
-  const internalIds = new Set<string>();
-
-  if (autoDetectInternals) {
-    const spending = transactions.filter(t => t.isSpending);
-    const credits = transactions.filter(t => t.isIncome);
-
-    for (const debit of spending) {
-      const debitDate = new Date(debit.date + 'T00:00:00').getTime();
-      const match = credits.find(c => {
-        if (c.accountName === debit.accountName) return false; // same account → not internal
-        const diff = Math.abs(c.amount - Math.abs(debit.amount));
-        if (diff > internalMatchToleranceAUD) return false;
-        const creditDate = new Date(c.date + 'T00:00:00').getTime();
-        const daysDiff = Math.abs(creditDate - debitDate) / 86400000;
-        return daysDiff <= internalMatchWindowDays;
-      });
-      if (match) {
-        internalIds.add(debit.id);
-        internalIds.add(match.id);
-      }
-    }
-  }
+  const near = (actual: number, target: number) =>
+    Math.abs(actual - target) <= target * tolerance;
 
   return transactions.map(t => {
-    // 1. Internal round-trip
-    if (internalIds.has(t.id)) {
-      return { ...t, tag: 'internal' as TxnTag };
-    }
-
-    // 2. Income
-    if (t.isIncome) {
-      const desc = (t.transactionDetails + ' ' + t.merchantName).toLowerCase();
-      // Roommate rent contribution — large credit from a person, not payroll
-      const isPayroll = /payroll|salary|wages/i.test(desc);
-      if (!isPayroll && t.amount >= monthlyRentShare * 0.4 && t.amount <= monthlyRentShare * 1.1) {
-        return { ...t, tag: 'income_committed' as TxnTag };
-      }
-      return { ...t, tag: 'income' as TxnTag };
-    }
-
     const desc = (t.transactionDetails + ' ' + t.merchantName).toLowerCase();
+    const isPayroll = /payroll|salary|wages/i.test(desc);
 
-    // 3. Rent — large debit matching rent keywords or exact full-rent amount
-    const fullRentAmount = monthlyRentShare * 2; // both shares combined
-    const isRentAmount = Math.abs(t.amount) >= monthlyRentShare * 0.9;
-    const isRentKeyword = rentKeywords.some(kw => desc.includes(kw.toLowerCase()));
-    if (t.isSpending && isRentAmount && (isRentKeyword || Math.abs(t.amount) >= fullRentAmount * 0.9)) {
-      return { ...t, tag: 'rent' as TxnTag };
+    // Rule 1: Full rent debit on Personal (~$2,934 spending)
+    if (t.isSpending && near(Math.abs(t.amount), fullRent)) {
+      return { ...t, tag: 'rent_payment' as TxnTag };
     }
 
-    // 4. Committed savings transfer (~$410/week to savings)
-    const isSavingsKeyword = savingsTransferKeywords.some(kw => desc.includes(kw.toLowerCase()));
-    const isSavingsAmount =
-      Math.abs(t.amount) >= weeklySavingsTransfer * 0.7 &&
-      Math.abs(t.amount) <= weeklySavingsTransfer * 1.3;
-    if (t.isSpending && isSavingsKeyword && isSavingsAmount) {
-      return { ...t, tag: 'committed_savings' as TxnTag };
+    // Rule 2 & 3: Credits ≈ rentShare (~$1,467) that are NOT salary
+    if (t.isIncome && !isPayroll && near(t.amount, rentShare)) {
+      // "Linked Acc" / own name in description = own account transfer (internal)
+      const isOwnTransfer = /linked acc|online j[0-9]/i.test(desc);
+      if (isOwnTransfer) {
+        return { ...t, tag: 'internal' as TxnTag };
+      }
+      // Otherwise it's Nasih's rent contribution
+      return { ...t, tag: 'rent_contribution' as TxnTag };
     }
 
-    // 5. Discretionary
     return { ...t, tag: 'discretionary' as TxnTag };
   });
 }
 
-/**
- * Compute committed cost summary for the snapshot display.
- * Uses cycle length to prorate rent correctly (fortnightly = divide by 2).
- */
-export function getCommittedCosts(
-  monthlyRentShare: number,
-  weeklySavingsTransfer: number,
-  cycleDays: number
-): CommittedCosts {
-  // Assume 4.33 pay cycles per month for fortnightly (14 days)
-  const cyclesPerMonth = 30.44 / cycleDays;
-  const rentProrated = monthlyRentShare / cyclesPerMonth;
-  return {
-    rentMonthly: monthlyRentShare,
-    rentProrated: Math.round(rentProrated),
-    weeklySavings: weeklySavingsTransfer,
-    totalCommitted: Math.round(rentProrated) + weeklySavingsTransfer,
-  };
-}
 
 // ── Category Auto-detection ────────────────────────────────────────────────────
 
@@ -841,21 +776,19 @@ export function getPayCycleTransactions(
 
 /**
  * Spending transactions that are truly discretionary.
- * Excludes: the locked savings transfer, rent debits, committed savings transfers, and internal round-trips.
- * Also accepts pre-classified transactions (ClassifiedTransaction) for smart filtering.
+ * Only excludes rent_payment (the $2,934 debit) — it's pre-funded by the weekly $410.
+ * The $410 itself IS discretionary spending (Rent & Bills category).
  */
 export function getDiscretionarySpend(
   cycleTxns: Transaction[],
-  lockedTxnId: string | null,
-  excludeTags?: Set<TxnTag>
+  lockedTxnId: string | null
 ): Transaction[] {
-  const tags = excludeTags ?? new Set<TxnTag>(['rent', 'committed_savings', 'internal', 'income_committed']);
   return cycleTxns.filter(t => {
     if (!t.isSpending) return false;
     if (t.id === lockedTxnId) return false;
-    // If classified, use tag to exclude
     const tag = (t as ClassifiedTransaction).tag;
-    if (tag && tags.has(tag)) return false;
+    // Only exclude the full rent payment — it's already covered by the weekly $410 savings
+    if (tag === 'rent_payment') return false;
     return true;
   });
 }
@@ -876,7 +809,7 @@ export function getDailySpendingForCycle(
     return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
   });
 
-  const EXCLUDED_TAGS = new Set<TxnTag>(['rent', 'committed_savings', 'internal', 'income_committed']);
+  const EXCLUDED_TAGS = new Set<TxnTag>(['rent_payment']);
   const todayStr = new Date().toISOString().slice(0, 10);
 
   return dayNames.map((day, i) => {
