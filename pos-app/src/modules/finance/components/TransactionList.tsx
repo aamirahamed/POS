@@ -1,30 +1,43 @@
 import { FC, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CATEGORY_COLORS, CATEGORY_ICONS, Transaction } from '@/store/useFinanceStore';
-import { ChevronDown, ChevronUp, Edit3, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Edit3 } from 'lucide-react';
 import { format } from 'date-fns';
+import { TxnTag } from '@/utils/financeUtils';
 
 const ALL_CATEGORIES = [
   'Groceries', 'Food & Drinks', 'Transport', 'Shopping', 'Entertainment',
   'Health', 'Income', 'YD Salary', 'Utilities', 'Subscriptions', 'Transfers', 'Other',
 ];
 
+// Visual badge metadata for non-discretionary tags
+const TAG_LABELS: Partial<Record<TxnTag, { label: string; color: string }>> = {
+  internal:          { label: 'Internal Transfer', color: '#64748b' },
+  rent:              { label: 'Rent',               color: '#818cf8' },
+  committed_savings: { label: 'Savings',            color: '#34d399' },
+  income_committed:  { label: 'Rent Contribution',  color: '#a78bfa' },
+};
+
 interface TransactionListProps {
   transactions: Transaction[];
   onUpdateCategory: (id: string, category: string) => void;
+  initialCount?: number;
 }
 
 const TransactionRow: FC<{
-  txn: Transaction;
+  txn: Transaction & { tag?: TxnTag };
   onUpdateCategory: (id: string, category: string) => void;
 }> = ({ txn, onUpdateCategory }) => {
   const [editingCat, setEditingCat] = useState(false);
   const color = CATEGORY_COLORS[txn.category] ?? '#64748b';
   const icon = CATEGORY_ICONS[txn.category] ?? '📦';
 
+  const tagMeta = txn.tag ? TAG_LABELS[txn.tag] : null;
+  const isExcluded = !!tagMeta; // excluded from discretionary spend
+
   const formattedDate = (() => {
     try {
-      return format(new Date(txn.date), 'dd MMM');
+      return format(new Date(txn.date + 'T00:00:00'), 'dd MMM');
     } catch {
       return txn.date;
     }
@@ -35,7 +48,9 @@ const TransactionRow: FC<{
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center gap-3 py-3 px-1 border-b border-white/5 last:border-0 group"
+      className={`flex items-center gap-3 py-3 px-1 border-b border-white/5 last:border-0 group ${
+        isExcluded ? 'opacity-60' : ''
+      }`}
     >
       {/* Category icon */}
       <div
@@ -47,7 +62,9 @@ const TransactionRow: FC<{
 
       {/* Details */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white truncate leading-tight">{txn.merchantName || txn.transactionDetails.slice(0, 30)}</p>
+        <p className="text-sm font-medium text-white truncate leading-tight">
+          {txn.merchantName || txn.transactionDetails.slice(0, 40)}
+        </p>
         {editingCat ? (
           <div className="flex items-center gap-1 mt-1 flex-wrap">
             {ALL_CATEGORIES.map((cat) => (
@@ -72,13 +89,27 @@ const TransactionRow: FC<{
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span
-              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-              style={{ color, background: `${color}18` }}
-            >
-              {txn.category}
-            </span>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            {/* Non-discretionary badge takes priority */}
+            {tagMeta ? (
+              <span
+                className="text-[10px] font-medium px-2 py-0.5 rounded-full border"
+                style={{
+                  color: tagMeta.color,
+                  background: `${tagMeta.color}18`,
+                  borderColor: `${tagMeta.color}30`,
+                }}
+              >
+                {tagMeta.label}
+              </span>
+            ) : (
+              <span
+                className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                style={{ color, background: `${color}18` }}
+              >
+                {txn.category}
+              </span>
+            )}
             <button
               onClick={() => setEditingCat(true)}
               className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-white transition-all"
@@ -92,7 +123,9 @@ const TransactionRow: FC<{
       {/* Date + Amount */}
       <div className="text-right shrink-0">
         <p
-          className={`text-sm font-semibold ${txn.isIncome ? 'text-emerald-400' : 'text-white'}`}
+          className={`text-sm font-semibold ${
+            txn.isIncome ? 'text-emerald-400' : isExcluded ? 'text-slate-500' : 'text-white'
+          }`}
         >
           {txn.isIncome ? '+' : ''}${Math.abs(txn.amount).toFixed(2)}
         </p>
@@ -102,33 +135,28 @@ const TransactionRow: FC<{
   );
 };
 
-interface TransactionListComponentProps {
-  transactions: Transaction[];
-  onUpdateCategory: (id: string, category: string) => void;
-  initialCount?: number;
-}
-
-const TransactionList: FC<TransactionListComponentProps> = ({
+const TransactionList: FC<TransactionListProps> = ({
   transactions,
   onUpdateCategory,
-  initialCount = 10,
+  initialCount = 12,
 }) => {
   const [showAll, setShowAll] = useState(false);
 
   const displayed = showAll ? transactions : transactions.slice(0, initialCount);
 
-  if (transactions.length === 0) return null;
+  if (transactions.length === 0) return (
+    <p className="text-xs text-slate-600 text-center py-6">No transactions match this filter</p>
+  );
 
   return (
-    <div className="bg-[#1a2235] border border-white/8 rounded-2xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Recent Transactions</h3>
-        <span className="text-xs text-slate-500">{transactions.length} total</span>
-      </div>
-
+    <div>
       <div>
         {displayed.map((txn) => (
-          <TransactionRow key={txn.id} txn={txn} onUpdateCategory={onUpdateCategory} />
+          <TransactionRow
+            key={txn.id}
+            txn={txn as Transaction & { tag?: TxnTag }}
+            onUpdateCategory={onUpdateCategory}
+          />
         ))}
       </div>
 

@@ -2,9 +2,10 @@ import { FC, useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   RefreshCw, ChevronLeft, ChevronRight, Search, X, Trash2,
-  Building2, CheckCircle2, AlertCircle, Loader2, Banknote, Wallet
+  Building2, CheckCircle2, AlertCircle, Loader2, Banknote, Wallet, Settings2
 } from 'lucide-react';
 import { useFinanceStore, BankAccount } from '@/store/useFinanceStore';
+import { useFinanceSettings } from '@/store/useFinanceSettings';
 import {
   detectPayCycles,
   getCurrentPayCycle,
@@ -15,6 +16,8 @@ import {
   getFinancialHealthStatus,
   buildWeekComparison,
   generateCycleInsights,
+  classifyTransactions,
+  getCommittedCosts,
   PayCycle,
 } from '@/utils/financeUtils';
 
@@ -194,9 +197,12 @@ const FinancePage: FC = () => {
     lastSyncedAt,
   } = useFinanceStore();
 
+  const settings = useFinanceSettings();
+
   const [showClear, setShowClear] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<'All' | 'Spending' | 'Income'>('All');
+  const [filterType, setFilterType] = useState<'All' | 'Spending' | 'Income' | 'Internal'>('All');
   const [syncSuccess, setSyncSuccess] = useState<number | null>(null);
 
   // ── Account selection: default to first (Personal) account ───────────────
@@ -219,11 +225,24 @@ const FinancePage: FC = () => {
 
   const selectedAccount = bankAccounts.find(a => a.id === selectedAccountId) ?? bankAccounts[0] ?? null;
 
-  // ── Transactions scoped to selected account ───────────────────────────────
-  const accountTxns = useMemo(() => {
-    if (!selectedAccount) return transactions;
-    return transactions.filter(t => t.accountName === selectedAccount.name);
-  }, [transactions, selectedAccount?.id]);
+  // ── Transactions scoped to selected account, then classified ─────────────
+  const classifiedTxns = useMemo(() => {
+    const allAccountTxns = selectedAccount
+      ? transactions.filter(t => t.accountName === selectedAccount.name)
+      : transactions;
+    return classifyTransactions(allAccountTxns, {
+      rentKeywords: settings.rentKeywords,
+      monthlyRentShare: settings.monthlyRentShare,
+      weeklySavingsTransfer: settings.weeklySavingsTransfer,
+      savingsTransferKeywords: settings.savingsTransferKeywords,
+      autoDetectInternals: settings.autoDetectInternals,
+      internalMatchWindowDays: settings.internalMatchWindowDays,
+      internalMatchToleranceAUD: settings.internalMatchToleranceAUD,
+    });
+  }, [transactions, selectedAccount?.id, settings]);
+
+  // Backwards-compat alias
+  const accountTxns = classifiedTxns;
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -326,24 +345,40 @@ const FinancePage: FC = () => {
   );
 
   // ── Filtered transactions ─────────────────────────────────────────────────
+  // For the transaction list we show ALL tagged transactions (including internal/rent)
+  // so the user can see them — they're only excluded from the spending calculations above.
   const filteredTxns = useMemo(() => {
-    const haystack = hasPayCycles && activeCycle ? thisCycleTxns : accountTxns.slice(0, 200);
+    // Show full account history, not just current cycle, for the list
+    const haystack = accountTxns.slice(0, 300);
     return haystack.filter((t) => {
       if (
         search &&
         !t.merchantName.toLowerCase().includes(search.toLowerCase()) &&
         !t.transactionDetails.toLowerCase().includes(search.toLowerCase())
       ) return false;
-      if (filterType === 'Spending' && !t.isSpending) return false;
-      if (filterType === 'Income' && !t.isIncome) return false;
-      return true;
+
+      const tag = (t as any).tag as string | undefined;
+
+      if (filterType === 'Spending') return t.isSpending && tag !== 'internal';
+      if (filterType === 'Income') return t.isIncome && tag !== 'internal';
+      if (filterType === 'Internal') return tag === 'internal' || tag === 'rent' || tag === 'committed_savings' || tag === 'income_committed';
+      return true; // 'All'
     });
-  }, [thisCycleTxns, accountTxns, search, filterType, hasPayCycles, activeCycle]);
+  }, [accountTxns, search, filterType]);
 
   const handleUpdateCategory = useCallback(updateTransactionCategory, [updateTransactionCategory]);
   const hasData = transactions.length > 0;
   const hasBankAccounts = bankAccounts.length > 0;
   const cycleLabel = activeCycle?.label ?? '—';
+
+  // Committed costs for snapshot display
+  const cycleDays = activeCycle
+    ? Math.max(1, (new Date(activeCycle.cycleEnd + 'T00:00:00').getTime() - new Date(activeCycle.cycleStart + 'T00:00:00').getTime()) / 86400000 + 1)
+    : 14;
+  const committedCosts = useMemo(
+    () => getCommittedCosts(settings.monthlyRentShare, settings.weeklySavingsTransfer, cycleDays),
+    [settings.monthlyRentShare, settings.weeklySavingsTransfer, cycleDays]
+  );
 
   return (
     <div className="min-h-full bg-[#0d1525]">
@@ -401,6 +436,15 @@ const FinancePage: FC = () => {
                 </button>
               )}
               <button
+                onClick={() => setShowSettings(s => !s)}
+                className={`p-2 rounded-xl transition-colors ${
+                  showSettings ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-white hover:bg-white/5'
+                }`}
+                title="Finance settings"
+              >
+                <Settings2 size={15} />
+              </button>
+              <button
                 onClick={handleSync}
                 disabled={isSyncing}
                 id="finance-sync-btn"
@@ -429,6 +473,88 @@ const FinancePage: FC = () => {
           >
             <CheckCircle2 size={13} />
             {syncSuccess} transactions synced successfully
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Finance Settings Popover ── */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="max-w-3xl mx-auto px-4 pt-3"
+          >
+            <div className="bg-[#1a2235] border border-white/10 rounded-2xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white">Committed Costs</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Excluded from your weekly discretionary spend</p>
+                </div>
+                <button onClick={() => setShowSettings(false)} className="text-slate-500 hover:text-white"><X size={15}/></button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Rent share */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">Monthly Rent Share</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      value={settings.monthlyRentShare}
+                      onChange={e => settings.update({ monthlyRentShare: parseFloat(e.target.value) || 0 })}
+                      className="w-full pl-7 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500/40 transition-colors"
+                      placeholder="1467"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1">Your share of monthly rent (prorated per cycle)</p>
+                </div>
+
+                {/* Savings transfer */}
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-slate-500 mb-1.5">Weekly Savings Transfer</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                    <input
+                      type="number"
+                      value={settings.weeklySavingsTransfer}
+                      onChange={e => settings.update({ weeklySavingsTransfer: parseFloat(e.target.value) || 0 })}
+                      className="w-full pl-7 pr-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500/40 transition-colors"
+                      placeholder="410"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1">Weekly committed transfer to savings account</p>
+                </div>
+              </div>
+
+              {/* Auto-detect toggle */}
+              <div className="flex items-center justify-between pt-1 border-t border-white/6">
+                <div>
+                  <p className="text-xs font-medium text-slate-300">Auto-detect internal transfers</p>
+                  <p className="text-[10px] text-slate-600">Automatically hide round-trips between your own accounts</p>
+                </div>
+                <button
+                  onClick={() => settings.update({ autoDetectInternals: !settings.autoDetectInternals })}
+                  className={`w-10 h-5.5 rounded-full transition-all relative ${
+                    settings.autoDetectInternals ? 'bg-emerald-500' : 'bg-white/10'
+                  }`}
+                >
+                  <span className={`absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white shadow transition-all ${
+                    settings.autoDetectInternals ? 'left-5' : 'left-0.5'
+                  }`} />
+                </button>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-white/3 border border-white/6 rounded-xl px-4 py-3 text-xs text-slate-400 flex justify-between items-center">
+                <span>Per-cycle committed cost</span>
+                <span className="font-semibold text-white">
+                  ${Math.round(settings.monthlyRentShare / (30.44 / 14) + settings.weeklySavingsTransfer).toLocaleString()}
+                </span>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -501,6 +627,7 @@ const FinancePage: FC = () => {
                 spent={spent}
                 healthStatus={healthStatus}
                 hasPayData={hasPayCycles}
+                committedCosts={committedCosts}
               />
 
               {/* 2 — Cycle-over-Cycle Comparison */}
@@ -534,7 +661,7 @@ const FinancePage: FC = () => {
                     )}
                   </div>
                   <div className="flex gap-1 bg-white/4 rounded-xl p-1 shrink-0">
-                    {(['All', 'Spending', 'Income'] as const).map((f) => (
+                    {(['All', 'Spending', 'Income', 'Internal'] as const).map((f) => (
                       <button
                         key={f}
                         onClick={() => setFilterType(f)}
