@@ -7,6 +7,8 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 interface WeekComparisonProps {
   rows: WeekComparisonRow[];
   hasTwoWeeksAgo: boolean;
+  onCategoryClick?: (category: string) => void;
+  selectedCategory?: string | null;
 }
 
 const fmt = (n: number) => (n > 0 ? `$${n.toFixed(0)}` : '—');
@@ -44,7 +46,7 @@ const ChangeChip: FC<{ pct: number | null; thisWeek: number; lastWeek: number }>
   );
 };
 
-const WeekComparison: FC<WeekComparisonProps> = ({ rows, hasTwoWeeksAgo }) => {
+const WeekComparison: FC<WeekComparisonProps> = ({ rows, hasTwoWeeksAgo, onCategoryClick, selectedCategory }) => {
   if (rows.length === 0) {
     return (
       <div className="bg-[#1a2235] border border-white/8 rounded-2xl p-5">
@@ -76,6 +78,7 @@ const WeekComparison: FC<WeekComparisonProps> = ({ rows, hasTwoWeeksAgo }) => {
           const color = CATEGORY_COLORS[row.category] ?? '#64748b';
           const thisBarW = (row.thisWeek / maxSpend) * 100;
           const lastBarW = (row.lastWeek / maxSpend) * 100;
+          const isSelected = selectedCategory === row.category;
 
           return (
             <motion.div
@@ -83,7 +86,10 @@ const WeekComparison: FC<WeekComparisonProps> = ({ rows, hasTwoWeeksAgo }) => {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04 }}
-              className="py-3 flex flex-col gap-2"
+              onClick={() => onCategoryClick?.(row.category)}
+              className={`py-3 flex flex-col gap-2 cursor-pointer transition-all rounded-xl px-2 -mx-2 hover:bg-white/5 active:scale-[0.99] ${
+                isSelected ? 'bg-white/5 border-l-2 border-l-indigo-500 pl-3' : ''
+              }`}
             >
               {/* Top row: icon + name + amounts + change */}
               <div className="flex items-center gap-3">

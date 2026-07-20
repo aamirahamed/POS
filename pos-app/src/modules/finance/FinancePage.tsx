@@ -203,6 +203,7 @@ const FinancePage: FC = () => {
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'All' | 'Spending' | 'Income' | 'Internal'>('All');
   const [syncSuccess, setSyncSuccess] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // ── Account selection: default to first (Personal) account ───────────────
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -220,6 +221,7 @@ const FinancePage: FC = () => {
     setManualIdx(null);
     setSearch('');
     setFilterType('All');
+    setSelectedCategory(null);
   };
 
   const selectedAccount = bankAccounts.find(a => a.id === selectedAccountId) ?? bankAccounts[0] ?? null;
@@ -345,6 +347,7 @@ const FinancePage: FC = () => {
     // Show full account history, not just current cycle, for the list
     const haystack = accountTxns.slice(0, 300);
     return haystack.filter((t) => {
+      if (selectedCategory && t.category !== selectedCategory) return false;
       if (
         search &&
         !t.merchantName.toLowerCase().includes(search.toLowerCase()) &&
@@ -358,7 +361,7 @@ const FinancePage: FC = () => {
       if (filterType === 'Internal') return tag === 'internal' || tag === 'rent_payment' || tag === 'rent_contribution';
       return true; // 'All'
     });
-  }, [accountTxns, search, filterType]);
+  }, [accountTxns, search, filterType, selectedCategory]);
 
   const handleUpdateCategory = useCallback(updateTransactionCategory, [updateTransactionCategory]);
   const hasData = transactions.length > 0;
@@ -603,7 +606,20 @@ const FinancePage: FC = () => {
               />
 
               {/* 2 — Cycle-over-Cycle Comparison */}
-              <WeekComparison rows={comparisonRows} hasTwoWeeksAgo={twoCyclesAgoTxns.length > 0} />
+              <WeekComparison
+                rows={comparisonRows}
+                hasTwoWeeksAgo={twoCyclesAgoTxns.length > 0}
+                selectedCategory={selectedCategory}
+                onCategoryClick={(cat) => {
+                  const nextCat = selectedCategory === cat ? null : cat;
+                  setSelectedCategory(nextCat);
+                  if (nextCat) {
+                    setTimeout(() => {
+                      document.getElementById('transaction-section')?.scrollIntoView({ behavior: 'smooth' });
+                    }, 50);
+                  }
+                }}
+              />
 
               {/* 3 — Cycle Insights */}
               {insights.length > 0 && <WeeklyInsights insights={insights} />}
@@ -612,7 +628,23 @@ const FinancePage: FC = () => {
               <DailyTimeline days={dailyDays} />
 
               {/* 5 — Transactions */}
-              <div className="bg-[#1a2235] border border-white/8 rounded-2xl p-4">
+              <div id="transaction-section" className="bg-[#1a2235] border border-white/8 rounded-2xl p-4 scroll-mt-20">
+                {selectedCategory && (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold rounded-xl mb-4">
+                    <div className="flex items-center gap-1.5">
+                      <span>Filtering by category:</span>
+                      <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 rounded-full font-bold">
+                        {selectedCategory}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setSelectedCategory(null)}
+                      className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white rounded-lg transition-all"
+                    >
+                      Clear Filter <X size={12} />
+                    </button>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-2.5 mb-4">
                   <div className="relative flex-1">
                     <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
