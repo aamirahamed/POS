@@ -715,10 +715,11 @@ export function detectPayCycles(transactions: Transaction[]): PayCycle[] {
   if (salaryCreds.length === 0) return [];
 
   return salaryCreds.map((salary, idx) => {
-    // Cycle starts on pay day, ends the day before next pay (or 13 days later for last cycle)
+    // Cycle ends the day before next pay. For the most recent open cycle where the
+    // next payroll hasn't posted yet, default to a 7-day (weekly) window (start + 6).
     const nextSalary = salaryCreds[idx + 1];
     const cycleStart = salary.date;
-    const cycleEnd = nextSalary ? addDays(nextSalary.date, -1) : addDays(cycleStart, 13);
+    const cycleEnd = nextSalary ? addDays(nextSalary.date, -1) : addDays(cycleStart, 6);
 
     // Find the $350 TRANSFER DEBIT within 3 days of salary date
     // Supports both legacy CSV (transactionType contains 'transfer') and Redbark (category='Transfers')
