@@ -6,36 +6,13 @@ import { useShoppingStore } from '@/store/useShoppingStore';
 import { useTodayStore, FocusItem } from '@/store/useTodayStore';
 import { CalendarSection } from './components/CalendarSection';
 import { RemindersWidget } from './components/RemindersWidget';
-import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar, Trash2, Check, Inbox, ExternalLink, Link as LinkIcon, Search } from 'lucide-react';
+import { Sparkles, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { Input } from '@/components/ui/input';
 
 
 
-// Helper: Resolve parent path for subnodes
-const resolveNodePath = (milestoneId: string, nodesList: any[], edgesList: any[]): string => {
-    if (milestoneId === 'milestone-inbox' || milestoneId === 'subnode-inbox') return 'Inbox';
-    const subnode = nodesList.find(n => n.id === milestoneId);
-    if (!subnode) return '';
 
-    const edgeToSubnode = edgesList.find(e => e.target === milestoneId);
-    if (!edgeToSubnode) return '';
-
-    const parentNode = nodesList.find(n => n.id === edgeToSubnode.source);
-    if (!parentNode) return '';
-
-    if (parentNode.type === 'project') {
-        const edgeToProject = edgesList.find(e => e.target === parentNode.id);
-        const domainNode = edgeToProject ? nodesList.find(n => n.id === edgeToProject.source) : null;
-
-        if (domainNode && domainNode.type === 'domain') {
-            return `${domainNode.data.label} > ${parentNode.data.label}`;
-        }
-        return parentNode.data.label;
-    }
-    return parentNode.data.label;
-};
 
 const DashboardPage: FC = () => {
     const navigate = useNavigate();
@@ -43,12 +20,7 @@ const DashboardPage: FC = () => {
     // Stores
     const { 
         nodes, 
-        edges, 
         setCommandCenterOpen,
-        addTaskToNode,
-        addResource,
-        deleteTaskFromNode,
-        removeResource,
         loadFromDB
     } = useLifeMapStore();
     const { reminders } = useRemindersStore();
@@ -57,7 +29,6 @@ const DashboardPage: FC = () => {
 
     // Local State
     const [showFocusSelector, setShowFocusSelector] = useState(false);
-    const [itemSearchQueries, setItemSearchQueries] = useState<Record<string, string>>({});
 
     // Load life map from DB on mount
     useEffect(() => {
@@ -79,17 +50,6 @@ const DashboardPage: FC = () => {
     const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
-
-
-    // Filter nodes list to include only milestones (execution nodes)
-    const subnodes = nodes.filter(n => n.type === 'milestone');
-
-    // Rank subnodes based on count of tasks they contain
-    // inbox captures always goes first
-    const inboxSubnode = subnodes.find(n => n.id === 'milestone-inbox' || n.id === 'subnode-inbox');
-
-
-
     // Focus Candidates
     const focusCandidates = nodes.filter(n => 
         (n.type === 'project' || n.type === 'milestone') && 
@@ -97,49 +57,9 @@ const DashboardPage: FC = () => {
         !focusItems.some(f => f.id === n.id)
     );
 
-    // Filter out target execution nodes
-    const executionNodes = nodes.filter(n => n.type === 'milestone' && n.id !== 'milestone-inbox' && n.id !== 'subnode-inbox');
 
-    // Get inbox subnode items
-    const inboxTasks = inboxSubnode?.data?.tasks || [];
-    const inboxResources = inboxSubnode?.data?.resources || [];
-    const inboxItems = [
-        ...inboxTasks.map(t => ({ ...t, type: 'task' as const })),
-        ...inboxResources.map(r => ({ ...r, type: 'resource' as const, text: r.title }))
-    ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
-    const inboxId = inboxSubnode?.id || 'milestone-inbox';
 
-    const handleMoveItem = (itemId: string, type: 'task' | 'resource', targetNodeId: string) => {
-        const targetNode = nodes.find(n => n.id === targetNodeId);
-        const targetNodeLabel = targetNode?.data?.label || 'Target Node';
-
-        if (type === 'task') {
-            const task = inboxTasks.find(t => t.id === itemId);
-            if (task) {
-                addTaskToNode(targetNodeId, task.text);
-                deleteTaskFromNode(inboxId, itemId);
-                toast.success(`Moved task to "${targetNodeLabel}"`);
-            }
-        } else {
-            const resource = inboxResources.find(r => r.id === itemId);
-            if (resource) {
-                addResource(targetNodeId, resource);
-                removeResource(inboxId, itemId);
-                toast.success(`Moved resource to "${targetNodeLabel}"`);
-            }
-        }
-    };
-
-    const handleDeleteInboxItem = (itemId: string, type: 'task' | 'resource') => {
-        if (type === 'task') {
-            deleteTaskFromNode(inboxId, itemId);
-            toast.success("Discarded inbox task");
-        } else {
-            removeResource(inboxId, itemId);
-            toast.success("Discarded inbox resource");
-        }
-    };
 
 
     // Render Focus Items with Notes & Duration
@@ -267,189 +187,64 @@ const DashboardPage: FC = () => {
                             <p className="text-[10px] font-black uppercase tracking-widest text-text-secondary/50">Focus & Capture Zone</p>
                         </div>
 
-                        {/* ── HORIZONTAL SPLIT ── */}
-                        <div className="flex flex-col md:flex-row">
-
-                            {/* ── LEFT: TODAY'S FOCUS (62%) ── */}
-                            <div className="flex-[62] p-5 space-y-4 min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-base font-bold text-white flex items-center gap-2">
-                                        <Target size={16} className="text-accent shrink-0" />
-                                        Today's Focus
-                                    </h2>
-                                    <button
-                                        onClick={() => setShowFocusSelector(!showFocusSelector)}
-                                        className="text-xs font-medium text-accent hover:text-accent-hover flex items-center gap-1 bg-accent/10 px-2.5 py-1.5 rounded-lg transition-colors shrink-0"
-                                    >
-                                        <Plus size={13} /> Add
-                                    </button>
-                                </div>
-
-                                {showFocusSelector && (
-                                    <div className="p-3 bg-surface-elevated border border-border rounded-xl animate-in fade-in slide-in-from-top-2 shadow-lg">
-                                        <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">Select from Life Map</h3>
-                                        <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
-                                            {focusCandidates.length === 0 ? (
-                                                <p className="text-sm text-text-secondary">No available active projects or milestones.</p>
-                                            ) : (
-                                                focusCandidates.map(node => (
-                                                    <div key={node.id} className="flex items-center justify-between p-2.5 bg-surface hover:bg-surface-hover rounded-lg cursor-pointer border border-transparent hover:border-border transition-colors" onClick={() => { addFocusNode(node.id); setShowFocusSelector(false); }}>
-                                                        <div className="flex items-center gap-2.5 min-w-0">
-                                                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${node.type === 'milestone' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                                                                {node.type === 'milestone' ? <ListTodo size={12} /> : <Target size={12} />}
-                                                            </div>
-                                                            <span className="text-sm font-medium text-white truncate">{node.data.label}</span>
-                                                        </div>
-                                                        <Plus size={13} className="text-text-secondary shrink-0" />
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="space-y-2.5">
-                                    {focusItems.length === 0 ? (
-                                        <div className="py-6 border border-dashed border-border rounded-xl text-center flex flex-col items-center gap-2.5 bg-surface-elevated/40">
-                                            <div className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center shadow-sm">
-                                                <Target size={18} className="text-text-secondary" />
-                                            </div>
-                                            <p className="text-xs text-text-secondary max-w-[200px]">No focus set. Choose your priorities intentionally.</p>
-                                        </div>
-                                    ) : (
-                                        focusItems.map(renderFocusItem)
-                                    )}
-                                </div>
+                        {/* ── TODAY'S FOCUS (100%) ── */}
+                        <div className="p-5 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                    <Target size={16} className="text-accent shrink-0" />
+                                    Today's Focus
+                                </h2>
+                                <button
+                                    onClick={() => setShowFocusSelector(!showFocusSelector)}
+                                    className="text-xs font-medium text-accent hover:text-accent-hover flex items-center gap-1 bg-accent/10 px-2.5 py-1.5 rounded-lg transition-colors shrink-0"
+                                >
+                                    <Plus size={13} /> Add
+                                </button>
                             </div>
 
-                            {/* ── Vertical Divider (desktop) / Horizontal Divider (mobile) ── */}
-                            <div className="hidden md:block w-px bg-border/60 my-5" />
-                            <div className="md:hidden mx-5 border-t border-border/60" />
+                            {showFocusSelector && (
+                                <div className="p-3 bg-surface-elevated border border-border rounded-xl animate-in fade-in slide-in-from-top-2 shadow-lg">
+                                    <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">Select from Life Map</h3>
+                                    <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
+                                        {focusCandidates.length === 0 ? (
+                                            <p className="text-sm text-text-secondary">No available active projects or milestones.</p>
+                                        ) : (
+                                            focusCandidates.map(node => (
+                                                <div key={node.id} className="flex items-center justify-between p-2.5 bg-surface hover:bg-surface-hover rounded-lg cursor-pointer border border-transparent hover:border-border transition-colors" onClick={() => { addFocusNode(node.id); setShowFocusSelector(false); }}>
+                                                    <div className="flex items-center gap-2.5 min-w-0">
+                                                        <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${node.type === 'milestone' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                                                            {node.type === 'milestone' ? <ListTodo size={12} /> : <Target size={12} />}
+                                                        </div>
+                                                        <span className="text-sm font-medium text-white truncate">{node.data.label}</span>
+                                                    </div>
+                                                    <Plus size={13} className="text-text-secondary shrink-0" />
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
-                            {/* ── RIGHT: ACTIVE REMINDERS (38%) ── */}
-                            <div className="flex-[38] p-5 min-w-0 flex flex-col">
-                                <RemindersWidget />
+                            <div className="space-y-2.5">
+                                {focusItems.length === 0 ? (
+                                    <div className="py-6 border border-dashed border-border rounded-xl text-center flex flex-col items-center gap-2.5 bg-surface-elevated/40">
+                                        <div className="w-10 h-10 rounded-xl bg-surface flex items-center justify-center shadow-sm">
+                                            <Target size={18} className="text-text-secondary" />
+                                        </div>
+                                        <p className="text-xs text-text-secondary max-w-[200px]">No focus set. Choose your priorities intentionally.</p>
+                                    </div>
+                                ) : (
+                                    focusItems.map(renderFocusItem)
+                                )}
                             </div>
                         </div>
 
                         {/* ── HORIZONTAL DIVIDER ── */}
                         <div className="border-t border-border/60 mx-6" />
 
-                        {/* ── BOTTOM ROW: INBOX TRIAGE (100%) ── */}
-                        <div className="p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                                    <Inbox size={16} className="text-accent shrink-0" />
-                                    <span>Inbox Triage</span>
-                                    {inboxItems.length > 0 && (
-                                        <span className="bg-accent/10 border border-accent/20 text-accent text-xs px-2 py-0.5 rounded-full font-bold ml-1">
-                                            {inboxItems.length}
-                                        </span>
-                                    )}
-                                </h2>
-                                <span className="text-xs text-text-secondary">Threadless captures needing execution nodes</span>
-                            </div>
-
-                            {inboxItems.length === 0 ? (
-                                <div className="py-8 text-center text-xs text-text-secondary/70 italic flex flex-col items-center gap-2 bg-surface-elevated/20 border border-dashed border-border/40 rounded-2xl">
-                                    <span>🎉 All captured items are assigned! Your Inbox is completely clean.</span>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-1">
-                                    {inboxItems.map(item => (
-                                        <div key={item.id} className="flex flex-col gap-3 p-3.5 bg-surface-elevated/40 border border-border/40 hover:bg-surface-elevated/60 transition-colors rounded-2xl shadow-sm min-w-0">
-                                            {/* Top Row: Icon, Title and Discard */}
-                                            <div className="flex items-start justify-between gap-3 min-w-0">
-                                                <div className="flex items-start gap-3 min-w-0 flex-1">
-                                                    {/* Type icon */}
-                                                    <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${item.type === 'task' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
-                                                        {item.type === 'task' ? <Check size={14} /> : <LinkIcon size={14} />}
-                                                    </div>
-                                                    {/* Content */}
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-semibold text-white leading-normal break-words">{item.text}</p>
-                                                        {item.type === 'resource' && item.url && (
-                                                            <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-accent font-bold hover:underline inline-flex items-center gap-0.5 mt-1 select-none">
-                                                                <span>View Link</span>
-                                                                <ExternalLink size={8} />
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                {/* Discard Action */}
-                                                <button
-                                                    onClick={() => handleDeleteInboxItem(item.id, item.type)}
-                                                    className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors shrink-0"
-                                                    title="Discard Item"
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            </div>
-
-                                            {/* Bottom Area: Search and Pills Grid */}
-                                            <div className="space-y-2 pt-2 border-t border-white/5 flex flex-col">
-                                                {/* Search Box */}
-                                                <div className="relative">
-                                                    <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-text-secondary h-3 w-3" />
-                                                    <Input
-                                                        placeholder="Search target node..."
-                                                        value={itemSearchQueries[item.id] || ''}
-                                                        onChange={(e) => setItemSearchQueries(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                                        className="pl-7 bg-surface/40 border-border/40 focus:border-accent text-[11px] rounded-lg h-7 text-white focus-visible:ring-0"
-                                                    />
-                                                </div>
-
-                                                {/* Pills List */}
-                                                <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto pr-1 py-0.5 custom-scrollbar">
-                                                    {(() => {
-                                                        const query = (itemSearchQueries[item.id] || '').toLowerCase().trim();
-                                                        const filtered = executionNodes.filter(node => {
-                                                            const label = node.data.label.toLowerCase();
-                                                            const path = resolveNodePath(node.id, nodes, edges).toLowerCase();
-                                                            return label.includes(query) || path.includes(query);
-                                                        });
-
-                                                        if (filtered.length === 0) {
-                                                            return (
-                                                                <div className="w-full py-1 text-[10px] text-text-secondary/70 italic pl-1">
-                                                                    No matching execution nodes.
-                                                                </div>
-                                                            );
-                                                        }
-
-                                                        return filtered.map(node => {
-                                                            const hue = node.data.hue || 210;
-                                                            const path = resolveNodePath(node.id, nodes, edges);
-
-                                                            return (
-                                                                <button
-                                                                    key={node.id}
-                                                                    type="button"
-                                                                    onClick={() => handleMoveItem(item.id, item.type, node.id)}
-                                                                    style={{
-                                                                        borderColor: `hsla(${hue}, 70%, 50%, 0.2)`,
-                                                                        backgroundColor: `hsla(${hue}, 75%, 15%, 0.15)`
-                                                                    }}
-                                                                    className="inline-flex items-center gap-1.5 py-0.5 px-2 rounded-md border text-[9px] font-medium text-text-secondary hover:text-white hover:border-white/20 transition-all max-w-full"
-                                                                    title={path ? `${path} > ${node.data.label}` : node.data.label}
-                                                                >
-                                                                    {/* Left Hue Dot */}
-                                                                    <span 
-                                                                        className="w-1.5 h-1.5 rounded-full shrink-0" 
-                                                                        style={{ backgroundColor: `hsl(${hue}, 70%, 55%)` }}
-                                                                    />
-                                                                    <span className="truncate">{node.data.label}</span>
-                                                                </button>
-                                                            );
-                                                        });
-                                                    })()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                        {/* ── BOTTOM ROW: ACTIVE REMINDERS (100%) ── */}
+                        <div className="p-6">
+                            <RemindersWidget />
                         </div>
                     </div>
 
