@@ -6,48 +6,12 @@ import { useShoppingStore } from '@/store/useShoppingStore';
 import { useTodayStore, FocusItem } from '@/store/useTodayStore';
 import { CalendarSection } from './components/CalendarSection';
 import { RemindersWidget } from './components/RemindersWidget';
-import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar, Trash2, Check, Inbox, ExternalLink, Link as LinkIcon, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar, Trash2, Check, Inbox, ExternalLink, Link as LinkIcon, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
-// Helper: check if string is URL
-const isUrl = (str: string) => {
-    try {
-        const parsed = new URL(str);
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch (_) {
-        return /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/gi.test(str);
-    }
-};
 
-// Helper: detect resource type
-const detectResourceType = (urlStr: string): 'youtube' | 'article' | 'link' => {
-    const lower = urlStr.toLowerCase();
-    if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
-        return 'youtube';
-    }
-    if (
-        lower.includes('medium.com') || 
-        lower.includes('wikipedia.org') || 
-        lower.includes('substack.com') || 
-        lower.includes('/article/') || 
-        lower.includes('/blog/')
-    ) {
-        return 'article';
-    }
-    return 'link';
-};
-
-// Helper: clean URL
-const cleanUrl = (urlStr: string) => {
-    if (!/^https?:\/\//i.test(urlStr)) {
-        return `https://${urlStr}`;
-    }
-    return urlStr;
-};
 
 // Helper: Resolve parent path for subnodes
 const resolveNodePath = (milestoneId: string, nodesList: any[], edgesList: any[]): string => {
@@ -95,15 +59,6 @@ const DashboardPage: FC = () => {
     const [showFocusSelector, setShowFocusSelector] = useState(false);
     const [itemSearchQueries, setItemSearchQueries] = useState<Record<string, string>>({});
 
-    // Quick Capture States
-    const [captureType, setCaptureType] = useState<'task' | 'resource'>('task');
-    const [captureInputText, setCaptureInputText] = useState('');
-    const [captureResourceTitle, setCaptureResourceTitle] = useState('');
-    const [captureSelectedNodeId, setCaptureSelectedNodeId] = useState<string>('milestone-inbox');
-    const [captureSearchQuery, setCaptureSearchQuery] = useState('');
-    const [showAllNodes, setShowAllNodes] = useState(false);
-    const [isManualOverride, setIsManualOverride] = useState(false);
-
     // Load life map from DB on mount
     useEffect(() => {
         loadFromDB();
@@ -124,67 +79,7 @@ const DashboardPage: FC = () => {
     const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
-    // Quick Capture Logic & Helpers
-    const handleCaptureInputChange = (val: string) => {
-        setCaptureInputText(val);
 
-        if (val.trim() === '') {
-            setIsManualOverride(false);
-            setCaptureType('task');
-            return;
-        }
-
-        if (!isManualOverride) {
-            if (isUrl(val)) {
-                setCaptureType('resource');
-            } else {
-                setCaptureType('task');
-            }
-        }
-    };
-
-    const handleCaptureTypeSelect = (type: 'task' | 'resource') => {
-        setCaptureType(type);
-        setIsManualOverride(true);
-    };
-
-    const handleCaptureSubmit = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
-        
-        const content = captureInputText.trim();
-        if (!content) {
-            toast.error('Please enter content to capture');
-            return;
-        }
-
-        const targetNode = captureSelectedNodeId || 'milestone-inbox';
-        const targetNodeLabel = nodes.find(n => n.id === targetNode)?.data.label || 'Inbox';
-
-        if (captureType === 'task') {
-            addTaskToNode(targetNode, content);
-            toast.success(`Task added to "${targetNodeLabel}"`);
-        } else {
-            // Resource
-            const url = cleanUrl(content);
-            const resType = detectResourceType(url);
-            const title = captureResourceTitle.trim() || content;
-
-            addResource(targetNode, {
-                id: `res-${Date.now()}`,
-                title,
-                url,
-                type: resType,
-                createdAt: Date.now()
-            });
-            toast.success(`Resource added to "${targetNodeLabel}"`);
-        }
-
-        // Reset state
-        setCaptureInputText('');
-        setCaptureResourceTitle('');
-        setIsManualOverride(false);
-        setCaptureType('task');
-    };
 
     // Filter nodes list to include only milestones (execution nodes)
     const subnodes = nodes.filter(n => n.type === 'milestone');
@@ -192,26 +87,8 @@ const DashboardPage: FC = () => {
     // Rank subnodes based on count of tasks they contain
     // inbox captures always goes first
     const inboxSubnode = subnodes.find(n => n.id === 'milestone-inbox' || n.id === 'subnode-inbox');
-    const otherSubnodes = subnodes.filter(n => n.id !== 'milestone-inbox' && n.id !== 'subnode-inbox');
-    const rankedOtherSubnodes = [...otherSubnodes].sort((a, b) => {
-        const aCount = a.data.tasks?.length || 0;
-        const bCount = b.data.tasks?.length || 0;
-        return bCount - aCount;
-    });
-    const allRankedSubnodes = inboxSubnode ? [inboxSubnode, ...rankedOtherSubnodes] : rankedOtherSubnodes;
 
-    // Filter subnodes by search query
-    const filteredSubnodes = allRankedSubnodes.filter(node => {
-        const label = node.data.label.toLowerCase();
-        const path = resolveNodePath(node.id, nodes, edges).toLowerCase();
-        const query = captureSearchQuery.toLowerCase().trim();
-        return label.includes(query) || path.includes(query);
-    });
 
-    // Determine which subnodes to show as pills
-    const visibleSubnodes = captureSearchQuery.trim() !== ''
-        ? filteredSubnodes
-        : (showAllNodes ? filteredSubnodes : filteredSubnodes.slice(0, 10));
 
     // Focus Candidates
     const focusCandidates = nodes.filter(n => 
@@ -449,171 +326,9 @@ const DashboardPage: FC = () => {
                             <div className="hidden md:block w-px bg-border/60 my-5" />
                             <div className="md:hidden mx-5 border-t border-border/60" />
 
-                            {/* ── RIGHT: QUICK CAPTURE (38%) ── */}
-                            <div className="flex-[38] p-5 space-y-4 min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-base font-bold text-white flex items-center gap-2">
-                                        <Zap size={16} className="text-accent shrink-0 fill-accent/15" />
-                                        Quick Capture
-                                    </h2>
-                                    {captureSearchQuery.trim() === '' && subnodes.length > 10 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowAllNodes(!showAllNodes)}
-                                            className="text-accent hover:text-accent-hover text-xs font-bold flex items-center gap-0.5 transition-colors py-1 px-1.5 rounded hover:bg-accent/5"
-                                        >
-                                            <span>{showAllNodes ? 'Show Less' : `Show All (${subnodes.length})`}</span>
-                                            {showAllNodes ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                                        </button>
-                                    )}
-                                </div>
-
-                                <form onSubmit={handleCaptureSubmit} className="space-y-4">
-                                    {/* Segmented control for Type */}
-                                    <div className="grid grid-cols-2 gap-1 p-1 bg-surface-elevated border border-border/40 rounded-xl">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleCaptureTypeSelect('task')}
-                                            className={cn(
-                                                "flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all duration-200 active:scale-98",
-                                                captureType === 'task' 
-                                                    ? "bg-accent text-white shadow-md shadow-accent/10" 
-                                                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                                            )}
-                                        >
-                                            <FileText size={13} />
-                                            <span>Task / Todo</span>
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleCaptureTypeSelect('resource')}
-                                            className={cn(
-                                                "flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all duration-200 active:scale-98",
-                                                captureType === 'resource' 
-                                                    ? "bg-accent text-white shadow-md shadow-accent/10" 
-                                                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-                                            )}
-                                        >
-                                            <LinkIcon size={13} />
-                                            <span>Link / Resource</span>
-                                        </button>
-                                    </div>
-
-                                    {/* Main Text Input */}
-                                    <div className="space-y-1">
-                                        <label htmlFor="captureInputText" className="text-[10px] font-bold text-text-secondary uppercase tracking-widest pl-0.5">
-                                            {captureType === 'task' ? 'Task Description' : 'Resource URL'}
-                                        </label>
-                                        <Input
-                                            id="captureInputText"
-                                            placeholder={captureType === 'task' ? '' : 'Paste link or URL...'}
-                                            value={captureInputText}
-                                            onChange={(e) => handleCaptureInputChange(e.target.value)}
-                                            className="bg-surface-elevated border-border/60 focus:border-accent text-sm rounded-xl h-10 px-3 shadow-inner"
-                                        />
-                                    </div>
-
-                                    {/* Optional Title Input for resources */}
-                                    {captureType === 'resource' && (
-                                        <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                                            <label htmlFor="captureResourceTitle" className="text-[10px] font-bold text-text-secondary uppercase tracking-widest pl-0.5">
-                                                Resource Title <span className="text-text-secondary/40 font-normal lowercase">(optional)</span>
-                                            </label>
-                                            <Input
-                                                id="captureResourceTitle"
-                                                placeholder="Add a friendly title..."
-                                                value={captureResourceTitle}
-                                                onChange={(e) => setCaptureResourceTitle(e.target.value)}
-                                                className="bg-surface-elevated border-border/60 focus:border-accent text-sm rounded-xl h-10 px-3 shadow-inner"
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Pill-based Execution Node Selector */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest pl-0.5">Target Execution Node</label>
-                                        </div>
-
-                                        {/* Search Filter for Pills */}
-                                        <div className="relative">
-                                            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-text-secondary h-3 w-3" />
-                                            <Input
-                                                placeholder="Filter nodes..."
-                                                value={captureSearchQuery}
-                                                onChange={(e) => setCaptureSearchQuery(e.target.value)}
-                                                className="pl-8 bg-surface-elevated/40 border-border/40 focus:border-accent text-xs rounded-lg h-8 text-white focus-visible:ring-0"
-                                            />
-                                        </div>
-
-                                        {/* Pills Grid Container */}
-                                        <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto pr-1 py-0.5 custom-scrollbar">
-                                            {visibleSubnodes.length === 0 ? (
-                                                <div className="w-full text-center py-2 text-[10px] text-text-secondary italic">
-                                                    No matching execution nodes.
-                                                </div>
-                                            ) : (
-                                                visibleSubnodes.map((node) => {
-                                                    const hue = node.data.hue || 210;
-                                                    const isSelected = captureSelectedNodeId === node.id;
-                                                    const taskCount = node.data.tasks?.length || 0;
-                                                    const path = resolveNodePath(node.id, nodes, edges);
-
-                                                    return (
-                                                        <button
-                                                            key={node.id}
-                                                            type="button"
-                                                            onClick={() => setCaptureSelectedNodeId(node.id)}
-                                                            style={{
-                                                                borderColor: isSelected ? `hsl(${hue}, 70%, 50%)` : 'rgba(255,255,255,0.06)',
-                                                                backgroundColor: isSelected ? `hsla(${hue}, 75%, 15%, 0.35)` : 'rgba(255,255,255,0.02)',
-                                                                color: isSelected ? 'white' : 'var(--text-secondary)'
-                                                            }}
-                                                            className={cn(
-                                                                "inline-flex items-center gap-1.5 py-1 px-2.5 rounded-lg border text-[10px] font-semibold transition-all duration-150 active:scale-95 hover:text-white",
-                                                                isSelected ? "shadow-sm" : "hover:border-white/10 hover:bg-white/5"
-                                                            )}
-                                                            title={path ? `${path} > ${node.data.label}` : node.data.label}
-                                                        >
-                                                            {/* Left Hue Dot */}
-                                                            <span 
-                                                                className="w-1.5 h-1.5 rounded-full shrink-0" 
-                                                                style={{ backgroundColor: `hsl(${hue}, 70%, 55%)` }}
-                                                            />
-                                                            
-                                                            <span className="truncate max-w-[120px]">{node.data.label}</span>
-                                                            
-                                                            {/* Task count badge */}
-                                                            {taskCount > 0 && (
-                                                                <span className="bg-white/5 text-[8px] px-1 rounded font-bold">
-                                                                    {taskCount}
-                                                                </span>
-                                                            )}
-
-                                                            {isSelected && <Check size={9} className="text-white shrink-0 ml-0.5" />}
-                                                        </button>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                        
-                                        {/* Selected Node Path Subtext */}
-                                        {captureSelectedNodeId && (
-                                            <div className="text-[9px] text-text-secondary/60 font-semibold pl-0.5 truncate">
-                                                Path: {resolveNodePath(captureSelectedNodeId, nodes, edges)}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Submit Button */}
-                                    <Button 
-                                        type="submit" 
-                                        className="w-full bg-accent hover:bg-accent-hover text-white font-bold h-10 rounded-xl shadow-md shadow-accent/10 transition-all text-xs flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                                    >
-                                        <Zap size={13} className="fill-white" />
-                                        <span>Capture Item</span>
-                                    </Button>
-                                </form>
+                            {/* ── RIGHT: ACTIVE REMINDERS (38%) ── */}
+                            <div className="flex-[38] p-5 min-w-0 flex flex-col">
+                                <RemindersWidget />
                             </div>
                         </div>
 
@@ -740,24 +455,15 @@ const DashboardPage: FC = () => {
 
 
                     {/* ══ ZONE 2: OPERATIONAL AWARENESS ══════════════════════
-                        A dual-panel layout showing calendar roster and active reminders. */}
+                        A single unified surface for all roster/calendar widgets. */}
                     <div className="bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col gap-0">
                         {/* Zone label */}
-                        <div className="px-6 pt-5 pb-2 border-b border-border/40 bg-surface-elevated/10">
+                        <div className="px-6 pt-5 pb-2">
                             <p className="text-[10px] font-black uppercase tracking-widest text-text-secondary/50">Operational Awareness Zone</p>
                         </div>
 
-                        <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-border/60">
-                            {/* Calendar Section (65%) */}
-                            <div className="flex-[65] min-w-0">
-                                <CalendarSection embedded />
-                            </div>
-
-                            {/* Reminders Widget (35%) */}
-                            <div className="flex-[35] p-6 min-w-0 bg-surface-elevated/5">
-                                <RemindersWidget />
-                            </div>
-                        </div>
+                        {/* CalendarSection handles its own embedded styling via the embedded prop */}
+                        <CalendarSection embedded />
                     </div>
                 </div>
 
