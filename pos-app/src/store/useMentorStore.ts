@@ -18,7 +18,7 @@ export interface ChatMessage {
 export interface MentorSuggestion {
   id: string;
   description: string;
-  actionType: 'add_subnode' | 'add_initiative' | 'add_task';
+  actionType: 'add_milestone' | 'add_project' | 'add_task' | 'add_subnode' | 'add_initiative';
   payload: {
     parentId: string;
     label: string;
@@ -271,12 +271,12 @@ export const useMentorStore = create<MentorState>()(
                   type: SchemaType.OBJECT,
                   properties: {
                     description: { type: SchemaType.STRING, description: "Mentor explanation of what to add/edit and why." },
-                    actionType: { type: SchemaType.STRING, description: "Type of action to perform. Must be one of: add_subnode, add_initiative, add_task" },
+                    actionType: { type: SchemaType.STRING, description: "Type of action to perform. Must be one of: add_milestone, add_project, add_task" },
                     payload: {
                       type: SchemaType.OBJECT,
                       properties: {
                         parentId: { type: SchemaType.STRING, description: "Target ID of the existing parent node." },
-                        label: { type: SchemaType.STRING, description: "Label/Title for the new node (required for add_subnode/add_initiative)." },
+                        label: { type: SchemaType.STRING, description: "Label/Title for the new node (required for add_milestone/add_project)." },
                         text: { type: SchemaType.STRING, description: "Task text (required for add_task)." }
                       },
                       required: ["parentId"]
@@ -297,9 +297,9 @@ Here is the current Life Map tree structure:
 ${outlineText || "No nodes exist."}
 
 Rules:
-1. Count the density of nodes (threads, initiatives, subnodes) under each of the 5 pillars (Health, Career, Personal Growth/Growth, Relationships, Masters).
+1. Count the density of nodes (projects, milestones) under each of the domains (Health & Lifestyle, Career, Personal Growth, Relationships, Masters).
 2. Write a highly strategic, structured, and challenging critique. Point out what Aamir is ignoring, where projects are cluttered, or if there is no actionable detail.
-3. Suggest exactly 3 concrete roadmap improvements (creating initiatives, subnodes, or tasks). Provide the exact parent node IDs from the outline.
+3. Suggest exactly 3 concrete roadmap improvements (creating projects, milestones, or tasks). Provide the exact parent node IDs from the outline.
 `;
 
           let result;
@@ -363,10 +363,10 @@ Rules:
           const store = useLifeMapStore.getState();
           const { actionType, payload } = sug;
 
-          if (actionType === 'add_subnode') {
-            await store.addSubnode(payload.parentId, payload.label);
-          } else if (actionType === 'add_initiative') {
-            await store.addInitiative(payload.parentId, payload.label);
+          if (actionType === 'add_subnode' || actionType === 'add_milestone') {
+            await store.addMilestone(payload.parentId, payload.label);
+          } else if (actionType === 'add_initiative' || actionType === 'add_project') {
+            await store.addProject(payload.parentId, payload.label);
           } else if (actionType === 'add_task') {
             await store.addTaskToNode(payload.parentId, payload.text || payload.label);
           }

@@ -21,7 +21,7 @@ interface Task {
 
 interface LifeMapNode {
   id: string;
-  type: "center" | "pillar" | "thread" | "initiative" | "subnode";
+  type: "center" | "domain" | "project" | "milestone" | "pillar" | "thread" | "initiative" | "subnode";
   data: {
     label: string;
     description?: string;
@@ -46,7 +46,7 @@ interface Edge {
 
 // Helper: Parse creation timestamp from node ID suffix
 function getCreatedAt(node: LifeMapNode, mapUpdatedAt?: string): number {
-  const match = node.id.match(/^[p|t|i|s]-(\d+)$/);
+  const match = node.id.match(/^[p|t|i|s|d|m|pjt]-(\d+)$/);
   if (match) {
     return parseInt(match[1], 10);
   }
@@ -188,128 +188,260 @@ const handler = async (req: Request): Promise<Response> => {
         continue;
       }
 
-      // Root children are Pillars
-      const pillarEdges = edges.filter((e) => e.source === centerNode.id);
-      const pillarIds = pillarEdges.map((e) => e.target);
-      const pillars = nodes.filter((n) => n.type === "pillar" && pillarIds.includes(n.id));
+      // Root children are Domains (old pillars)
+      const domainEdges = edges.filter((e) => e.source === centerNode.id);
+      const domainIds = domainEdges.map((e) => e.target);
+      const domains = nodes.filter((n) => (n.type === "domain" || n.type === "pillar") && domainIds.includes(n.id));
 
-      const processedPillars = [];
-      let totalActiveInitiativesCount = 0;
-      let totalInactiveInitiativesCount = 0;
-      let totalActiveThreadsCount = 0;
-      let totalPillarsWithActiveFocus = 0;
-      const stagnantInitiatives = [];
+      const processedDomains = [];
+      let totalActiveProjectsCount = 0;
+      let totalInactiveProjectsCount = 0;
+      let totalDomainsWithActiveFocus = 0;
+      const stagnantProjects = [];
 
-      for (const pillar of pillars) {
-        const hue = pillar.data.hue || 210;
+      for (const domain of domains) {
+        const hue = domain.data.hue || 210;
         
-        // Find child threads
-        const threadEdges = edges.filter((e) => e.source === pillar.id);
-        const threadIds = threadEdges.map((e) => e.target);
-        // Exclude completed or archived threads
-        const threads = nodes.filter(
-          (n) => n.type === "thread" && threadIds.includes(n.id) && n.data.status !== "completed" && n.data.status !== "archived"
+        // Find child projects (old initiatives) directly under the domain
+        const projectEdges = edges.filter((e) => e.source === domain.id);
+        const projectIds = projectEdges.map((e) => e.target);
+        
+        // Exclude archived projects
+        const projects = nodes.filter(
+          (n) => (n.type === "project" || n.type === "initiative") && projectIds.includes(n.id) && n.data.status !== "archived"
         );
 
-        const activeThreadsList = [];
-        const inactiveThreadsList = [];
+        const activeProjectsList = [];
+        const inactiveProjectsList = [];
 
-        for (const thread of threads) {
-          // Find initiatives under this thread
-          const initEdges = edges.filter((e) => e.source === thread.id);
-          const initIds = initEdges.map((e) => e.target);
-          const initiatives = nodes.filter(
-            (n) => n.type === "initiative" && initIds.includes(n.id) && n.data.status !== "archived"
-          );
+        for (const project of projects) {
+          // Find milestones (old subnodes) under this project
+          const milestoneEdges = edges.filter((e) => e.source === project.id);
+          const milestoneIds = milestoneEdges.map((e) => e.target);
+          const milestones = nodes.filter((n) => (n.type === "milestone" || n.type === "subnode") && milestoneIds.includes(n.id));
 
-          const activeInits = [];
-          const inactiveInits = [];
+          let totalTasks = 0;
+          let completedTasks = 0;
+          milestones.forEach((mile) => {
+            const tasks = mile.data.tasks || [];
+            totalTasks += tasks.length;
+            completedTasks += tasks.filter((t) => t.completed).length;
+          });
 
-          for (const init of initiatives) {
-            // Count tasks and completion from subnodes of this initiative
-            const subnodeEdges = edges.filter((e) => e.source === init.id);
-            const subnodeIds = subnodeEdges.map((e) => e.target);
-            const subnodes = nodes.filter((n) => n.type === "subnode" && subnodeIds.includes(n.id));
+          const projStatus = project.data.status || "active";
+          const projCreatedAt = getCreatedAt(project, mapUpdatedAt);
+          const projLastUpdated = effectiveUpdates.get(project.id) || getLastUpdated(project, mapUpdatedAt);
+          const daysSinceAdded = getDaysSince(projCreatedAt);
+          const daysSinceUpdated = getDaysSince(projLastUpdated);
 
-            let totalTasks = 0;
-            let completedTasks = 0;
-            subnodes.forEach((sub) => {
-              const tasks = sub.data.tasks || [];
-              totalTasks += tasks.length;
-              completedTasks += tasks.filter((t) => t.completed).length;
-            });
-
-            const initStatus = init.data.status || "active";
-            const initCreatedAt = getCreatedAt(init, mapUpdatedAt);
-            const initLastUpdated = effectiveUpdates.get(init.id) || getLastUpdated(init, mapUpdatedAt);
-            const daysSinceAdded = getDaysSince(initCreatedAt);
-            const daysSinceUpdated = getDaysSince(initLastUpdated);
-
-            const initiativeDetails = {
-              id: init.id,
-              label: init.data.label,
-              status: initStatus,
-              daysSinceAdded,
-              daysSinceUpdated,
-              lastUpdatedText: getRelativeTime(initLastUpdated),
-              createdAtText: getRelativeTime(initCreatedAt),
-              taskStats: totalTasks > 0 ? `(${completedTasks}/${totalTasks} tasks)` : "",
-              completedPercentage: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
-            };
-
-            // Detect Stagnant Active Initiatives (Active but not updated in > 7 days)
-            if (initStatus === "active" && daysSinceUpdated > 7) {
-              stagnantInitiatives.push({
-                pillarName: pillar.data.label,
-                threadName: thread.data.label,
-                initiativeName: init.data.label,
-                daysSinceUpdated,
-              });
-            }
-
-            if (initStatus === "active") {
-              activeInits.push(initiativeDetails);
-              totalActiveInitiativesCount++;
-            } else if (initStatus === "paused" || initStatus === "backlog") {
-              inactiveInits.push(initiativeDetails);
-              totalInactiveInitiativesCount++;
-            }
-          }
-
-          // Thread grouping
-          const threadCreatedAt = getCreatedAt(thread, mapUpdatedAt);
-          const threadLastUpdated = effectiveUpdates.get(thread.id) || getLastUpdated(thread, mapUpdatedAt);
-
-          const threadDetails = {
-            id: thread.id,
-            label: thread.data.label,
-            daysSinceAdded: getDaysSince(threadCreatedAt),
-            lastUpdatedText: getRelativeTime(threadLastUpdated),
-            activeInitiatives: activeInits,
-            inactiveInitiatives: inactiveInits,
+          const projectDetails = {
+            id: project.id,
+            label: project.data.label,
+            status: projStatus,
+            daysSinceAdded,
+            daysSinceUpdated,
+            lastUpdatedText: getRelativeTime(projLastUpdated),
+            createdAtText: getRelativeTime(projCreatedAt),
+            taskStats: totalTasks > 0 ? `(${completedTasks}/${totalTasks} actions)` : "",
+            completedPercentage: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
           };
 
-          // Active Thread if it has at least one active initiative, or has no initiatives
-          if (activeInits.length > 0 || (activeInits.length === 0 && inactiveInits.length === 0)) {
-            activeThreadsList.push(threadDetails);
-            totalActiveThreadsCount++;
-          } else if (inactiveInits.length > 0) {
-            inactiveThreadsList.push(threadDetails);
+          // Detect Stagnant Active Projects (Active but not updated in > 7 days)
+          if (projStatus === "active" && daysSinceUpdated > 7) {
+            stagnantProjects.push({
+              pillarName: domain.data.label,
+              initiativeName: project.data.label,
+              daysSinceUpdated,
+            });
+          }
+
+          if (projStatus === "active") {
+            activeProjectsList.push(projectDetails);
+            totalActiveProjectsCount++;
+          } else if (projStatus === "paused" || projStatus === "backlog") {
+            inactiveProjectsList.push(projectDetails);
+            totalInactiveProjectsCount++;
           }
         }
 
-        if (activeThreadsList.length > 0) {
-          totalPillarsWithActiveFocus++;
+        if (activeProjectsList.length > 0) {
+          totalDomainsWithActiveFocus++;
         }
 
-        processedPillars.push({
-          id: pillar.id,
-          label: pillar.data.label,
+        processedDomains.push({
+          id: domain.id,
+          label: domain.data.label,
           hue,
-          activeThreads: activeThreadsList,
-          inactiveThreads: inactiveThreadsList,
-          hasContent: activeThreadsList.length > 0 || inactiveThreadsList.length > 0,
+          activeProjects: activeProjectsList,
+          inactiveProjects: inactiveProjectsList,
+          hasContent: activeProjectsList.length > 0 || inactiveProjectsList.length > 0,
         });
+      }
+
+      // 4. Identify Cold Spots (Domains with 0 active projects)
+      const coldSpots = processedDomains
+        .filter((d) => d.activeProjects.length === 0)
+        .map((d) => d.label);
+
+      // 5. Generate Email HTML Template
+      const dateStr = new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const activeRatio = totalActiveProjectsCount + totalInactiveProjectsCount > 0
+        ? Math.round((totalActiveProjectsCount / (totalActiveProjectsCount + totalInactiveProjectsCount)) * 100)
+        : 0;
+
+      let emailHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Life Map Daily Digest</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #0A0A0C; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #FFFFFF; -webkit-font-smoothing: antialiased;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #0A0A0C; table-layout: fixed;">
+            <tr>
+              <td align="center" style="padding: 24px 16px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; text-align: left;">
+                  
+                  <!-- HEADER -->
+                  <tr>
+                    <td style="padding-bottom: 24px;">
+                      <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #6366F1; font-weight: 700; margin-bottom: 6px;">
+                        Personal Operating System
+                      </div>
+                      <h1 style="font-size: 22px; font-weight: 800; color: #FFFFFF; margin: 0 0 4px 0;">Life Map Daily Digest</h1>
+                      <div style="font-size: 13px; color: #71717A;">${dateStr}</div>
+                    </td>
+                  </tr>
+
+                  <!-- METRICS SUMMARY PANEL -->
+                  <tr>
+                    <td style="background: linear-gradient(135deg, #18181B 0%, #09090B 100%); border: 1px solid #27272A; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+                      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                          <td width="33%" style="text-align: center; border-right: 1px solid #27272A; padding: 0 10px;">
+                            <div style="font-size: 24px; font-weight: 800; color: #6366F1; margin-bottom: 4px;">
+                              ${totalActiveProjectsCount}
+                            </div>
+                            <div style="font-size: 10px; color: #A1A1AA; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
+                              Active Projects
+                            </div>
+                          </td>
+                          <td width="34%" style="text-align: center; border-right: 1px solid #27272A; padding: 0 10px;">
+                            <div style="font-size: 24px; font-weight: 800; color: #10B981; margin-bottom: 4px;">
+                              ${activeRatio}%
+                            </div>
+                            <div style="font-size: 10px; color: #A1A1AA; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
+                              Focus Ratio
+                            </div>
+                          </td>
+                          <td width="33%" style="text-align: center; padding: 0 10px;">
+                            <div style="font-size: 24px; font-weight: 800; color: #F59E0B; margin-bottom: 4px;">
+                              ${stagnantProjects.length}
+                            </div>
+                            <div style="font-size: 10px; color: #A1A1AA; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
+                              Slipping Items
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                  
+                  <tr><td style="height: 20px;"></td></tr>
+
+                  <!-- PILLARS SECTIONS -->
+                  <tr>
+                    <td>
+                      <h2 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #A1A1AA; margin: 0 0 16px 0; border-bottom: 1px solid #27272A; padding-bottom: 8px;">
+                        Domain Breakdown
+                      </h2>
+      `;
+
+      for (const domain of processedDomains) {
+        if (!domain.hasContent) continue;
+
+        emailHtml += `
+          <!-- DOMAIN CARD: ${domain.label} -->
+          <div style="background-color: #121214; border: 1px solid #27272A; border-left: 4px solid hsl(${domain.hue}, 70%, 50%); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <!-- Domain Title -->
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 16px;">
+              <tr>
+                <td>
+                  <span style="font-size: 18px; font-weight: 800; color: #FFFFFF;">${domain.label}</span>
+                </td>
+                <td align="right">
+                  <span style="font-size: 11px; font-weight: 700; color: #A1A1AA; background-color: #1F1F23; border: 1px solid #27272A; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
+                    ${domain.activeProjects.length + domain.inactiveProjects.length} ${domain.activeProjects.length + domain.inactiveProjects.length === 1 ? 'Project' : 'Projects'}
+                  </span>
+                </td>
+              </tr>
+            </table>
+        `;
+
+        // Active Focus Section
+        if (domain.activeProjects.length > 0) {
+          emailHtml += `
+            <div style="margin-bottom: 16px;">
+              <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #10B981; font-weight: 700; margin-bottom: 8px;">
+                🟢 Active Focus
+              </div>
+          `;
+
+          for (const project of domain.activeProjects) {
+            // Determine color indicators for days since updated
+            const ageColor = project.daysSinceUpdated > 7 ? "#F59E0B" : "#A1A1AA";
+            emailHtml += `
+              <div style="background-color: #18181B; border: 1px solid #27272A; border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+                <!-- Project Title -->
+                <div style="font-size: 12px; font-weight: 700; color: #FFFFFF; display: inline-block; margin-bottom: 4px;">
+                  ${project.label} <span style="font-size: 10px; color: #71717A; font-weight: normal; margin-left: 4px;">${project.taskStats}</span>
+                </div>
+                <div style="font-size: 10px; color: ${ageColor};">
+                  Added ${project.daysSinceAdded}d ago &bull; Updated ${project.lastUpdatedText}
+                </div>
+              </div>
+            `;
+          }
+
+          emailHtml += `</div>`;
+        }
+
+        // Backburner / Backlog Section
+        if (domain.inactiveProjects.length > 0) {
+          emailHtml += `
+            <div>
+              <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #A1A1AA; font-weight: 700; margin-bottom: 8px;">
+                ⏸ Backburner / Backlog
+              </div>
+          `;
+
+          for (const project of domain.inactiveProjects) {
+            const badge = project.status === "paused" ? "⏸" : "⚪";
+            const ageColor = project.daysSinceUpdated > 14 ? "#F59E0B" : "#71717A";
+            emailHtml += `
+              <div style="background-color: #18181B; border: 1px solid #27272A; border-radius: 8px; padding: 12px; margin-bottom: 8px; opacity: 0.75;">
+                <!-- Project Title -->
+                <div style="font-size: 12px; font-weight: 700; color: #A1A1AA; display: inline-block; margin-bottom: 4px;">
+                  ${badge} ${project.label} <span style="font-size: 9px; color: #71717A; font-weight: normal; margin-left: 4px;">${project.taskStats}</span>
+                </div>
+                <div style="font-size: 10px; color: ${ageColor};">
+                  Added ${project.daysSinceAdded}d ago &bull; Updated ${project.lastUpdatedText}
+                </div>
+              </div>
+            `;
+          }
+
+          emailHtml += `</div>`;
+        }
+
+        emailHtml += `</div>`;
       }
 
       // 4. Identify Cold Spots (Pillars with 0 active threads/initiatives)
@@ -519,12 +651,12 @@ const handler = async (req: Request): Promise<Response> => {
                       
                       <!-- Cold Spots -->
                       <div style="background-color: #121214; border: 1px solid #27272A; border-radius: 12px; padding: 16px; margin-bottom: 12px;">
-                        <div style="font-size: 13px; font-weight: 700; color: #FFFFFF; margin-bottom: 6px;">❄️ Cold Spots (Unfocused Pillars)</div>
+                        <div style="font-size: 13px; font-weight: 700; color: #FFFFFF; margin-bottom: 6px;">❄️ Cold Spots (Unfocused Domains)</div>
                         <div style="font-size: 12px; color: #A1A1AA; line-height: 1.4;">
                           ${
                             coldSpots.length > 0
-                              ? `You have no active focus under: <strong>${coldSpots.join(", ")}</strong>.`
-                              : "Great coverage! All pillars have at least one active thread."
+                              ? `You have no active projects under: <strong>${coldSpots.join(", ")}</strong>.`
+                              : "Great coverage! All domains have at least one active project."
                           }
                         </div>
                       </div>
@@ -534,15 +666,15 @@ const handler = async (req: Request): Promise<Response> => {
                         <div style="font-size: 13px; font-weight: 700; color: #FFFFFF; margin-bottom: 6px;">⏳ Slipping Items (Active but idle > 7 days)</div>
                         <div style="font-size: 12px; color: #A1A1AA; line-height: 1.4;">
                           ${
-                            stagnantInitiatives.length > 0
-                              ? stagnantInitiatives
+                            stagnantProjects.length > 0
+                              ? stagnantProjects
                                   .slice(0, 4)
                                   .map(
                                     (stg) =>
                                       `• [${stg.pillarName}] <strong>${stg.initiativeName}</strong> (No updates in ${stg.daysSinceUpdated} days)`
                                   )
                                   .join("<br/>")
-                              : "Excellent momentum! No active initiatives are currently stagnant."
+                              : "Excellent momentum! No active projects are currently stagnant."
                           }
                         </div>
                       </div>

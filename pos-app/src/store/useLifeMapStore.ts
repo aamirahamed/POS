@@ -46,28 +46,28 @@ const initialNodes: LifeMapNode[] = [
     },
     {
         id: 'p1',
-        type: 'pillar',
+        type: 'domain',
         position: { x: 0, y: -200 },
         data: { label: 'Health', expanded: true, hue: 150 }, // Green
         zIndex: 50,
     },
     {
         id: 'p2',
-        type: 'pillar',
+        type: 'domain',
         position: { x: 200, y: 0 },
         data: { label: 'Career', expanded: true, hue: 210 }, // Blue
         zIndex: 50,
     },
     {
         id: 'p3',
-        type: 'pillar',
+        type: 'domain',
         position: { x: 0, y: 200 },
         data: { label: 'Relationships', expanded: true, hue: 330 }, // Pink
         zIndex: 50,
     },
     {
         id: 'p4',
-        type: 'pillar',
+        type: 'domain',
         position: { x: -200, y: 0 },
         data: { label: 'Growth', expanded: true, hue: 40 }, // Amber
         zIndex: 50,
@@ -81,60 +81,163 @@ const initialEdges = [
     { id: 'e4', source: 'center', target: 'p4', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
 ];
 
+export const migrateNodesAndEdges = (nodes: any[], edges: any[]): { nodes: LifeMapNode[], edges: any[] } => {
+    // Check if migration is needed (checks for presence of 'thread' or old types)
+    const hasThread = nodes.some(n => n.type === 'thread');
+    const hasOldTypes = nodes.some(n => n.type === 'pillar' || n.type === 'initiative' || n.type === 'subnode');
+
+    if (!hasThread && !hasOldTypes) {
+        return { nodes: nodes as LifeMapNode[], edges };
+    }
+
+    console.log("Migrating Life Map data to 4-level PM Standard structure...");
+
+    const parentMap: Record<string, string> = {};
+    const typeMap: Record<string, string> = {};
+    nodes.forEach(n => {
+        parentMap[n.id] = n.data?.parentId || '';
+        typeMap[n.id] = n.type;
+    });
+
+    const threadNodes = nodes.filter(n => n.type === 'thread');
+    const threadIds = new Set(threadNodes.map(n => n.id));
+
+    const getNewParent = (parentId: string): string => {
+        if (!parentId) return '';
+        if (threadIds.has(parentId)) {
+            const threadParent = parentMap[parentId];
+            return threadParent || 'center';
+        }
+        return parentId;
+    };
+
+    // Filter out threads and update type names + parentIds
+    const migratedNodes = nodes
+        .filter(n => n.type !== 'thread')
+        .map(n => {
+            const currentType = n.type;
+            let newType = currentType;
+            if (currentType === 'pillar') newType = 'domain';
+            if (currentType === 'initiative') newType = 'project';
+            if (currentType === 'subnode') newType = 'milestone';
+
+            const parentId = n.data?.parentId || '';
+            const newParentId = getNewParent(parentId);
+
+            return {
+                ...n,
+                type: newType,
+                data: {
+                    ...n.data,
+                    parentId: newParentId
+                }
+            };
+        });
+
+    const migratedEdges: any[] = [];
+    const addedEdges = new Set<string>();
+
+    edges.forEach(edge => {
+        const sourceIsThread = threadIds.has(edge.source);
+        const targetIsThread = threadIds.has(edge.target);
+
+        if (sourceIsThread && targetIsThread) return;
+        if (targetIsThread) return;
+
+        if (sourceIsThread) {
+            // Relink Thread -> Initiative to Pillar/Domain -> Project
+            const threadParent = parentMap[edge.source];
+            const targetNode = edge.target;
+            if (threadParent && targetNode) {
+                const newEdgeId = `e-${threadParent}-${targetNode}`;
+                if (!addedEdges.has(newEdgeId)) {
+                    migratedEdges.push({
+                        ...edge,
+                        id: newEdgeId,
+                        source: threadParent,
+                        target: targetNode
+                    });
+                    addedEdges.add(newEdgeId);
+                }
+            }
+            return;
+        }
+
+        let newSource = edge.source;
+        let newTarget = edge.target;
+
+        const newEdgeId = `e-${newSource}-${newTarget}`;
+        if (!addedEdges.has(newEdgeId)) {
+            migratedEdges.push({
+                ...edge,
+                id: newEdgeId,
+                source: newSource,
+                target: newTarget
+            });
+            addedEdges.add(newEdgeId);
+        }
+    });
+
+    return calculateRadialLayout(migratedNodes as LifeMapNode[], migratedEdges);
+};
+
 const ensureInboxExists = (nodes: LifeMapNode[], edges: any[]): { nodes: LifeMapNode[], edges: any[] } => {
     let newNodes = [...nodes];
     let newEdges = [...edges];
     let changed = false;
 
-    // 1. Ensure pillar-inbox
-    const pillarIdx = newNodes.findIndex(n => n.id === 'pillar-inbox');
-    if (pillarIdx === -1) {
+    // 1. Ensure domain-inbox (old pillar-inbox)
+    const domainIdx = newNodes.findIndex(n => n.id === 'domain-inbox' || n.id === 'pillar-inbox');
+    let domainId = 'domain-inbox';
+    if (domainIdx === -1) {
         newNodes.push({
-            id: 'pillar-inbox',
-            type: 'pillar',
+            id: 'domain-inbox',
+            type: 'domain',
             position: { x: -350, y: 0 },
             data: { label: 'Inbox', expanded: true, hue: 240 },
             zIndex: 50,
         });
         changed = true;
+    } else {
+        domainId = newNodes[domainIdx].id;
+        if (newNodes[domainIdx].type !== 'domain') {
+            newNodes[domainIdx].type = 'domain';
+            changed = true;
+        }
     }
 
-    // 2. Ensure thread-inbox
-    const threadIdx = newNodes.findIndex(n => n.id === 'thread-inbox');
-    if (threadIdx === -1) {
+    // 2. Ensure project-inbox (old initiative-inbox)
+    const projectIdx = newNodes.findIndex(n => n.id === 'project-inbox' || n.id === 'initiative-inbox');
+    let projectId = 'project-inbox';
+    if (projectIdx === -1) {
         newNodes.push({
-            id: 'thread-inbox',
-            type: 'thread',
+            id: 'project-inbox',
+            type: 'project',
             position: { x: -350, y: 280 },
-            data: { label: 'Quick captures', parentId: 'pillar-inbox', expanded: true, hue: 240 },
-            zIndex: 40,
-        });
-        changed = true;
-    }
-
-    // 3. Ensure initiative-inbox
-    const initIdx = newNodes.findIndex(n => n.id === 'initiative-inbox');
-    if (initIdx === -1) {
-        newNodes.push({
-            id: 'initiative-inbox',
-            type: 'initiative',
-            position: { x: -350, y: 560 },
-            data: { label: 'Inbox Focus', parentId: 'thread-inbox', expanded: true, hue: 240, status: 'active' },
+            data: { label: 'Inbox Focus', parentId: domainId, expanded: true, hue: 240, status: 'active' },
             zIndex: 30,
         });
         changed = true;
+    } else {
+        projectId = newNodes[projectIdx].id;
+        if (newNodes[projectIdx].type !== 'project' || newNodes[projectIdx].data.parentId !== domainId) {
+            newNodes[projectIdx].type = 'project';
+            newNodes[projectIdx].data.parentId = domainId;
+            changed = true;
+        }
     }
 
-    // 4. Ensure subnode-inbox
-    const subIdx = newNodes.findIndex(n => n.id === 'subnode-inbox');
-    if (subIdx === -1) {
+    // 3. Ensure milestone-inbox (old subnode-inbox)
+    const milestoneIdx = newNodes.findIndex(n => n.id === 'milestone-inbox' || n.id === 'subnode-inbox');
+    let milestoneId = 'milestone-inbox';
+    if (milestoneIdx === -1) {
         newNodes.push({
-            id: 'subnode-inbox',
-            type: 'subnode',
-            position: { x: -350, y: 840 },
+            id: 'milestone-inbox',
+            type: 'milestone',
+            position: { x: -350, y: 560 },
             data: {
                 label: 'Quick Captures',
-                parentId: 'initiative-inbox',
+                parentId: projectId,
                 status: 'active',
                 hue: 240,
                 priority: 'medium',
@@ -146,15 +249,36 @@ const ensureInboxExists = (nodes: LifeMapNode[], edges: any[]): { nodes: LifeMap
             zIndex: 20,
         });
         changed = true;
+    } else {
+        milestoneId = newNodes[milestoneIdx].id;
+        if (newNodes[milestoneIdx].type !== 'milestone' || newNodes[milestoneIdx].data.parentId !== projectId) {
+            newNodes[milestoneIdx].type = 'milestone';
+            newNodes[milestoneIdx].data.parentId = projectId;
+            changed = true;
+        }
     }
 
-    // 5. Ensure edges
+    // Remove any leftover thread-inbox
+    const oldThreadInboxIdx = newNodes.findIndex(n => n.id === 'thread-inbox');
+    if (oldThreadInboxIdx !== -1) {
+        newNodes.splice(oldThreadInboxIdx, 1);
+        changed = true;
+    }
+
+    // 4. Ensure required edges
     const requiredEdges = [
-        { id: 'e-center-pillar-inbox', source: 'center', target: 'pillar-inbox', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
-        { id: 'e-pillar-inbox-thread-inbox', source: 'pillar-inbox', target: 'thread-inbox', type: 'smoothstep', animated: false, zIndex: 5, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
-        { id: 'e-thread-inbox-initiative-inbox', source: 'thread-inbox', target: 'initiative-inbox', type: 'smoothstep', animated: false, zIndex: 3, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
-        { id: 'e-initiative-inbox-subnode-inbox', source: 'initiative-inbox', target: 'subnode-inbox', type: 'default', animated: false, zIndex: 1, sourceHandle: 'source-bottom', targetHandle: 'target-top' }
+        { id: `e-center-${domainId}`, source: 'center', target: domainId, type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+        { id: `e-${domainId}-${projectId}`, source: domainId, target: projectId, type: 'smoothstep', animated: false, zIndex: 5, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+        { id: `e-${projectId}-${milestoneId}`, source: projectId, target: milestoneId, type: 'default', animated: false, zIndex: 1, sourceHandle: 'source-bottom', targetHandle: 'target-top' }
     ];
+
+    // Remove old inbox edges
+    newEdges = newEdges.filter(e => 
+        e.id !== 'e-center-pillar-inbox' && 
+        e.id !== 'e-pillar-inbox-thread-inbox' && 
+        e.id !== 'e-thread-inbox-initiative-inbox' && 
+        e.id !== 'e-initiative-inbox-subnode-inbox'
+    );
 
     requiredEdges.forEach(reqEdge => {
         if (!newEdges.some(e => e.id === reqEdge.id)) {
@@ -172,7 +296,6 @@ const ensureInboxExists = (nodes: LifeMapNode[], edges: any[]): { nodes: LifeMap
 export const useLifeMapStore = create<LifeMapState>()(
     persist(
         (set, get) => {
-            // Ensure system inbox exists and calculate initial layout
             const { nodes: initNodes, edges: initEdges } = ensureInboxExists(initialNodes, initialEdges);
 
             return {
@@ -195,11 +318,12 @@ export const useLifeMapStore = create<LifeMapState>()(
                     if (!user) return;
                     const map = await fetchLifeMap(user.id);
                     if (map?.nodes?.length) {
-                        const { nodes: layoutedNodes, edges: layoutedEdges } = ensureInboxExists(map.nodes, map.edges || []);
+                        const migrated = migrateNodesAndEdges(map.nodes, map.edges || []);
+                        const { nodes: layoutedNodes, edges: layoutedEdges } = ensureInboxExists(migrated.nodes, migrated.edges);
                         set({ nodes: layoutedNodes, edges: layoutedEdges });
-                        if (layoutedNodes.length > map.nodes.length) {
-                            await saveLifeMap(user.id, layoutedNodes, layoutedEdges);
-                        }
+                        
+                        // Force a sync back to Supabase to persist the migrated state
+                        await saveLifeMap(user.id, layoutedNodes, layoutedEdges);
                     }
                 },
                 confirmDeleteNode: () => {
@@ -233,17 +357,17 @@ export const useLifeMapStore = create<LifeMapState>()(
                     set({ nodes: layouted.nodes });
                 },
 
-                addPillar: (label) => {
-                    const id = `p-${Date.now()}`;
+                addDomain: (label) => {
+                    const id = `d-${Date.now()}`;
 
                     // Assign next hue
-                    const currentPillars = get().nodes.filter(n => n.type === 'pillar');
-                    const hueIndex = currentPillars.length % PILLAR_HUES.length;
+                    const currentDomains = get().nodes.filter(n => n.type === 'domain');
+                    const hueIndex = currentDomains.length % PILLAR_HUES.length;
                     const hue = PILLAR_HUES[hueIndex];
 
-                    const newPillar: LifeMapNode = {
+                    const newDomain: LifeMapNode = {
                         id,
-                        type: 'pillar',
+                        type: 'domain',
                         position: { x: 0, y: 0 },
                         data: { label, expanded: true, hue },
                         zIndex: 50,
@@ -259,79 +383,28 @@ export const useLifeMapStore = create<LifeMapState>()(
                         targetHandle: 'target-top'
                     };
 
-                    const newNodes = [...get().nodes, newPillar];
+                    const newNodes = [...get().nodes, newDomain];
                     const newEdges = [...get().edges, newEdge];
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
                     immediateSync(layouted.nodes, newEdges);
+                    return id;
                 },
 
-                addThread: (parentId, label) => {
-                    const id = `t-${Date.now()}`;
-                    const isNew = label === "";
-
-                    // Find parent hue
-                    const parent = get().nodes.find(n => n.id === parentId);
-                    const parentHue = parent?.data.hue || 210;
-
-                    // Calculate sibling offset for variance
-                    // "If a pillar has 2 different threads, each thread will follow a unique color scheme"
-                    const siblings = get().nodes.filter(n =>
-                        n.type === 'thread' && get().edges.some(e => e.source === parentId && e.target === n.id)
-                    );
-
-                    // Shift hue slightly for uniqueness, but keep related (e.g. +/- 15 deg)
-                    // Or cycle through small offsets: 0, -15, +15, -30, +30
-                    const index = siblings.length;
-                    const offset = index === 0 ? 0 : (index % 2 === 0 ? 1 : -1) * Math.ceil(index / 2) * 15;
-                    const hue = (parentHue + offset + 360) % 360;
-
-                    const newThread: LifeMapNode = {
-                        id,
-                        type: 'thread',
-                        position: { x: 0, y: 0 },
-                        data: {
-                            label: isNew ? "New Thread" : label,
-                            parentId,
-                            expanded: true,
-                            editing: isNew,
-                            hue
-                        },
-                        zIndex: 25,
-                    };
-                    const newEdge = {
-                        id: `e-${parentId}-${id}`,
-                        source: parentId,
-                        target: id,
-                        type: 'smoothstep',
-                        animated: false,
-                        zIndex: 5,
-                        sourceHandle: 'source-bottom',
-                        targetHandle: 'target-top'
-                    };
-
-                    const newNodes = [...get().nodes, newThread];
-                    const newEdges = [...get().edges, newEdge];
-                    const layouted = calculateRadialLayout(newNodes, newEdges);
-
-                    set({ nodes: layouted.nodes, edges: newEdges });
-                    immediateSync(layouted.nodes, newEdges);
-                },
-
-                addInitiative: (parentId, label) => {
-                    const id = `i-${Date.now()}`;
+                addProject: (parentId, label) => {
+                    const id = `pjt-${Date.now()}`;
                     const isNew = label === "";
 
                     const parent = get().nodes.find(n => n.id === parentId);
                     const hue = parent?.data.hue || 210;
 
-                    const newInitiative: LifeMapNode = {
+                    const newProject: LifeMapNode = {
                         id,
-                        type: 'initiative',
+                        type: 'project',
                         position: { x: 0, y: 0 },
                         data: {
-                            label: isNew ? "New Initiative" : label,
+                            label: isNew ? "New Project" : label,
                             parentId,
                             expanded: true,
                             editing: isNew,
@@ -351,27 +424,28 @@ export const useLifeMapStore = create<LifeMapState>()(
                         targetHandle: 'target-top'
                     };
 
-                    const newNodes = [...get().nodes, newInitiative];
+                    const newNodes = [...get().nodes, newProject];
                     const newEdges = [...get().edges, newEdge];
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
                     immediateSync(layouted.nodes, newEdges);
+                    return id;
                 },
 
-                addSubnode: (parentId, label) => {
-                    const id = `s-${Date.now()}`;
+                addMilestone: (parentId, label) => {
+                    const id = `m-${Date.now()}`;
                     const isNew = label === "";
 
                     const parent = get().nodes.find(n => n.id === parentId);
                     const hue = parent?.data.hue || 210; // Inherit parent hue directly
 
-                    const newSubnode: LifeMapNode = {
+                    const newMilestone: LifeMapNode = {
                         id,
-                        type: 'subnode',
+                        type: 'milestone',
                         position: { x: 0, y: 0 },
                         data: {
-                            label: isNew ? "New Execution Node" : label,
+                            label: isNew ? "New Milestone" : label,
                             parentId,
                             status: 'active',
                             editing: isNew,
@@ -396,12 +470,13 @@ export const useLifeMapStore = create<LifeMapState>()(
                         targetHandle: 'target-top'
                     };
 
-                    const newNodes = [...get().nodes, newSubnode];
+                    const newNodes = [...get().nodes, newMilestone];
                     const newEdges = [...get().edges, newEdge];
                     const layouted = calculateRadialLayout(newNodes, newEdges);
 
                     set({ nodes: layouted.nodes, edges: newEdges });
                     immediateSync(layouted.nodes, newEdges);
+                    return id;
                 },
 
                 addTaskToNode: (nodeId, text) => {
@@ -697,7 +772,7 @@ export const useLifeMapStore = create<LifeMapState>()(
             };
         },
         {
-            name: 'pos-lifemap-storage-v10', // Changed storage key to force reset
+            name: 'pos-lifemap-storage-v11', // Changed storage key to force reset / refresh
         }
     )
 );

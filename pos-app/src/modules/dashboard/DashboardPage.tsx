@@ -49,37 +49,23 @@ const cleanUrl = (urlStr: string) => {
 };
 
 // Helper: Resolve parent path for subnodes
-const resolveNodePath = (subnodeId: string, nodesList: any[], edgesList: any[]): string => {
-    if (subnodeId === 'subnode-inbox') return 'Inbox';
-    const subnode = nodesList.find(n => n.id === subnodeId);
+const resolveNodePath = (milestoneId: string, nodesList: any[], edgesList: any[]): string => {
+    if (milestoneId === 'milestone-inbox' || milestoneId === 'subnode-inbox') return 'Inbox';
+    const subnode = nodesList.find(n => n.id === milestoneId);
     if (!subnode) return '';
 
-    const edgeToSubnode = edgesList.find(e => e.target === subnodeId);
+    const edgeToSubnode = edgesList.find(e => e.target === milestoneId);
     if (!edgeToSubnode) return '';
 
     const parentNode = nodesList.find(n => n.id === edgeToSubnode.source);
     if (!parentNode) return '';
 
-    if (parentNode.type === 'initiative') {
-        const edgeToInit = edgesList.find(e => e.target === parentNode.id);
-        const threadNode = edgeToInit ? nodesList.find(n => n.id === edgeToInit.source) : null;
+    if (parentNode.type === 'project') {
+        const edgeToProject = edgesList.find(e => e.target === parentNode.id);
+        const domainNode = edgeToProject ? nodesList.find(n => n.id === edgeToProject.source) : null;
 
-        if (threadNode && threadNode.type === 'thread') {
-            const edgeToThread = edgesList.find(e => e.target === threadNode.id);
-            const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
-
-            if (pillarNode && pillarNode.type === 'pillar') {
-                return `${pillarNode.data.label} > ${threadNode.data.label} > ${parentNode.data.label}`;
-            }
-            return `${threadNode.data.label} > ${parentNode.data.label}`;
-        }
-        return parentNode.data.label;
-    } else if (parentNode.type === 'thread') {
-        const edgeToThread = edgesList.find(e => e.target === parentNode.id);
-        const pillarNode = edgeToThread ? nodesList.find(n => n.id === edgeToThread.source) : null;
-
-        if (pillarNode && pillarNode.type === 'pillar') {
-            return `${pillarNode.data.label} > ${parentNode.data.label}`;
+        if (domainNode && domainNode.type === 'domain') {
+            return `${domainNode.data.label} > ${parentNode.data.label}`;
         }
         return parentNode.data.label;
     }
@@ -112,7 +98,7 @@ const DashboardPage: FC = () => {
     const [captureType, setCaptureType] = useState<'task' | 'resource'>('task');
     const [captureInputText, setCaptureInputText] = useState('');
     const [captureResourceTitle, setCaptureResourceTitle] = useState('');
-    const [captureSelectedNodeId, setCaptureSelectedNodeId] = useState<string>('subnode-inbox');
+    const [captureSelectedNodeId, setCaptureSelectedNodeId] = useState<string>('milestone-inbox');
     const [captureSearchQuery, setCaptureSearchQuery] = useState('');
     const [showAllNodes, setShowAllNodes] = useState(false);
     const [isManualOverride, setIsManualOverride] = useState(false);
@@ -132,7 +118,7 @@ const DashboardPage: FC = () => {
     // Derived Stats
     const activeReminders = reminders.filter(r => !r.completed).length;
     const activeFocuses = focusItems.length;
-    const backlogInitiatives = nodes.filter(n => n.type === 'initiative' && n.data.status === 'backlog').length;
+    const backlogProjects = nodes.filter(n => n.type === 'project' && n.data.status === 'backlog').length;
 
     const hour = now.getHours();
     const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -170,7 +156,7 @@ const DashboardPage: FC = () => {
             return;
         }
 
-        const targetNode = captureSelectedNodeId || 'subnode-inbox';
+        const targetNode = captureSelectedNodeId || 'milestone-inbox';
         const targetNodeLabel = nodes.find(n => n.id === targetNode)?.data.label || 'Inbox';
 
         if (captureType === 'task') {
@@ -199,13 +185,13 @@ const DashboardPage: FC = () => {
         setCaptureType('task');
     };
 
-    // Filter nodes list to include only subnodes (execution nodes)
-    const subnodes = nodes.filter(n => n.type === 'subnode');
+    // Filter nodes list to include only milestones (execution nodes)
+    const subnodes = nodes.filter(n => n.type === 'milestone');
 
     // Rank subnodes based on count of tasks they contain
     // inbox captures always goes first
-    const inboxSubnode = subnodes.find(n => n.id === 'subnode-inbox');
-    const otherSubnodes = subnodes.filter(n => n.id !== 'subnode-inbox');
+    const inboxSubnode = subnodes.find(n => n.id === 'milestone-inbox' || n.id === 'subnode-inbox');
+    const otherSubnodes = subnodes.filter(n => n.id !== 'milestone-inbox' && n.id !== 'subnode-inbox');
     const rankedOtherSubnodes = [...otherSubnodes].sort((a, b) => {
         const aCount = a.data.tasks?.length || 0;
         const bCount = b.data.tasks?.length || 0;
@@ -228,13 +214,13 @@ const DashboardPage: FC = () => {
 
     // Focus Candidates
     const focusCandidates = nodes.filter(n => 
-        (n.type === 'initiative' || n.type === 'subnode') && 
+        (n.type === 'project' || n.type === 'milestone') && 
         n.data.status !== 'completed' && n.data.status !== 'archived' &&
         !focusItems.some(f => f.id === n.id)
     );
 
     // Filter out target execution nodes
-    const executionNodes = nodes.filter(n => n.type === 'subnode' && n.id !== 'subnode-inbox');
+    const executionNodes = nodes.filter(n => n.type === 'milestone' && n.id !== 'milestone-inbox' && n.id !== 'subnode-inbox');
 
     // Get inbox subnode items
     const inboxTasks = inboxSubnode?.data?.tasks || [];
@@ -244,6 +230,8 @@ const DashboardPage: FC = () => {
         ...inboxResources.map(r => ({ ...r, type: 'resource' as const, text: r.title }))
     ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
+    const inboxId = inboxSubnode?.id || 'milestone-inbox';
+
     const handleMoveItem = (itemId: string, type: 'task' | 'resource', targetNodeId: string) => {
         const targetNode = nodes.find(n => n.id === targetNodeId);
         const targetNodeLabel = targetNode?.data?.label || 'Target Node';
@@ -252,14 +240,14 @@ const DashboardPage: FC = () => {
             const task = inboxTasks.find(t => t.id === itemId);
             if (task) {
                 addTaskToNode(targetNodeId, task.text);
-                deleteTaskFromNode('subnode-inbox', itemId);
+                deleteTaskFromNode(inboxId, itemId);
                 toast.success(`Moved task to "${targetNodeLabel}"`);
             }
         } else {
             const resource = inboxResources.find(r => r.id === itemId);
             if (resource) {
                 addResource(targetNodeId, resource);
-                removeResource('subnode-inbox', itemId);
+                removeResource(inboxId, itemId);
                 toast.success(`Moved resource to "${targetNodeLabel}"`);
             }
         }
@@ -267,10 +255,10 @@ const DashboardPage: FC = () => {
 
     const handleDeleteInboxItem = (itemId: string, type: 'task' | 'resource') => {
         if (type === 'task') {
-            deleteTaskFromNode('subnode-inbox', itemId);
+            deleteTaskFromNode(inboxId, itemId);
             toast.success("Discarded inbox task");
         } else {
-            removeResource('subnode-inbox', itemId);
+            removeResource(inboxId, itemId);
             toast.success("Discarded inbox resource");
         }
     };
@@ -281,7 +269,7 @@ const DashboardPage: FC = () => {
         const node = nodes.find(n => n.id === focus.id);
         if (!node) return null;
 
-        const isExecution = node.type === 'subnode';
+        const isExecution = node.type === 'milestone';
         const parentNode = nodes.find(n => n.id === node.data.parentId);
         const daysInFocus = Math.floor((Date.now() - focus.addedAt) / (1000 * 60 * 60 * 24));
         const durationText = daysInFocus === 0 ? 'Today' : daysInFocus === 1 ? '1 day' : `${daysInFocus}d`;
@@ -337,7 +325,7 @@ const DashboardPage: FC = () => {
 
     // Generate lightweight suggestions
     const suggestions = [];
-    if (backlogInitiatives > 3) suggestions.push(`You have ${backlogInitiatives} initiatives in backlog. Consider activating one.`);
+    if (backlogProjects > 3) suggestions.push(`You have ${backlogProjects} projects in backlog. Consider activating one.`);
     if (activeReminders > 0) suggestions.push(`You have ${activeReminders} active reminders to review.`);
     if (shoppingItems.filter(i => !i.completed).length > 5) suggestions.push(`Your shopping list has over 5 items pending.`);
     if (suggestions.length === 0) suggestions.push(`Everything is on track. Have a great day!`);
@@ -383,7 +371,7 @@ const DashboardPage: FC = () => {
                         </div>
                         <div className="flex items-center gap-2 bg-surface px-3.5 py-2 rounded-xl border border-border text-sm">
                             <Zap size={14} className="text-indigo-400" />
-                            <span className="font-medium text-white">{backlogInitiatives}</span>
+                            <span className="font-medium text-white">{backlogProjects}</span>
                             <span className="text-text-secondary">in backlog</span>
                         </div>
                     </div>
@@ -424,13 +412,13 @@ const DashboardPage: FC = () => {
                                         <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">Select from Life Map</h3>
                                         <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
                                             {focusCandidates.length === 0 ? (
-                                                <p className="text-sm text-text-secondary">No available active initiatives or nodes.</p>
+                                                <p className="text-sm text-text-secondary">No available active projects or milestones.</p>
                                             ) : (
                                                 focusCandidates.map(node => (
                                                     <div key={node.id} className="flex items-center justify-between p-2.5 bg-surface hover:bg-surface-hover rounded-lg cursor-pointer border border-transparent hover:border-border transition-colors" onClick={() => { addFocusNode(node.id); setShowFocusSelector(false); }}>
                                                         <div className="flex items-center gap-2.5 min-w-0">
-                                                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${node.type === 'subnode' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                                                                {node.type === 'subnode' ? <ListTodo size={12} /> : <Target size={12} />}
+                                                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${node.type === 'milestone' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                                                                {node.type === 'milestone' ? <ListTodo size={12} /> : <Target size={12} />}
                                                             </div>
                                                             <span className="text-sm font-medium text-white truncate">{node.data.label}</span>
                                                         </div>

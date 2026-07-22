@@ -46,7 +46,7 @@ const ExecutionNodeDrawer: FC = () => {
 
     const node = nodes.find(n => n.id === selectedExecutionNodeId);
 
-    if (!selectedExecutionNodeId || !node || node.type !== 'subnode') return null;
+    if (!selectedExecutionNodeId || !node || node.type !== 'milestone') return null;
 
     const data = node.data;
     const tasks = (data.tasks as any[]) || [];
@@ -197,11 +197,11 @@ const ExecutionNodeDrawer: FC = () => {
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8 custom-scrollbar">
                 
-                {/* 2. EXECUTION LIST */}
+                {/* 2. ACTION ITEMS */}
                 <section>
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-bold tracking-wide text-text-primary flex items-center gap-2">
-                            <ArrowRight size={14} className="text-accent" /> Execution List
+                            <ArrowRight size={14} className="text-accent" /> Action Items
                         </h3>
                     </div>
                     <div className="bg-black/30 border border-white/5 rounded-xl p-2 flex flex-col gap-1 shadow-inner">
@@ -254,7 +254,7 @@ const ExecutionNodeDrawer: FC = () => {
                                                 setEditingTaskId(task.id);
                                             }}
                                             className="p-1 rounded text-text-secondary hover:text-white hover:bg-white/10 transition-colors"
-                                            title="Edit Task"
+                                            title="Edit Action Item"
                                         >
                                             <Edit2 size={12} />
                                         </button>
@@ -264,7 +264,7 @@ const ExecutionNodeDrawer: FC = () => {
                                                 deleteTaskFromNode(node.id, task.id);
                                             }}
                                             className="p-1 rounded text-text-secondary hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                                            title="Delete Task"
+                                            title="Delete Action Item"
                                         >
                                             <Trash2 size={12} />
                                         </button>
@@ -273,7 +273,7 @@ const ExecutionNodeDrawer: FC = () => {
                             </div>
                         )) : (
                             <div className="p-3 text-sm text-text-secondary italic">
-                                No tasks defined yet.
+                                No action items defined yet.
                             </div>
                         )}
                         
@@ -281,7 +281,7 @@ const ExecutionNodeDrawer: FC = () => {
                             <Plus size={16} className="text-text-secondary flex-shrink-0" />
                             <input 
                                 type="text" 
-                                placeholder="Add a new task..."
+                                placeholder="Add a new action item..."
                                 value={newTaskText}
                                 onChange={(e) => setNewTaskText(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}

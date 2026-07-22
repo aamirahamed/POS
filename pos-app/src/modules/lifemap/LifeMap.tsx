@@ -15,18 +15,16 @@ import { Button } from "@/components/ui/button";
 import { Trash2 } from 'lucide-react';
 
 import CenterNode from './nodes/CenterNode';
-import PillarNode from './nodes/PillarNode';
-import ThreadNode from './nodes/ThreadNode';
-import InitiativeNode from './nodes/InitiativeNode';
-import SubNode from './nodes/SubNode';
+import DomainNode from './nodes/DomainNode';
+import ProjectNode from './nodes/ProjectNode';
+import MilestoneNode from './nodes/MilestoneNode';
 import ExecutionNodeDrawer from './components/ExecutionNodeDrawer';
 
 const nodeTypes: NodeTypes = {
     center: CenterNode,
-    pillar: PillarNode,
-    thread: ThreadNode,
-    initiative: InitiativeNode,
-    subnode: SubNode,
+    domain: DomainNode,
+    project: ProjectNode,
+    milestone: MilestoneNode,
 };
 
 const LifeMap: FC = () => {
@@ -83,40 +81,32 @@ const LifeMap: FC = () => {
 
 
 
-    // Actually I'm replacing the whole body, so I can rewrite handleAddPillar.
-
-    const { addPillar } = useLifeMapStore();
-    const handleAddPillar = useCallback(() => {
-        const title = prompt("Enter Pillar Name:");
-        if (title) addPillar(title);
-    }, [addPillar]);
+    const { addDomain } = useLifeMapStore();
+    const handleAddDomain = useCallback(() => {
+        const title = prompt("Enter Domain Name:");
+        if (title) addDomain(title);
+    }, [addDomain]);
 
     const styledEdges = edges.map(edge => {
         const sourceNode = nodes.find(n => n.id === edge.source);
         const targetNode = nodes.find(n => n.id === edge.target);
 
-        let relevantInitiative = null;
-        if (sourceNode?.type === 'initiative') {
-            relevantInitiative = sourceNode;
-        } else if (targetNode?.type === 'initiative') {
-            relevantInitiative = targetNode;
-        } else if (targetNode?.type === 'thread') {
-            // Find all initiatives belonging to this thread
-            const childInitiatives = nodes.filter(n => n.type === 'initiative' && n.data.parentId === targetNode.id);
-            
-            if (childInitiatives.length > 0) {
-                // Priority: active > paused > backlog > completed
-                const active = childInitiatives.find(n => (n.data.status || 'active') === 'active');
-                const paused = childInitiatives.find(n => n.data.status === 'paused');
-                const backlog = childInitiatives.find(n => n.data.status === 'backlog');
-                
-                relevantInitiative = active || paused || backlog || childInitiatives[0];
+        let relevantProject = null;
+        if (sourceNode?.type === 'project') {
+            relevantProject = sourceNode;
+        } else if (targetNode?.type === 'project') {
+            relevantProject = targetNode;
+        } else if (targetNode?.type === 'milestone') {
+            // Find parent project status
+            const parentProject = nodes.find(n => n.id === targetNode.data.parentId);
+            if (parentProject) {
+                relevantProject = parentProject;
             }
         }
 
-        if (relevantInitiative) {
-            const status = relevantInitiative.data.status || 'active';
-            const hue = targetNode?.type === 'thread' ? (targetNode.data.hue || 210) : (relevantInitiative.data.hue || 210);
+        if (relevantProject) {
+            const status = relevantProject.data.status || 'active';
+            const hue = targetNode?.type === 'milestone' ? (targetNode.data.hue || 210) : (relevantProject.data.hue || 210);
             
             if (status === 'active') {
                 return { ...edge, animated: true, style: { stroke: `hsl(${hue}, 70%, 60%)`, strokeWidth: 2, opacity: 1 } };
@@ -151,13 +141,13 @@ const LifeMap: FC = () => {
                 <MiniMap
                     nodeColor={(n) => {
                         if (n.type === 'center') return '#6366f1';
-                        if (n.type === 'pillar') return '#27272a';
+                        if (n.type === 'domain') return '#27272a';
                         return '#3f3f46';
                     }}
                     className="bg-surface border-border"
                 />
                 <Panel position="top-right">
-                    <Button onClick={handleAddPillar} variant="default" size="sm">New Pillar</Button>
+                    <Button onClick={handleAddDomain} variant="default" size="sm">New Domain</Button>
                     <div className="mt-2 text-[10px] text-text-secondary text-right">
                         {userId ? 'Syncing...' : 'Local Mode'}
                     </div>
@@ -171,7 +161,7 @@ const LifeMap: FC = () => {
                             <Trash2 size={20} /> Delete Node?
                         </h3>
                         <p className="text-sm text-text-secondary leading-relaxed">
-                            Are you sure you want to delete this node? This will also permanently delete all of its child nodes and connected execution tasks. This action cannot be undone.
+                            Are you sure you want to delete this node? This will also permanently delete all of its child nodes and connected tasks. This action cannot be undone.
                         </p>
                         <div className="flex justify-end gap-3 mt-4">
                             <button 

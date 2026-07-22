@@ -3,8 +3,8 @@ import { Handle, Position, NodeProps, NodeToolbar } from '@xyflow/react';
 import { Plus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 
-const PillarNode = ({ id, data, selected }: NodeProps) => {
-    const { addThread, toggleNodeExpansion, deleteNode, updateNode } = useLifeMapStore();
+const DomainNode = ({ id, data, selected }: NodeProps) => {
+    const { addProject, toggleNodeExpansion, deleteNode, updateNode } = useLifeMapStore();
     const [isHovered, setIsHovered] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.label as string);
@@ -21,8 +21,8 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
         timeoutRef[1](timeout);
     };
 
-    const handleAddThread = () => {
-        addThread(id, ""); // Empty string triggers editing mode in ThreadNode
+    const handleAddProject = () => {
+        addProject(id, ""); // Empty string triggers editing mode in ProjectNode
     };
 
     useEffect(() => {
@@ -69,18 +69,18 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             onDoubleClick={() => {
-                if (id !== 'pillar-inbox') {
+                if (id !== 'domain-inbox' && id !== 'pillar-inbox') {
                     setIsEditing(true);
                     setEditValue(data.label as string);
                 }
             }}
         >
             <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
-                {id !== 'pillar-inbox' && (
+                {id !== 'domain-inbox' && id !== 'pillar-inbox' && (
                     <button
-                        onClick={handleAddThread}
+                        onClick={handleAddProject}
                         className="p-1 rounded-full bg-surface-hover hover:bg-accent text-text-primary transition-colors"
-                        title="Add Thread"
+                        title="Add Project"
                     >
                         <Plus size={14} />
                     </button>
@@ -92,7 +92,7 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
                 >
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
-                {id !== 'pillar-inbox' && (
+                {id !== 'domain-inbox' && id !== 'pillar-inbox' && (
                     <button
                         onClick={() => deleteNode(id)}
                         className="p-1 rounded-full bg-surface-hover hover:bg-red-500 text-text-primary transition-colors"
@@ -131,12 +131,12 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
                 )}
             </div>
 
-            {/* Persistent Add Thread Button */}
-            {id !== 'pillar-inbox' && (
+            {/* Persistent Add Project Button */}
+            {id !== 'domain-inbox' && id !== 'pillar-inbox' && (
                 <button 
-                    onClick={(e) => { e.stopPropagation(); handleAddThread(); }}
+                    onClick={(e) => { e.stopPropagation(); handleAddProject(); }}
                     className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-surface-hover hover:bg-accent border border-white/10 rounded-full flex items-center justify-center text-text-secondary hover:text-white transition-all shadow-md group-hover:opacity-100 opacity-60 z-10"
-                    title="Add Thread"
+                    title="Add Project"
                 >
                     <Plus size={12} />
                 </button>
@@ -150,4 +150,4 @@ const PillarNode = ({ id, data, selected }: NodeProps) => {
     );
 };
 
-export default memo(PillarNode);
+export default memo(DomainNode);

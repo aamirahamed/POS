@@ -1,6 +1,6 @@
 import { Node, Edge } from '@xyflow/react';
 
-export type NodeType = 'center' | 'pillar' | 'thread' | 'initiative' | 'subnode';
+export type NodeType = 'center' | 'domain' | 'project' | 'milestone';
 
 export type ResourceType = 'youtube' | 'article' | 'attachment' | 'link';
 
@@ -31,7 +31,7 @@ export interface LifeMapNode extends Node {
         parentId?: string;
         editing?: boolean;
         hue?: number;
-        tasks?: { id: string; text: string; completed: boolean; createdAt?: number }[];
+        tasks?: { id: string; text: string; completed: boolean; createdAt?: number }[]; // Action items
         priority?: 'low' | 'medium' | 'high';
         notes?: string;
         contextRich?: string;
@@ -70,17 +70,16 @@ export interface LifeMapState {
     setCommandCenterOpen: (isOpen: boolean) => void;
 
     // Specialized actions
-    addPillar: (label: string) => void;
-    addThread: (parentId: string, label: string) => void;
-    addInitiative: (parentId: string, label: string) => void;
-    addSubnode: (parentId: string, label: string) => void;
+    addDomain: (label: string) => string;
+    addProject: (parentId: string, label: string) => string;
+    addMilestone: (parentId: string, label: string) => string;
     toggleNodeExpansion: (id: string) => void;
     deleteNodeImmediately: (id: string) => void;
     moveNode: (id: string, newParentId: string) => void;
     renameNode: (id: string, label: string) => void;
     changeNodeType: (id: string, type: NodeType) => void;
 
-    // Task actions
+    // Task / Action Item actions
     addTaskToNode: (nodeId: string, text: string) => void;
     toggleNodeTask: (nodeId: string, taskId: string) => void;
     deleteTaskFromNode: (nodeId: string, taskId: string) => void;

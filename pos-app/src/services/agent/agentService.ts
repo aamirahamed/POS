@@ -71,52 +71,39 @@ const orchestratorTools: Tool[] = [{
 // ──────────────────────────────────────────────────────────
 // 2. Tool Definitions for Life Map Agent
 // ──────────────────────────────────────────────────────────
-const addPillarDecl: FunctionDeclaration = {
-  name: 'add_pillar',
-  description: 'Create a new top-level Pillar to the Life Map.',
+const addDomainDecl: FunctionDeclaration = {
+  name: 'add_domain',
+  description: 'Create a new top-level Domain to the Life Map.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
-      label: { type: SchemaType.STRING, description: 'The display name of the new Pillar.' }
+      label: { type: SchemaType.STRING, description: 'The display name of the new Domain.' }
     },
     required: ['label']
   }
 };
 
-const addThreadDecl: FunctionDeclaration = {
-  name: 'add_thread',
-  description: 'Create a new Thread node under a parent node (usually a Pillar).',
+const addProjectDecl: FunctionDeclaration = {
+  name: 'add_project',
+  description: 'Create a new Project node under a parent Domain node.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
-      parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent (e.g. p2, p4, pillar-inbox).' },
-      label: { type: SchemaType.STRING, description: 'The display name of the new Thread.' }
+      parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Domain node (e.g. d-1771055997407).' },
+      label: { type: SchemaType.STRING, description: 'The display name of the new Project.' }
     },
     required: ['parent_id', 'label']
   }
 };
 
-const addInitiativeDecl: FunctionDeclaration = {
-  name: 'add_initiative',
-  description: 'Create a new Initiative node under a parent node (usually a Thread).',
+const addMilestoneDecl: FunctionDeclaration = {
+  name: 'add_milestone',
+  description: 'Create a new Milestone node under a parent Project node.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
-      parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Thread node (e.g. t-1771055997407).' },
-      label: { type: SchemaType.STRING, description: 'The display name of the new Initiative.' }
-    },
-    required: ['parent_id', 'label']
-  }
-};
-
-const addSubnodeDecl: FunctionDeclaration = {
-  name: 'add_subnode',
-  description: 'Create a new Subnode (Execution Node) under a parent node (usually an Initiative).',
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Initiative node (e.g. i-1778287435069).' },
-      label: { type: SchemaType.STRING, description: 'The display name of the new Subnode.' }
+      parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Project node (e.g. pjt-1778287435069).' },
+      label: { type: SchemaType.STRING, description: 'The display name of the new Milestone.' }
     },
     required: ['parent_id', 'label']
   }
@@ -124,11 +111,11 @@ const addSubnodeDecl: FunctionDeclaration = {
 
 const addTaskToNodeDecl: FunctionDeclaration = {
   name: 'add_task_to_node',
-  description: 'Create a task checklist item inside a specific Subnode (Execution Node).',
+  description: 'Create a task checklist item inside a specific Milestone node.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
-      node_id: { type: SchemaType.STRING, description: 'The exact ID of the target Subnode/Execution node.' },
+      node_id: { type: SchemaType.STRING, description: 'The exact ID of the target Milestone node.' },
       text: { type: SchemaType.STRING, description: 'The checklist task text to insert.' }
     },
     required: ['node_id', 'text']
@@ -144,6 +131,21 @@ const addInboxItemDecl: FunctionDeclaration = {
       text: { type: SchemaType.STRING, description: 'The text of the capture/thought.' }
     },
     required: ['text']
+  }
+};
+
+const addResourceToNodeDecl: FunctionDeclaration = {
+  name: 'add_resource_to_node',
+  description: 'Add a reference resource link (url, youtube link, article link, design resource) inside a specific Milestone node.',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      node_id: { type: SchemaType.STRING, description: 'The exact ID of the target Milestone node.' },
+      title: { type: SchemaType.STRING, description: 'The human-readable title or description of the resource.' },
+      url: { type: SchemaType.STRING, description: 'The absolute URL link of the resource (e.g. https://21st.dev).' },
+      type: { type: SchemaType.STRING, description: 'The type of resource. Must be one of: link, youtube, article.' }
+    },
+    required: ['node_id', 'title', 'url', 'type']
   }
 };
 
@@ -187,14 +189,14 @@ const renameNodeDecl: FunctionDeclaration = {
 
 const changeNodeTypeDecl: FunctionDeclaration = {
   name: 'change_node_type',
-  description: 'Change the type level of a node in the Life Map structure (e.g. promoting a subnode to an initiative, or demoting an initiative to a subnode).',
+  description: 'Change the type level of a node in the Life Map structure (e.g. promoting a milestone to a project, or demoting a project to a milestone).',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
       node_id: { type: SchemaType.STRING, description: 'The exact ID of the node.' },
       type: { 
         type: SchemaType.STRING, 
-        description: 'The new type level. Must be one of: pillar, thread, initiative, subnode.' 
+        description: 'The new type level. Must be one of: domain, project, milestone.' 
       }
     },
     required: ['node_id', 'type']
@@ -203,12 +205,12 @@ const changeNodeTypeDecl: FunctionDeclaration = {
 
 const lifemapTools: Tool[] = [{
   functionDeclarations: [
-    addPillarDecl, 
-    addThreadDecl, 
-    addInitiativeDecl, 
-    addSubnodeDecl, 
+    addDomainDecl, 
+    addProjectDecl, 
+    addMilestoneDecl, 
     addTaskToNodeDecl, 
     addInboxItemDecl,
+    addResourceToNodeDecl,
     deleteNodeDecl,
     moveNodeDecl,
     renameNodeDecl,
@@ -230,12 +232,12 @@ const updateMentorProfileDecl: FunctionDeclaration = {
 
 const mentorTools: Tool[] = [{
   functionDeclarations: [
-    addPillarDecl, 
-    addThreadDecl, 
-    addInitiativeDecl, 
-    addSubnodeDecl, 
+    addDomainDecl, 
+    addProjectDecl, 
+    addMilestoneDecl, 
     addTaskToNodeDecl, 
     addInboxItemDecl,
+    addResourceToNodeDecl,
     deleteNodeDecl,
     moveNodeDecl,
     renameNodeDecl,
@@ -418,10 +420,22 @@ async function executeLifeMapAgent(
     });
   }
 
-  const calls = result.response.functionCalls();
   const statusLog: string[] = [];
+  const contents: Content[] = [{ role: "user", parts: [{ text: query }] }];
 
-  if (calls && calls.length > 0) {
+  let currentResult = result;
+  let iterations = 0;
+  const maxIterations = 5;
+
+  while (iterations < maxIterations) {
+    const calls = currentResult.response.functionCalls();
+    if (!calls || calls.length === 0) {
+      break;
+    }
+
+    // Add model's function call response to history
+    contents.push(currentResult.response.candidates![0].content);
+
     const functionResponses = [];
 
     for (const call of calls) {
@@ -432,24 +446,30 @@ async function executeLifeMapAgent(
       statusLog.push(`Calling tool: ${call.name}`);
 
       // Dispatch stores actions
-      if (call.name === 'add_pillar') {
-        await useLifeMapStore.getState().addPillar(args.label);
-        executionMessage = `✓ Added Pillar "${args.label}" to Life Map.`;
-      } else if (call.name === 'add_thread') {
-        await useLifeMapStore.getState().addThread(args.parent_id, args.label);
-        executionMessage = `✓ Added Thread "${args.label}" under parent ID "${args.parent_id}".`;
-      } else if (call.name === 'add_initiative') {
-        await useLifeMapStore.getState().addInitiative(args.parent_id, args.label);
-        executionMessage = `✓ Added Initiative "${args.label}" under parent ID "${args.parent_id}".`;
-      } else if (call.name === 'add_subnode') {
-        await useLifeMapStore.getState().addSubnode(args.parent_id, args.label);
-        executionMessage = `✓ Added Subnode "${args.label}" under parent ID "${args.parent_id}".`;
+      if (call.name === 'add_domain') {
+        const id = await useLifeMapStore.getState().addDomain(args.label);
+        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".`;
+      } else if (call.name === 'add_project') {
+        const id = await useLifeMapStore.getState().addProject(args.parent_id, args.label);
+        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".`;
+      } else if (call.name === 'add_milestone') {
+        const id = await useLifeMapStore.getState().addMilestone(args.parent_id, args.label);
+        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".`;
       } else if (call.name === 'add_task_to_node') {
         await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-        executionMessage = `✓ Added task "${args.text}" into Execution Node ID "${args.node_id}".`;
+        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".`;
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);
         executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
+      } else if (call.name === 'add_resource_to_node') {
+        const id = `res-${Date.now()}`;
+        await useLifeMapStore.getState().addResource(args.node_id, {
+          id,
+          title: args.title,
+          url: args.url,
+          type: args.type
+        });
+        executionMessage = `✓ Added resource reference "${args.title}" to Milestone ID "${args.node_id}".`;
       } else if (call.name === 'delete_node') {
         await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
         executionMessage = `✓ Deleted node ID "${args.node_id}".`;
@@ -474,27 +494,18 @@ async function executeLifeMapAgent(
       });
     }
 
-    // Feed back result to get natural response
-    const finalResult = await lifemapAgent.generateContent({
-      contents: [
-        { role: 'user', parts: [{ text: query }] },
-        result.response.candidates![0].content,
-        {
-          role: 'user',
-          parts: functionResponses
-        }
-      ]
+    contents.push({
+      role: 'user',
+      parts: functionResponses
     });
 
-    return {
-      text: finalResult.response.text(),
-      statusLog
-    };
+    currentResult = await lifemapAgent.generateContent({ contents });
+    iterations++;
   }
 
   return {
-    text: result.response.text(),
-    statusLog: []
+    text: currentResult.response.text(),
+    statusLog
   };
 }
 
@@ -579,10 +590,22 @@ ${outlineText || "No nodes currently exist."}`;
     throw new Error(`All mentor models failed. Last error: ${lastError?.message || lastError}`);
   }
 
-  const calls = result.response.functionCalls();
   const statusLog: string[] = [];
+  const contents: Content[] = [{ role: "user", parts: [{ text: query }] }];
 
-  if (calls && calls.length > 0) {
+  let currentResult = result;
+  let iterations = 0;
+  const maxIterations = 5;
+
+  while (iterations < maxIterations) {
+    const calls = currentResult.response.functionCalls();
+    if (!calls || calls.length === 0) {
+      break;
+    }
+
+    // Add model's function call response to history
+    contents.push(currentResult.response.candidates![0].content);
+
     const functionResponses = [];
 
     for (const call of calls) {
@@ -593,24 +616,30 @@ ${outlineText || "No nodes currently exist."}`;
       statusLog.push(`Calling tool: ${call.name}`);
 
       // Dispatch stores actions
-      if (call.name === 'add_pillar') {
-        await useLifeMapStore.getState().addPillar(args.label);
-        executionMessage = `✓ Added Pillar "${args.label}" to Life Map.`;
-      } else if (call.name === 'add_thread') {
-        await useLifeMapStore.getState().addThread(args.parent_id, args.label);
-        executionMessage = `✓ Added Thread "${args.label}" under parent ID "${args.parent_id}".`;
-      } else if (call.name === 'add_initiative') {
-        await useLifeMapStore.getState().addInitiative(args.parent_id, args.label);
-        executionMessage = `✓ Added Initiative "${args.label}" under parent ID "${args.parent_id}".`;
-      } else if (call.name === 'add_subnode') {
-        await useLifeMapStore.getState().addSubnode(args.parent_id, args.label);
-        executionMessage = `✓ Added Subnode "${args.label}" under parent ID "${args.parent_id}".`;
+      if (call.name === 'add_domain') {
+        const id = await useLifeMapStore.getState().addDomain(args.label);
+        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".`;
+      } else if (call.name === 'add_project') {
+        const id = await useLifeMapStore.getState().addProject(args.parent_id, args.label);
+        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".`;
+      } else if (call.name === 'add_milestone') {
+        const id = await useLifeMapStore.getState().addMilestone(args.parent_id, args.label);
+        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".`;
       } else if (call.name === 'add_task_to_node') {
         await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-        executionMessage = `✓ Added task "${args.text}" into Execution Node ID "${args.node_id}".`;
+        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".`;
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);
         executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
+      } else if (call.name === 'add_resource_to_node') {
+        const id = `res-${Date.now()}`;
+        await useLifeMapStore.getState().addResource(args.node_id, {
+          id,
+          title: args.title,
+          url: args.url,
+          type: args.type
+        });
+        executionMessage = `✓ Added resource reference "${args.title}" to Milestone ID "${args.node_id}".`;
       } else if (call.name === 'delete_node') {
         await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
         executionMessage = `✓ Deleted node ID "${args.node_id}".`;
@@ -638,27 +667,18 @@ ${outlineText || "No nodes currently exist."}`;
       });
     }
 
-    // Feed back result to get natural response
-    const finalResult = await mentorAgent.generateContent({
-      contents: [
-        { role: 'user', parts: [{ text: query }] },
-        result.response.candidates![0].content,
-        {
-          role: 'user',
-          parts: functionResponses
-        }
-      ]
+    contents.push({
+      role: 'user',
+      parts: functionResponses
     });
 
-    return {
-      text: finalResult.response.text(),
-      statusLog
-    };
+    currentResult = await mentorAgent.generateContent({ contents });
+    iterations++;
   }
 
   return {
-    text: result.response.text(),
-    statusLog: []
+    text: currentResult.response.text(),
+    statusLog
   };
 }
 

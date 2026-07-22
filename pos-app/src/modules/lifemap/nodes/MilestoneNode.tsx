@@ -4,7 +4,7 @@ import { Trash2, CheckCircle, Circle, Maximize2, BookOpen, Flame, Clock } from '
 import { LifeMapNode } from '@/types/lifemap';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 
-const SubNode = ({ id, data, selected }: NodeProps) => {
+const MilestoneNode = ({ id, data, selected }: NodeProps) => {
     const { deleteNode, updateNode, addTaskToNode, toggleNodeTask, setSelectedExecutionNodeId } = useLifeMapStore();
     const parentStatus = useLifeMapStore(state => {
         const parent = state.nodes.find(n => n.id === data.parentId);
@@ -157,11 +157,11 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
                 <button
                     onClick={openDrawer}
                     className="p-1.5 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors shadow-md"
-                    title="Expand Workspace"
+                    title="Open Milestone Details"
                 >
                     <Maximize2 size={12} />
                 </button>
-                {id !== 'subnode-inbox' && (
+                {id !== 'milestone-inbox' && id !== 'subnode-inbox' && (
                     <>
                         <button
                             onClick={toggleStatus}
@@ -189,7 +189,7 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
             {/* HEADER SECTION */}
             <div className="p-3 border-b border-white/5 flex flex-col gap-2">
                 <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1" onDoubleClick={(e) => { if (id !== 'subnode-inbox') { e.stopPropagation(); setIsEditing(true); setEditValue(data.label as string); } }}>
+                    <div className="flex-1" onDoubleClick={(e) => { if (id !== 'milestone-inbox' && id !== 'subnode-inbox') { e.stopPropagation(); setIsEditing(true); setEditValue(data.label as string); } }}>
                         {isEditing ? (
                             <input
                                 ref={inputRef}
@@ -245,17 +245,12 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
                                         {task.text}
                                     </span>
                                 </div>
-                            ))}
-                            {tasks.length === 0 && !isAddingTask && (
-                                <div className="text-xs text-text-secondary italic pl-1 flex items-center gap-1.5">
-                                    No tasks added yet.
-                                </div>
-                            )}
+                              ))}
                         </>
                     ) : (
                         !isAddingTask && (
                             <div className="text-xs text-text-secondary italic opacity-70">
-                                No active actions...
+                                No active action items...
                             </div>
                         )
                     )}
@@ -271,7 +266,7 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
                                 onChange={(e) => setNewTaskText(e.target.value)}
                                 onKeyDown={handleTaskKeyDown}
                                 onBlur={() => submitNewTask()}
-                                placeholder="Type task..."
+                                placeholder="Type action item..."
                                 className="flex-1 bg-transparent text-text-primary focus:outline-none placeholder:text-text-secondary/50"
                                 onClick={(e) => e.stopPropagation()}
                             />
@@ -281,7 +276,7 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
                             className="text-[10px] text-text-secondary hover:text-white transition-colors cursor-pointer pl-4 pt-1"
                             onClick={(e) => { e.stopPropagation(); setIsAddingTask(true); }}
                         >
-                            + Quick task
+                            + Action item
                         </div>
                     )}
                 </div>
@@ -328,4 +323,4 @@ const SubNode = ({ id, data, selected }: NodeProps) => {
     );
 };
 
-export default memo(SubNode);
+export default memo(MilestoneNode);

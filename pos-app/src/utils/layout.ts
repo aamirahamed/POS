@@ -15,10 +15,13 @@ export const calculateRadialLayout = (nodes: LifeMapNode[], edges: Edge[]) => {
     // Visual dimensions mapping to prevent overlap
     const NODE_WIDTHS: Record<string, number> = {
         'center': 100,
-        'pillar': 160,
-        'thread': 140,
-        'initiative': 150,
-        'subnode': 300, // Execution Nodes are the widest (240-280px)
+        'domain': 160,
+        'pillar': 160, // Fallback for migration
+        'thread': 140, // Fallback for migration
+        'project': 150,
+        'initiative': 150, // Fallback for migration
+        'milestone': 300,
+        'subnode': 300, // Fallback for migration
     };
 
     // Helper: Find active children (ignore hidden nodes if collapsed)
@@ -93,15 +96,17 @@ export const calculateRadialLayout = (nodes: LifeMapNode[], edges: Edge[]) => {
     // Position center at absolute center
     layoutNode(centerNode, 0, 0, processedNodes);
 
-    // Step 3: Enforce strict Z-Index Hierarchy (L1 > L2 > L3 > L4 > L5)
+    // Step 3: Enforce strict Z-Index Hierarchy (L1 > L2 > L3 > L4)
     // This ensures higher level nodes appear visually above lower ones and connectors tuck underneath
     const getZIndex = (type?: string) => {
         switch (type) {
             case 'center': return 100;
-            case 'pillar': return 50;
-            case 'thread': return 40;
-            case 'initiative': return 30;
-            case 'subnode': return 20; // Execution Node
+            case 'domain': return 50;
+            case 'pillar': return 50; // Fallback for migration
+            case 'project': return 30;
+            case 'initiative': return 30; // Fallback for migration
+            case 'milestone': return 20;
+            case 'subnode': return 20; // Fallback for migration
             default: return 10;
         }
     };

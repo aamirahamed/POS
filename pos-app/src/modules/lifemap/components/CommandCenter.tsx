@@ -13,7 +13,7 @@ interface ChatMessage {
 }
 
 const CommandCenter: FC = () => {
-    const { isCommandCenterOpen, setCommandCenterOpen, nodes, addPillar, addThread, addInitiative, addSubnode, addTaskToNode, addInboxItem } = useLifeMapStore();
+    const { isCommandCenterOpen, setCommandCenterOpen, nodes, addDomain, addProject, addMilestone, addTaskToNode, addInboxItem } = useLifeMapStore();
     const { addItem: addShoppingItem } = useShoppingStore();
     const { addReminder } = useRemindersStore();
     
@@ -65,23 +65,25 @@ const CommandCenter: FC = () => {
                 addReminder(action.reminderText);
             } else if (action.actionType === 'lifemap' && action.lifeMapAction) {
                 const { typeToCreate, name, parentName } = action.lifeMapAction;
+                const normalizedType = typeToCreate.toLowerCase().trim();
                 
-                if (typeToCreate === 'pillar') {
-                    addPillar(name);
+                if (normalizedType === 'pillar' || normalizedType === 'domain') {
+                    addDomain(name);
                 } else if (parentName) {
                     const query = parentName.toLowerCase();
                     const match = nodes.find(n => n.data.label?.toString().toLowerCase() === query) 
                                || nodes.find(n => n.data.label?.toString().toLowerCase().includes(query));
                     
                     if (match) {
-                        const normalizedType = typeToCreate.toLowerCase().trim();
-                        if (normalizedType === 'thread') addThread(match.id, name);
-                        else if (normalizedType === 'initiative') addInitiative(match.id, name);
-                        else if (normalizedType === 'subnode' || normalizedType === 'execution node') addSubnode(match.id, name);
-                        else if (normalizedType === 'task') addTaskToNode(match.id, name);
-                        else {
+                        if (normalizedType === 'thread' || normalizedType === 'initiative' || normalizedType === 'project') {
+                            addProject(match.id, name);
+                        } else if (normalizedType === 'subnode' || normalizedType === 'milestone' || normalizedType === 'execution node') {
+                            addMilestone(match.id, name);
+                        } else if (normalizedType === 'task' || normalizedType === 'action item') {
+                            addTaskToNode(match.id, name);
+                        } else {
                             // Fallback if AI invents a type
-                            addInitiative(match.id, name);
+                            addProject(match.id, name);
                         }
                     } else {
                         // Parent not found, fallback to inbox
@@ -168,8 +170,8 @@ const CommandCenter: FC = () => {
                                 <button onClick={() => setInput("Remind me to complete assignment")} className="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-sm text-left transition-colors text-text-secondary hover:text-white">
                                     "Remind me to complete assignment"
                                 </button>
-                                <button onClick={() => setInput("Add an initiative to Career called Promotion")} className="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-sm text-left transition-colors text-text-secondary hover:text-white">
-                                    "Add an initiative to Career called Promotion"
+                                <button onClick={() => setInput("Add a project to Career called Promotion")} className="bg-white/5 hover:bg-white/10 p-3 rounded-xl text-sm text-left transition-colors text-text-secondary hover:text-white">
+                                    "Add a project to Career called Promotion"
                                 </button>
                             </div>
                         </div>

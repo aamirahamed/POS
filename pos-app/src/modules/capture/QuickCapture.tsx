@@ -62,37 +62,20 @@ const cleanUrl = (urlStr: string) => {
 };
 
 // Helper: Resolve parent path for subnodes
-const resolveNodePath = (subnodeId: string, nodes: LifeMapNode[], edges: any[]): string => {
-    if (subnodeId === 'subnode-inbox') return 'Inbox';
-    const subnode = nodes.find(n => n.id === subnodeId);
-    if (!subnode) return '';
+const resolveNodePath = (milestoneId: string, nodes: LifeMapNode[], edges: any[]): string => {
+    if (milestoneId === 'milestone-inbox' || milestoneId === 'subnode-inbox') return 'Inbox';
+    const edgeToMilestone = edges.find(e => e.target === milestoneId);
+    if (!edgeToMilestone) return '';
 
-    const edgeToSubnode = edges.find(e => e.target === subnodeId);
-    if (!edgeToSubnode) return '';
-
-    const parentNode = nodes.find(n => n.id === edgeToSubnode.source);
+    const parentNode = nodes.find(n => n.id === edgeToMilestone.source);
     if (!parentNode) return '';
 
-    if (parentNode.type === 'initiative') {
-        const edgeToInit = edges.find(e => e.target === parentNode.id);
-        const threadNode = edgeToInit ? nodes.find(n => n.id === edgeToInit.source) : null;
+    if (parentNode.type === 'project') {
+        const edgeToProject = edges.find(e => e.target === parentNode.id);
+        const domainNode = edgeToProject ? nodes.find(n => n.id === edgeToProject.source) : null;
 
-        if (threadNode && threadNode.type === 'thread') {
-            const edgeToThread = edges.find(e => e.target === threadNode.id);
-            const pillarNode = edgeToThread ? nodes.find(n => n.id === edgeToThread.source) : null;
-
-            if (pillarNode && pillarNode.type === 'pillar') {
-                return `${pillarNode.data.label} > ${threadNode.data.label} > ${parentNode.data.label}`;
-            }
-            return `${threadNode.data.label} > ${parentNode.data.label}`;
-        }
-        return parentNode.data.label;
-    } else if (parentNode.type === 'thread') {
-        const edgeToThread = edges.find(e => e.target === parentNode.id);
-        const pillarNode = edgeToThread ? nodes.find(n => n.id === edgeToThread.source) : null;
-
-        if (pillarNode && pillarNode.type === 'pillar') {
-            return `${pillarNode.data.label} > ${parentNode.data.label}`;
+        if (domainNode && domainNode.type === 'domain') {
+            return `${domainNode.data.label} > ${parentNode.data.label}`;
         }
         return parentNode.data.label;
     }
@@ -107,7 +90,7 @@ const QuickCapture: FC = () => {
     const [captureType, setCaptureType] = useState<'task' | 'resource'>('task');
     const [inputText, setInputText] = useState('');
     const [resourceTitle, setResourceTitle] = useState('');
-    const [selectedNodeId, setSelectedNodeId] = useState<string>('subnode-inbox');
+    const [selectedNodeId, setSelectedNodeId] = useState<string>('milestone-inbox');
     const [searchQuery, setSearchQuery] = useState('');
     const [showAllNodes, setShowAllNodes] = useState(false);
     const [isManualOverride, setIsManualOverride] = useState(false);
@@ -122,13 +105,13 @@ const QuickCapture: FC = () => {
         }
     }, [loadFromDB]);
 
-    // Filter nodes list to include only subnodes (execution nodes)
-    const subnodes = nodes.filter(n => n.type === 'subnode');
+    // Filter nodes list to include only milestones (execution nodes)
+    const subnodes = nodes.filter(n => n.type === 'milestone');
 
     // Rank subnodes based on count of tasks they contain
     // inbox captures always goes first
-    const inboxSubnode = subnodes.find(n => n.id === 'subnode-inbox');
-    const otherSubnodes = subnodes.filter(n => n.id !== 'subnode-inbox');
+    const inboxSubnode = subnodes.find(n => n.id === 'milestone-inbox' || n.id === 'subnode-inbox');
+    const otherSubnodes = subnodes.filter(n => n.id !== 'milestone-inbox' && n.id !== 'subnode-inbox');
     const rankedOtherSubnodes = [...otherSubnodes].sort((a, b) => {
         const aCount = a.data.tasks?.length || 0;
         const bCount = b.data.tasks?.length || 0;

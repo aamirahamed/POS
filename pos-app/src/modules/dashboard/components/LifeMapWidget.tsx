@@ -9,15 +9,15 @@ export const LifeMapWidget = () => {
     const { nodes } = useLifeMapStore();
     const navigate = useNavigate();
 
-    const pillars = useMemo(() => nodes.filter(n => n.type === 'pillar'), [nodes]);
+    const domains = useMemo(() => nodes.filter(n => n.type === 'domain'), [nodes]);
 
-    // stable random pillar based on date to avoid jumping around on re-renders too much
+    // stable random domain based on date to avoid jumping around on re-renders too much
     // but actually, random on mount is fine for "freshness"
-    const randomPillar = useMemo(() => {
-        if (pillars.length === 0) return null;
-        const randomIndex = Math.floor(Math.random() * pillars.length);
-        return pillars[randomIndex];
-    }, [pillars]);
+    const randomDomain = useMemo(() => {
+        if (domains.length === 0) return null;
+        const randomIndex = Math.floor(Math.random() * domains.length);
+        return domains[randomIndex];
+    }, [domains]);
 
     const quotes = [
         "Create the life you can't wait to wake up to.",
@@ -48,13 +48,13 @@ export const LifeMapWidget = () => {
                 </Button>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-center text-center p-6 pt-2">
-                {randomPillar ? (
+                {randomDomain ? (
                     <div className="space-y-4">
                         <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-surface border border-white/5 shadow-lg relative overflow-hidden group/pillar cursor-pointer" onClick={() => navigate('/life-map')}>
-                            <div className="absolute inset-0 opacity-20" style={{ backgroundColor: `hsl(${randomPillar.data.hue}, 70%, 50%)` }} />
-                            <Sparkles className="h-5 w-5 mr-2" style={{ color: `hsl(${randomPillar.data.hue}, 80%, 70%)` }} />
-                            <span className="text-lg font-bold tracking-wide" style={{ color: `hsl(${randomPillar.data.hue}, 80%, 70%)` }}>
-                                {randomPillar.data.label as string}
+                            <div className="absolute inset-0 opacity-20" style={{ backgroundColor: `hsl(${randomDomain.data.hue}, 70%, 50%)` }} />
+                            <Sparkles className="h-5 w-5 mr-2" style={{ color: `hsl(${randomDomain.data.hue}, 80%, 70%)` }} />
+                            <span className="text-lg font-bold tracking-wide" style={{ color: `hsl(${randomDomain.data.hue}, 80%, 70%)` }}>
+                                {randomDomain.data.label as string}
                             </span>
                         </div>
 
@@ -71,10 +71,10 @@ export const LifeMapWidget = () => {
                             <Network className="h-6 w-6 text-green-400" />
                         </div>
                         <p className="text-sm text-muted-foreground">
-                            Start mapping your life pillars to find your balance.
+                            Start mapping your life domains to find your balance.
                         </p>
                         <Button variant="outline" size="sm" onClick={() => navigate('/life-map')} className="mt-2 border-green-500/20 text-green-400 hover:bg-green-500/10">
-                            Create First Pillar
+                            Create First Domain
                         </Button>
                     </div>
                 )}
