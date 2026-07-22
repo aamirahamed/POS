@@ -4,6 +4,7 @@ import { useLifeMapStore } from "@/store/useLifeMapStore";
 import { useShoppingStore } from "@/store/useShoppingStore";
 import { useMentorStore } from "@/store/useMentorStore";
 import { useFinanceStore } from "@/store/useFinanceStore";
+import { useRemindersStore } from "@/store/useRemindersStore";
 import { supabase } from "@/lib/supabase";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -149,6 +150,41 @@ const addResourceToNodeDecl: FunctionDeclaration = {
   }
 };
 
+const addReminderDecl: FunctionDeclaration = {
+  name: 'add_reminder',
+  description: 'Create a new personal reminder or alert in Aamir\'s POS system (e.g. remind me to do X tomorrow).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      text: { type: SchemaType.STRING, description: 'The text/content of the reminder.' },
+      category: { type: SchemaType.STRING, description: 'Optional category (e.g. "Work", "Personal", "Health", "Career").' },
+      dueDate: { type: SchemaType.STRING, description: 'Optional date or description of when it is due (e.g. "2026-07-23T12:00:00Z" or "tomorrow").' }
+    },
+    required: ['text']
+  }
+};
+
+function parseReminderDueDate(dueDateStr?: string): number | undefined {
+  if (!dueDateStr) return undefined;
+  const lower = dueDateStr.toLowerCase();
+  if (lower.includes('tomorrow')) {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0); // Tomorrow at 9 AM
+    return d.getTime();
+  }
+  if (lower.includes('today')) {
+    const d = new Date();
+    d.setHours(18, 0, 0, 0); // Today evening
+    return d.getTime();
+  }
+  const timestamp = Date.parse(dueDateStr);
+  if (!isNaN(timestamp)) {
+    return timestamp;
+  }
+  return undefined;
+}
+
 const deleteNodeDecl: FunctionDeclaration = {
   name: 'delete_node',
   description: 'Delete a node and all of its sub-nodes/descendants from the Life Map.',
@@ -211,6 +247,7 @@ const lifemapTools: Tool[] = [{
     addTaskToNodeDecl, 
     addInboxItemDecl,
     addResourceToNodeDecl,
+    addReminderDecl,
     deleteNodeDecl,
     moveNodeDecl,
     renameNodeDecl,
@@ -238,6 +275,7 @@ const mentorTools: Tool[] = [{
     addTaskToNodeDecl, 
     addInboxItemDecl,
     addResourceToNodeDecl,
+    addReminderDecl,
     deleteNodeDecl,
     moveNodeDecl,
     renameNodeDecl,
@@ -482,6 +520,10 @@ async function executeLifeMapAgent(
       } else if (call.name === 'change_node_type') {
         await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
         executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+      } else if (call.name === 'add_reminder') {
+        const parsedDue = parseReminderDueDate(args.dueDate);
+        await useRemindersStore.getState().addReminder(args.text, args.category || 'General', parsedDue);
+        executionMessage = `✓ Created reminder "${args.text}" (Category: "${args.category || 'General'}"${args.dueDate ? `, Due: ${args.dueDate}` : ''}).`;
       }
 
       statusLog.push(executionMessage);
@@ -652,6 +694,10 @@ ${outlineText || "No nodes currently exist."}`;
       } else if (call.name === 'change_node_type') {
         await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
         executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+      } else if (call.name === 'add_reminder') {
+        const parsedDue = parseReminderDueDate(args.dueDate);
+        await useRemindersStore.getState().addReminder(args.text, args.category || 'General', parsedDue);
+        executionMessage = `✓ Created reminder "${args.text}" (Category: "${args.category || 'General'}"${args.dueDate ? `, Due: ${args.dueDate}` : ''}).`;
       } else if (call.name === 'update_mentor_profile') {
         await useMentorStore.getState().updateProfileMemory(args.content);
         executionMessage = `✓ Updated dynamic profile memory.`;

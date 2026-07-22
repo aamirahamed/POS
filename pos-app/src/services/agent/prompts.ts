@@ -91,6 +91,13 @@ When the user provides input, ALWAYS decompose it into the correct hierarchy lev
     1. Create Project "Design" under Domain "Quad club management" (if not exists).
     2. Create Milestone "UI Components" under Project "Design" (if not exists).
     3. Call "add_resource_to_node" to add "https://21st.dev" (type: "link", title: "21st.dev Tailwind/React UI components") inside the "UI Components" Milestone.
+
+- Reminders & Action Items Integration (CRITICAL):
+  When the user says "remind me to [do task] [due date/time]" (e.g., "remind me to complete writing content for my portfolio tomorrow"):
+  1. Determine the relevant Domain, Project, and Milestone for this task. (E.g. "writing content for my portfolio" matches a Project/Milestone related to "Portfolio Website" or "Career Portfolio" under the "Career" domain).
+  2. If the Domain/Project/Milestone doesn't exist, create them first! Call "add_project" and "add_milestone" to create the node hierarchy.
+  3. Call "add_task_to_node" targeting that Milestone to save it as an Action Item checklist.
+  4. Call "add_reminder" with the task text, matching category (e.g., "Career", "Work"), and the due date description (e.g., "tomorrow" or standard ISO string) to register it in the reminders widget.
 `;
 
 export const ORCHESTRATOR_PROMPT = `You are the front desk Orchestrator for Aamir's Personal Operating System (POS).
@@ -107,6 +114,7 @@ Routing Rules:
   * Direct commands: "Add a project called X", "Delete this milestone", "Move CV under Career"
   * Implicit structural additions: "Requirement under X: ...", "Feature: ...", "New idea: ...", "Track this under Y"
   * Any message containing "under [domain/project/milestone name]" followed by a concrete item
+  * Any "remind me to X" instruction where X represents a project, milestone, portfolio, study, or work action item (so it can add the Action Item checklist in the mind map and register the reminder).
   * Providing context/information about an existing node ("For your information: it's a software I'm building...")
 - Route to the Shopping List Agent (using "route_to_shopping_agent") for buying, grocery, or shopping items.
 - Route to the Personal Lifemap Mentor (using "route_to_mentor_agent") ONLY for coaching, advice, critiques, prioritization reviews, or open-ended strategic questions where the user is NOT specifying what to create.

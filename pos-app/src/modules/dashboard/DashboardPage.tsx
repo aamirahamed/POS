@@ -5,6 +5,7 @@ import { useRemindersStore } from '@/store/useRemindersStore';
 import { useShoppingStore } from '@/store/useShoppingStore';
 import { useTodayStore, FocusItem } from '@/store/useTodayStore';
 import { CalendarSection } from './components/CalendarSection';
+import { RemindersWidget } from './components/RemindersWidget';
 import { Sparkles, ArrowRight, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar, Trash2, Check, Inbox, ExternalLink, Link as LinkIcon, Search, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -739,16 +740,24 @@ const DashboardPage: FC = () => {
 
 
                     {/* ══ ZONE 2: OPERATIONAL AWARENESS ══════════════════════
-                        A single unified surface for all roster/calendar widgets. */}
+                        A dual-panel layout showing calendar roster and active reminders. */}
                     <div className="bg-surface border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col gap-0">
-
                         {/* Zone label */}
-                        <div className="px-6 pt-5 pb-2">
+                        <div className="px-6 pt-5 pb-2 border-b border-border/40 bg-surface-elevated/10">
                             <p className="text-[10px] font-black uppercase tracking-widest text-text-secondary/50">Operational Awareness Zone</p>
                         </div>
 
-                        {/* CalendarSection handles its own embedded styling via the embedded prop */}
-                        <CalendarSection embedded />
+                        <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-border/60">
+                            {/* Calendar Section (65%) */}
+                            <div className="flex-[65] min-w-0">
+                                <CalendarSection embedded />
+                            </div>
+
+                            {/* Reminders Widget (35%) */}
+                            <div className="flex-[35] p-6 min-w-0 bg-surface-elevated/5">
+                                <RemindersWidget />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
