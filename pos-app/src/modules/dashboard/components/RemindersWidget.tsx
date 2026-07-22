@@ -49,7 +49,7 @@ export const RemindersWidget = () => {
 
     return (
         <Card className="h-full bg-surface/40 backdrop-blur-sm border-white/5 hover:border-white/10 transition-all group overflow-hidden relative flex flex-col">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 shrink-0">
                 <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-purple-400 transition-colors flex items-center gap-2">
