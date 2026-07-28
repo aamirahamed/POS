@@ -253,6 +253,19 @@ const updateUserFactDecl: FunctionDeclaration = {
   }
 };
 
+const updateNodeDescriptionDecl: FunctionDeclaration = {
+  name: 'update_node_description',
+  description: 'Update the description or context notes of a specific node in the Life Map (used for saving context gathered about a project/domain).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      node_id: { type: SchemaType.STRING, description: 'The exact ID of the node.' },
+      description: { type: SchemaType.STRING, description: 'The detailed context, purpose, or goal of the node.' }
+    },
+    required: ['node_id', 'description']
+  }
+};
+
 const lifemapTools: Tool[] = [{
   functionDeclarations: [
     addDomainDecl, 
@@ -266,7 +279,8 @@ const lifemapTools: Tool[] = [{
     moveNodeDecl,
     renameNodeDecl,
     changeNodeTypeDecl,
-    updateUserFactDecl
+    updateUserFactDecl,
+    updateNodeDescriptionDecl
   ]
 }];
 
@@ -296,7 +310,8 @@ const mentorTools: Tool[] = [{
     renameNodeDecl,
     changeNodeTypeDecl,
     updateMentorProfileDecl,
-    updateUserFactDecl
+    updateUserFactDecl,
+    updateNodeDescriptionDecl
   ]
 }];
 
@@ -539,6 +554,9 @@ async function executeLifeMapAgent(
       } else if (call.name === 'update_user_fact') {
         await useProfileStore.getState().updateFact(args.key, args.value);
         executionMessage = `✓ Updated user profile fact "${args.key}" to "${args.value}".`;
+      } else if (call.name === 'update_node_description') {
+        await useLifeMapStore.getState().updateNode(args.node_id, { description: args.description });
+        executionMessage = `✓ Updated description for node ID "${args.node_id}".`;
       }
 
       statusLog.push(executionMessage);
@@ -677,6 +695,9 @@ export async function executeMentorAgent(
       } else if (call.name === 'update_user_fact') {
         await useProfileStore.getState().updateFact(args.key, args.value);
         executionMessage = `✓ Updated user profile fact "${args.key}" to "${args.value}".`;
+      } else if (call.name === 'update_node_description') {
+        await useLifeMapStore.getState().updateNode(args.node_id, { description: args.description });
+        executionMessage = `✓ Updated description for node ID "${args.node_id}".`;
       }
 
       statusLog.push(executionMessage);

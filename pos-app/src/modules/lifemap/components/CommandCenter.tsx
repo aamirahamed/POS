@@ -1,9 +1,8 @@
 import { FC, useState, useEffect, useRef } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { useAgentStore } from '@/store/useAgentStore';
-import { X, ArrowRight, Bot, User, Loader2, Link as LinkIcon, Trash2 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { X, ArrowRight, Bot, User, Loader2, Trash2 } from 'lucide-react';
+import { AgentMessage } from './AgentMessage';
 
 const CommandCenter: FC = () => {
     const { isCommandCenterOpen, setCommandCenterOpen } = useLifeMapStore();
@@ -89,54 +88,40 @@ const CommandCenter: FC = () => {
 
                 {/* Chat History */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 flex flex-col gap-6 custom-scrollbar">
-                    {messages.map(msg => {
+                    {messages.map((msg, index) => {
                         const isUser = msg.role === 'user';
+                        const isLatest = index === messages.length - 1;
+
+                        if (!isUser) {
+                            return (
+                                <AgentMessage 
+                                    key={msg.id} 
+                                    msg={msg} 
+                                    isLatest={isLatest} 
+                                    onSendAnswers={async (answers) => {
+                                        // Format answers into a single message
+                                        const formatted = Object.entries(answers)
+                                            .filter(([_, ans]) => ans.trim().length > 0)
+                                            .map(([q, ans], i) => `**Q${i+1}:** ${q}\n**Answer:** ${ans}`)
+                                            .join('\n\n');
+                                        
+                                        if (formatted) {
+                                            await sendMessage(formatted);
+                                        }
+                                    }}
+                                />
+                            );
+                        }
+
                         return (
-                            <div key={msg.id} className={`flex items-start gap-3 max-w-[88%] ${isUser ? 'self-end flex-row-reverse' : 'self-start'}`}>
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 ${isUser ? 'bg-indigo-500/20 text-indigo-300' : 'bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 text-indigo-400'}`}>
-                                    {isUser ? <User size={14} /> : <Bot size={14} />}
+                            <div key={msg.id} className="flex items-start gap-3 max-w-[88%] self-end flex-row-reverse">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 bg-indigo-500/20 text-indigo-300">
+                                    <User size={14} />
                                 </div>
-                                <div className={`p-4 rounded-2xl text-[15px] shadow-sm ${
-                                    isUser 
-                                        ? 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-tr-sm border border-indigo-400/30' 
-                                        : 'bg-white/5 backdrop-blur-md text-text-primary border border-white/10 rounded-tl-sm'
-                                }`}>
-                                    <div className={`leading-relaxed break-words ${isUser ? 'whitespace-pre-wrap' : 'prose prose-sm prose-invert prose-p:leading-relaxed prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/10 prose-ul:my-1.5 prose-li:my-0.5'}`}>
-                                        {isUser ? (
-                                            msg.text
-                                        ) : (
-                                            <ReactMarkdown 
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    a: ({ node, ...props }) => (
-                                                        <a
-                                                            {...props}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 transition-all text-xs font-medium text-indigo-300 no-underline mt-1 mb-1 shadow-sm group max-w-full"
-                                                        >
-                                                            <LinkIcon size={10} className="group-hover:scale-110 transition-transform flex-shrink-0" />
-                                                            <span className="truncate">{props.children}</span>
-                                                        </a>
-                                                    ),
-                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />
-                                                }}
-                                            >
-                                                {msg.text}
-                                            </ReactMarkdown>
-                                        )}
+                                <div className="p-4 rounded-2xl text-[15px] shadow-sm bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-tr-sm border border-indigo-400/30">
+                                    <div className="leading-relaxed break-words whitespace-pre-wrap">
+                                        {msg.text}
                                     </div>
-                                    
-                                    {/* Status / Execution Logs */}
-                                    {!isUser && msg.statusLog && msg.statusLog.length > 0 && (
-                                        <div className="mt-3 pt-2 border-t border-white/10 flex flex-col gap-1 text-[11px] text-text-secondary/70">
-                                            {msg.statusLog.map((log, index) => (
-                                                <div key={index} className="flex items-center gap-1">
-                                                    <span className="opacity-60 font-mono">{log}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         );
