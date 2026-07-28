@@ -46,7 +46,17 @@ export async function compileUnifiedContext(): Promise<UnifiedContext> {
     const { nodes } = useLifeMapStore.getState();
     const outlineText = nodes.map(n => {
         const parent = n.data?.parentId ? ` (parent ID: "${n.data.parentId}")` : '';
-        return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}`;
+        let extra = '';
+        if (n.data?.resources && n.data.resources.length > 0) {
+            extra += `\n    - Resources: ${n.data.resources.map(r => `[${r.title}](${r.url})`).join(', ')}`;
+        }
+        if (n.data?.canvases && n.data.canvases.length > 0) {
+            extra += `\n    - Canvases: ${n.data.canvases.map(c => c.title).join(', ')}`;
+        }
+        if (n.data?.tasks && n.data.tasks.length > 0) {
+            extra += `\n    - Tasks: ${n.data.tasks.map(t => `${t.text} (${t.completed ? 'Done' : 'Todo'})`).join(', ')}`;
+        }
+        return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}${extra}`;
     }).join('\n');
 
     // 4. Structured Facts

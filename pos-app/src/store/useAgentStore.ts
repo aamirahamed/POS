@@ -27,7 +27,7 @@ export const useAgentStore = create<AgentState>()(
         {
           id: 'welcome',
           role: 'assistant',
-          text: "Hello Aamir! I am your POS Assistant. I can help you organize your Life Map (pillars, threads, initiatives, and subnodes) and manage your Shopping List. Try typing: *'Add 2 packs of coffee to shopping list'* or *'Add Learn Figma under Career pillar'*.",
+          text: "Hello Aamir! I am Sam, your POS Assistant. I can help you organize your Life Map (domains, projects, and milestones) and manage your Shopping List. Try typing: *'Add 2 packs of coffee to shopping list'* or *'Add Learn Figma under Career domain'*.",
           timestamp: Date.now()
         }
       ],
@@ -107,7 +107,7 @@ export const useAgentStore = create<AgentState>()(
           {
             id: 'welcome',
             role: 'assistant',
-            text: "Hello Aamir! I am your POS Assistant. I can help you organize your Life Map (pillars, threads, initiatives, and subnodes) and manage your Shopping List. Try typing: *'Add 2 packs of coffee to shopping list'* or *'Add Learn Figma under Career pillar'*.",
+            text: "Hello Aamir! I am Sam, your POS Assistant. I can help you organize your Life Map (domains, projects, and milestones) and manage your Shopping List. Try typing: *'Add 2 packs of coffee to shopping list'* or *'Add Learn Figma under Career domain'*.",
             timestamp: Date.now()
           }
         ]

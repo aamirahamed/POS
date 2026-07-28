@@ -19,7 +19,6 @@ import DomainNode from './nodes/DomainNode';
 import ProjectNode from './nodes/ProjectNode';
 import MilestoneNode from './nodes/MilestoneNode';
 import ExecutionNodeDrawer from './components/ExecutionNodeDrawer';
-import InboxPanel from './components/InboxPanel';
 import DomainsView from './components/DomainsView';
 import { Layers, Map as MapIcon } from 'lucide-react';
 
@@ -259,7 +258,6 @@ const LifeMap: FC = () => {
             )}
 
             <ExecutionNodeDrawer />
-            <InboxPanel />
         </div>
     );
 };

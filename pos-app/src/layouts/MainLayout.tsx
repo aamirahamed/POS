@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CommandCenter from '@/modules/lifemap/components/CommandCenter';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { Command } from 'lucide-react';
-import { POSAgentChat } from '@/components/POSAgentChat';
 
 const NAV_ITEMS = [
     { path: '/', label: 'Overview', icon: LayoutDashboard },
@@ -162,14 +161,13 @@ const MainLayout: FC = () => {
             {/* Global FAB for Command Center */}
             <button
                 onClick={() => setCommandCenterOpen(true)}
-                className="fixed bottom-6 right-24 md:bottom-8 md:right-28 w-14 h-14 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_32px_rgba(99,102,241,0.4)] flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-40 group border border-white/10"
+                className="fixed bottom-6 right-6 md:bottom-8 md:right-8 w-14 h-14 md:w-16 md:h-16 bg-accent hover:bg-accent-hover text-white rounded-full shadow-[0_8px_32px_rgba(99,102,241,0.4)] flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-40 group border border-white/10"
                 title="Open Command Center (Cmd+K)"
             >
-                <Command size={24} className="group-hover:rotate-12 transition-transform duration-300" />
+                <Command size={28} className="group-hover:rotate-12 transition-transform duration-300" />
             </button>
 
             <CommandCenter />
-            <POSAgentChat />
         </div>
     );
 };
