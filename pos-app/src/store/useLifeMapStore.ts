@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase';
 
 // Debounced DB sync — waits 1.5s after last change before writing
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
-const debouncedSync = (nodes: LifeMapNode[], edges: any[]) => {
+export const debouncedSync = (nodes: LifeMapNode[], edges: any[]) => {
     if (syncTimer) clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -312,7 +312,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                 nodeToDelete: null,
                 setNodeToDelete: (id) => set({ nodeToDelete: id }),
 
-                // Load from Supabase on app start (falls back to localStorage)
+                // Load from Supabase on app start (falls back to localStorage, or seeds DB if DB is empty)
                 loadFromDB: async () => {
                     const { data: { user } } = await supabase.auth.getUser();
                     if (!user) return;
@@ -324,6 +324,13 @@ export const useLifeMapStore = create<LifeMapState>()(
                         
                         // Force a sync back to Supabase to persist the migrated state
                         await saveLifeMap(user.id, layoutedNodes, layoutedEdges);
+                    } else {
+                        // DB has no saved map for this user yet.
+                        // If current local state has rich data, seed Supabase with it!
+                        const { nodes, edges } = get();
+                        if (nodes && nodes.length > 0) {
+                            await saveLifeMap(user.id, nodes, edges);
+                        }
                     }
                 },
                 confirmDeleteNode: () => {

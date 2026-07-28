@@ -4,7 +4,7 @@ import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { Resource, ResourceType } from '@/types/lifemap';
 import { uploadResourceFile } from '@/services/lifeMapService';
 import { supabase } from '@/lib/supabase';
-import { X, Plus, Trash2, CheckCircle, Circle, BookOpen, Clock, Flame, Link as LinkIcon, FileText, Play, Pause, Archive, ArrowRight, Activity, Calendar, Youtube, Paperclip, ExternalLink, Edit2 } from 'lucide-react';
+import { X, Plus, Trash2, CheckCircle, Circle, Clock, Flame, Link as LinkIcon, FileText, Play, Pause, Archive, ArrowRight, Activity, Calendar, Youtube, Paperclip, ExternalLink, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { AnimatePresence } from 'framer-motion';
@@ -32,7 +32,6 @@ const formatFileSize = (bytes: number) => {
 const ExecutionNodeDrawer: FC = () => {
     const { nodes, selectedExecutionNodeId, setSelectedExecutionNodeId, addTaskToNode, toggleNodeTask, deleteTaskFromNode, editTaskInNode, updateNode, deleteNode, addResource, removeResource, loadFromDB } = useLifeMapStore();
     const [newTaskText, setNewTaskText] = useState('');
-    const [newNoteText, setNewNoteText] = useState('');
     const [resUrl, setResUrl] = useState('');
     const [resTitle, setResTitle] = useState('');
     const [resUploading, setResUploading] = useState(false);

@@ -20,7 +20,7 @@ const DashboardPage: FC = () => {
         loadFromDB
     } = useLifeMapStore();
     const { reminders } = useRemindersStore();
-    const { items: shoppingItems, addItem: addShoppingItem } = useShoppingStore();
+    const { items: shoppingItems } = useShoppingStore();
     const { focusItems, addFocusNode, removeFocusNode } = useTodayStore();
 
     // Local State

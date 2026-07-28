@@ -1,6 +1,6 @@
 import { FC, useCallback, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
-import { fetchLifeMap, saveLifeMap } from '@/services/lifeMapService';
+import { saveLifeMap } from '@/services/lifeMapService';
 import {
     ReactFlow,
     Background,
@@ -12,7 +12,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { Button } from "@/components/ui/button";
-import { Trash2 } from 'lucide-react';
+import { Trash2, Download, Upload } from 'lucide-react';
 
 import CenterNode from './nodes/CenterNode';
 import DomainNode from './nodes/DomainNode';
@@ -54,14 +54,46 @@ const LifeMap: FC = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
                 setUserId(user.id);
-                await loadFromDB();
-                // Trigger the new layout engine to reposition nodes correctly
-                setTimeout(() => triggerLayout(), 50);
-                setIsLoaded(true);
             }
+            await loadFromDB();
+            // Trigger the new layout engine to reposition nodes correctly
+            setTimeout(() => triggerLayout(), 50);
+            setIsLoaded(true);
         };
         load();
     }, [loadFromDB, triggerLayout]);
+
+    // Export JSON backup
+    const handleExportJSON = useCallback(() => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ nodes, edges }, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", `lifemap_backup_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    }, [nodes, edges]);
+
+    // Import JSON backup
+    const handleImportJSON = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        const fileObj = event.target.files && event.target.files[0];
+        if (!fileObj) return;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const parsed = JSON.parse(e.target?.result as string);
+                if (parsed.nodes && Array.isArray(parsed.nodes)) {
+                    setNodes(parsed.nodes);
+                    if (parsed.edges) setEdges(parsed.edges);
+                    setTimeout(() => triggerLayout(), 100);
+                    alert(`Successfully imported ${parsed.nodes.length} nodes!`);
+                }
+            } catch (err) {
+                alert("Failed to parse JSON file.");
+            }
+        };
+        reader.readAsText(fileObj);
+    }, [setNodes, setEdges, triggerLayout]);
 
     // 2. Auto-save on changes
     useEffect(() => {
@@ -146,10 +178,19 @@ const LifeMap: FC = () => {
                     }}
                     className="bg-surface border-border"
                 />
-                <Panel position="top-right">
-                    <Button onClick={handleAddDomain} variant="default" size="sm">New Domain</Button>
-                    <div className="mt-2 text-[10px] text-text-secondary text-right">
-                        {userId ? 'Syncing...' : 'Local Mode'}
+                <Panel position="top-right" className="flex items-center gap-2 bg-[#121214]/80 p-2 rounded-xl border border-white/10 backdrop-blur-md">
+                    <Button onClick={handleAddDomain} variant="default" size="sm">+ Domain</Button>
+                    <Button onClick={handleExportJSON} variant="outline" size="sm" className="flex items-center gap-1.5 text-xs text-text-primary border-white/10 hover:bg-white/5">
+                        <Download size={13} /> Export JSON
+                    </Button>
+                    <label className="cursor-pointer">
+                        <span className="px-3 py-1.5 rounded-md border border-white/10 text-xs text-text-primary hover:bg-white/5 transition-colors flex items-center gap-1.5 bg-surface font-medium">
+                            <Upload size={13} /> Import JSON
+                        </span>
+                        <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
+                    </label>
+                    <div className="text-[10px] text-text-secondary pl-2 border-l border-white/10">
+                        {userId ? '🟢 Cloud Sync' : '🟡 Local Mode'}
                     </div>
                 </Panel>
             </ReactFlow>

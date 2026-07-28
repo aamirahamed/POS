@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import { motion } from 'framer-motion';
 
-interface TrendData {
+export interface TrendData {
   week?: string;
   month?: string;
   total: number;
