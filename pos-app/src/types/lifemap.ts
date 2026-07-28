@@ -74,6 +74,8 @@ export interface LifeMapState {
     addProject: (parentId: string, label: string) => string;
     addMilestone: (parentId: string, label: string) => string;
     toggleNodeExpansion: (id: string) => void;
+    collapseAll: () => void;
+    expandAll: () => void;
     deleteNodeImmediately: (id: string) => void;
     moveNode: (id: string, newParentId: string) => void;
     renameNode: (id: string, label: string) => void;

@@ -9,8 +9,8 @@ export const calculateRadialLayout = (nodes: LifeMapNode[], edges: Edge[]) => {
     if (!centerNode) return { nodes, edges };
 
     // Hierarchy Spacing Configuration
-    const LEVEL_HEIGHT = 280; // Vertical breathing room between L1, L2, L3, L4, L5
-    const SIBLING_GAP = 120; // Generous horizontal spacing to prevent overlap
+    const LEVEL_HEIGHT = 200; // Tighter vertical spacing for compact milestone cards
+    const SIBLING_GAP = 80; // Tighter horizontal spacing to reduce canvas sprawl
 
     // Visual dimensions mapping to prevent overlap
     const NODE_WIDTHS: Record<string, number> = {
@@ -20,8 +20,8 @@ export const calculateRadialLayout = (nodes: LifeMapNode[], edges: Edge[]) => {
         'thread': 140, // Fallback for migration
         'project': 150,
         'initiative': 150, // Fallback for migration
-        'milestone': 300,
-        'subnode': 300, // Fallback for migration
+        'milestone': 240,
+        'subnode': 240, // Fallback for migration
     };
 
     // Helper: Find active children (ignore hidden nodes if collapsed)

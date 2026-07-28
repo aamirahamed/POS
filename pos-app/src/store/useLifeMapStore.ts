@@ -75,10 +75,10 @@ const initialNodes: LifeMapNode[] = [
 ];
 
 const initialEdges = [
-    { id: 'e1', source: 'center', target: 'p1', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
-    { id: 'e2', source: 'center', target: 'p2', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
-    { id: 'e3', source: 'center', target: 'p3', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
-    { id: 'e4', source: 'center', target: 'p4', type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+    { id: 'e1', source: 'center', target: 'p1', type: 'step', animated: false, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+    { id: 'e2', source: 'center', target: 'p2', type: 'step', animated: false, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+    { id: 'e3', source: 'center', target: 'p3', type: 'step', animated: false, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+    { id: 'e4', source: 'center', target: 'p4', type: 'step', animated: false, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
 ];
 
 export const migrateNodesAndEdges = (nodes: any[], edges: any[]): { nodes: LifeMapNode[], edges: any[] } => {
@@ -267,8 +267,8 @@ const ensureInboxExists = (nodes: LifeMapNode[], edges: any[]): { nodes: LifeMap
 
     // 4. Ensure required edges
     const requiredEdges = [
-        { id: `e-center-${domainId}`, source: 'center', target: domainId, type: 'smoothstep', animated: true, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
-        { id: `e-${domainId}-${projectId}`, source: domainId, target: projectId, type: 'smoothstep', animated: false, zIndex: 5, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+        { id: `e-center-${domainId}`, source: 'center', target: domainId, type: 'step', animated: false, zIndex: 10, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
+        { id: `e-${domainId}-${projectId}`, source: domainId, target: projectId, type: 'step', animated: false, zIndex: 5, sourceHandle: 'source-bottom', targetHandle: 'target-top' },
         { id: `e-${projectId}-${milestoneId}`, source: projectId, target: milestoneId, type: 'default', animated: false, zIndex: 1, sourceHandle: 'source-bottom', targetHandle: 'target-top' }
     ];
 
@@ -383,8 +383,8 @@ export const useLifeMapStore = create<LifeMapState>()(
                         id: `e-center-${id}`,
                         source: 'center',
                         target: id,
-                        type: 'smoothstep',
-                        animated: true,
+                        type: 'step',
+                        animated: false,
                         zIndex: 10,
                         sourceHandle: 'source-bottom',
                         targetHandle: 'target-top'
@@ -654,6 +654,33 @@ export const useLifeMapStore = create<LifeMapState>()(
                     set({ nodes: layouted.nodes });
                 },
 
+                collapseAll: () => {
+                    const nodes = get().nodes;
+                    const finalNodes = nodes.map(n => {
+                        if (n.type === 'domain' || n.type === 'project') {
+                            return { ...n, data: { ...n.data, expanded: false }, hidden: n.type === 'project' };
+                        }
+                        if (n.type === 'milestone') {
+                            return { ...n, hidden: true };
+                        }
+                        return n;
+                    });
+                    const layouted = calculateRadialLayout(finalNodes, get().edges);
+                    set({ nodes: layouted.nodes });
+                },
+
+                expandAll: () => {
+                    const nodes = get().nodes;
+                    const finalNodes = nodes.map(n => ({
+                        ...n,
+                        data: (n.type === 'domain' || n.type === 'project') ? { ...n.data, expanded: true } : n.data,
+                        hidden: false,
+                    }));
+                    const layouted = calculateRadialLayout(finalNodes, get().edges);
+                    set({ nodes: layouted.nodes });
+                },
+
+
                 deleteNode: (id) => {
                     if (id.endsWith('-inbox')) return;
                     set({ nodeToDelete: id });
@@ -763,7 +790,7 @@ export const useLifeMapStore = create<LifeMapState>()(
                 },
 
                 onConnect: (connection: Connection) => {
-                    const newEdges = addEdge({ ...connection, type: 'smoothstep', animated: true }, get().edges);
+                    const newEdges = addEdge({ ...connection, type: 'step', animated: false }, get().edges);
                     set({ edges: newEdges });
                     const layouted = calculateRadialLayout(get().nodes, newEdges);
                     set({ nodes: layouted.nodes });

@@ -5,6 +5,7 @@ import { useLifeMapStore } from '@/store/useLifeMapStore';
 
 const DomainNode = ({ id, data, selected }: NodeProps) => {
     const { addProject, toggleNodeExpansion, deleteNode, updateNode } = useLifeMapStore();
+    const childCount = useLifeMapStore(state => state.nodes.filter(n => n.data.parentId === id).length);
     const [isHovered, setIsHovered] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(data.label as string);
@@ -55,12 +56,12 @@ const DomainNode = ({ id, data, selected }: NodeProps) => {
         <div
             style={{
                 borderColor: `hsl(${hue}, 70%, 50%)`,
-                backgroundColor: `hsla(${hue}, 70%, 10%, 0.8)`,
+                backgroundColor: `hsla(${hue}, 50%, 12%, 0.95)`,
                 boxShadow: selected ? `0 0 20px hsla(${hue}, 70%, 50%, 0.3)` : 'none',
             }}
             className={`
-        relative px-6 py-4 rounded-xl min-w-[160px] text-center
-        border-2 transition-all duration-200 shadow-lg group
+        relative px-8 py-5 rounded-xl min-w-[200px] text-center
+        border-[3px] transition-all duration-200 shadow-lg group
         ${selected
                     ? 'scale-105'
                     : 'hover:border-opacity-100' // Base styles handled by inline
@@ -120,13 +121,18 @@ const DomainNode = ({ id, data, selected }: NodeProps) => {
                         className="w-full bg-transparent text-sm font-bold tracking-wide text-text-primary text-center focus:outline-none border-b border-white/20"
                     />
                 ) : (
-                    <div className="text-base font-bold tracking-wide text-text-primary">
+                    <div className="text-lg font-bold tracking-wide text-text-primary">
                         {data.label as string}
                     </div>
                 )}
                 {!isExpanded && (
                     <div className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">
                         Collapsed
+                    </div>
+                )}
+                {isExpanded && childCount > 0 && (
+                    <div className="text-[10px] text-text-secondary mt-1">
+                        {childCount} {childCount === 1 ? 'project' : 'projects'}
                     </div>
                 )}
             </div>

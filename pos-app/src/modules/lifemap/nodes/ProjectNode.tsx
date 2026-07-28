@@ -65,24 +65,29 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
     let shadow = selected ? `0 0 15px hsla(${hue}, 65%, 45%, 0.3)` : 'none';
     let opacity = 1;
     let filter = 'none';
+    let stripeColor = `hsl(${hue}, 80%, 60%)`;
 
     if (status === 'active') {
         borderStyle = `solid 1.5px hsl(${hue}, 80%, 60%)`;
         bgColor = `hsla(${hue}, 70%, 15%, 0.9)`;
         shadow = `0 0 20px hsla(${hue}, 70%, 50%, 0.2)`;
+        stripeColor = `hsl(${hue}, 80%, 60%)`;
     } else if (status === 'backlog') {
         borderStyle = `dashed 1.5px hsl(${hue}, 30%, 40%)`;
         bgColor = `hsla(${hue}, 20%, 10%, 0.6)`;
         opacity = 0.85;
+        stripeColor = `hsl(${hue}, 30%, 40%)`;
     } else if (status === 'paused') {
         borderStyle = `solid 1px hsl(0, 0%, 40%)`;
         bgColor = `hsla(0, 0%, 15%, 0.6)`;
         opacity = 0.7;
         filter = 'grayscale(30%)';
+        stripeColor = `hsl(0, 0%, 40%)`;
     } else if (status === 'completed') {
         borderStyle = `solid 1px hsl(${hue}, 20%, 30%)`;
         bgColor = `hsla(${hue}, 20%, 10%, 0.4)`;
         opacity = 0.5;
+        stripeColor = `hsl(${hue}, 20%, 30%)`;
     }
 
     const stateColors: any = {
@@ -103,8 +108,8 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
         <div
             style={{ border: borderStyle, backgroundColor: bgColor, boxShadow: shadow, opacity, filter }}
             className={`
-        relative px-4 py-3 rounded-xl min-w-[150px] text-center
-        transition-all duration-500 group flex flex-col items-center gap-2
+        relative rounded-xl min-w-[150px] text-center
+        transition-all duration-500 group flex flex-row
         ${selected ? 'scale-105 z-50' : 'hover:scale-[1.02]'}
       `}
             onMouseEnter={handleMouseEnter}
@@ -116,7 +121,10 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
                 }
             }}
         >
-            <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
+            <div style={{ backgroundColor: stripeColor }} className="w-1 rounded-l-xl self-stretch flex-shrink-0" />
+            
+            <div className="flex-1 flex flex-col items-center gap-2 px-4 py-3">
+                <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
                 {id !== 'project-inbox' && id !== 'initiative-inbox' && (
                     <>
                         <button onClick={() => setStatus('active')} className="p-1 rounded-full bg-surface hover:bg-green-600/30 text-green-400 transition-colors" title="Activate"><Play size={12} /></button>
@@ -194,6 +202,7 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
             )}
 
             <Handle type="source" position={Position.Bottom} id="source-bottom" className="invisible" />
+            </div>
         </div>
     );
 };

@@ -12,13 +12,16 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { Button } from "@/components/ui/button";
-import { Trash2, Download, Upload } from 'lucide-react';
+import { Trash2, Download, Upload, ChevronsUp, ChevronsDown } from 'lucide-react';
 
 import CenterNode from './nodes/CenterNode';
 import DomainNode from './nodes/DomainNode';
 import ProjectNode from './nodes/ProjectNode';
 import MilestoneNode from './nodes/MilestoneNode';
 import ExecutionNodeDrawer from './components/ExecutionNodeDrawer';
+import InboxPanel from './components/InboxPanel';
+import DomainsView from './components/DomainsView';
+import { Layers, Map as MapIcon } from 'lucide-react';
 
 const nodeTypes: NodeTypes = {
     center: CenterNode,
@@ -40,12 +43,15 @@ const LifeMap: FC = () => {
         nodeToDelete,
         confirmDeleteNode,
         setNodeToDelete,
-        loadFromDB
+        loadFromDB,
+        collapseAll,
+        expandAll
     } = useLifeMapStore();
 
     // Sync state
     const [userId, setUserId] = useState<string | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [activeView, setActiveView] = useState<'domains' | 'map'>('domains');
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // 1. Fetch user and load data
@@ -129,33 +135,52 @@ const LifeMap: FC = () => {
         } else if (targetNode?.type === 'project') {
             relevantProject = targetNode;
         } else if (targetNode?.type === 'milestone') {
-            // Find parent project status
             const parentProject = nodes.find(n => n.id === targetNode.data.parentId);
             if (parentProject) {
                 relevantProject = parentProject;
             }
         }
 
+        // Base clean connector style: thin, low opacity, no animation
+        const baseStyle = { strokeWidth: 1.5, opacity: 0.25 };
+
         if (relevantProject) {
             const status = relevantProject.data.status || 'active';
             const hue = targetNode?.type === 'milestone' ? (targetNode.data.hue || 210) : (relevantProject.data.hue || 210);
             
             if (status === 'active') {
-                return { ...edge, animated: true, style: { stroke: `hsl(${hue}, 70%, 60%)`, strokeWidth: 2, opacity: 1 } };
+                return { ...edge, animated: false, style: { ...baseStyle, stroke: `hsl(${hue}, 50%, 50%)`, opacity: 0.45 } };
             } else if (status === 'backlog') {
-                return { ...edge, animated: false, style: { stroke: `hsl(${hue}, 30%, 40%)`, strokeWidth: 1.5, strokeDasharray: '5,5', opacity: 0.6 } };
+                return { ...edge, animated: false, style: { ...baseStyle, stroke: `hsl(${hue}, 20%, 40%)`, strokeDasharray: '5,5', opacity: 0.2 } };
             } else if (status === 'paused') {
-                return { ...edge, animated: false, style: { stroke: '#6b7280', strokeWidth: 1.5, opacity: 0.4 } };
+                return { ...edge, animated: false, style: { ...baseStyle, stroke: '#6b7280', opacity: 0.15 } };
             } else if (status === 'completed') {
-                return { ...edge, animated: false, style: { stroke: `hsl(${hue}, 20%, 30%)`, strokeWidth: 1.5, opacity: 0.3 } };
+                return { ...edge, animated: false, style: { ...baseStyle, stroke: `hsl(${hue}, 15%, 30%)`, opacity: 0.15 } };
             }
         }
-        return edge;
+        return { ...edge, animated: false, style: { ...baseStyle, stroke: '#52525b' } };
     });
 
     return (
-        <div className="h-full w-full bg-background relative">
-            <ReactFlow
+        <div className="h-full w-full bg-background relative flex flex-col">
+            {/* View Toggle Bar */}
+            <div className="absolute top-6 left-6 z-40 bg-[#121214]/80 p-1.5 rounded-xl border border-white/10 backdrop-blur-md flex items-center gap-1 shadow-lg">
+                <button
+                    onClick={() => setActiveView('domains')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeView === 'domains' ? 'bg-white/10 text-white shadow-sm' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'}`}
+                >
+                    <Layers size={16} /> Domains
+                </button>
+                <button
+                    onClick={() => setActiveView('map')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeView === 'map' ? 'bg-white/10 text-white shadow-sm' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'}`}
+                >
+                    <MapIcon size={16} /> Map
+                </button>
+            </div>
+
+            {activeView === 'map' ? (
+                <ReactFlow
                 nodes={nodes}
                 edges={styledEdges}
                 onNodesChange={onNodesChange}
@@ -180,12 +205,20 @@ const LifeMap: FC = () => {
                 />
                 <Panel position="top-right" className="flex items-center gap-2 bg-[#121214]/80 p-2 rounded-xl border border-white/10 backdrop-blur-md">
                     <Button onClick={handleAddDomain} variant="default" size="sm">+ Domain</Button>
+                    <div className="w-[1px] h-5 bg-white/10" />
+                    <Button onClick={expandAll} variant="outline" size="sm" className="flex items-center gap-1.5 text-xs text-text-primary border-white/10 hover:bg-white/5" title="Expand All">
+                        <ChevronsDown size={13} /> Expand
+                    </Button>
+                    <Button onClick={collapseAll} variant="outline" size="sm" className="flex items-center gap-1.5 text-xs text-text-primary border-white/10 hover:bg-white/5" title="Collapse All">
+                        <ChevronsUp size={13} /> Collapse
+                    </Button>
+                    <div className="w-[1px] h-5 bg-white/10" />
                     <Button onClick={handleExportJSON} variant="outline" size="sm" className="flex items-center gap-1.5 text-xs text-text-primary border-white/10 hover:bg-white/5">
-                        <Download size={13} /> Export JSON
+                        <Download size={13} /> Export
                     </Button>
                     <label className="cursor-pointer">
                         <span className="px-3 py-1.5 rounded-md border border-white/10 text-xs text-text-primary hover:bg-white/5 transition-colors flex items-center gap-1.5 bg-surface font-medium">
-                            <Upload size={13} /> Import JSON
+                            <Upload size={13} /> Import
                         </span>
                         <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
                     </label>
@@ -194,6 +227,9 @@ const LifeMap: FC = () => {
                     </div>
                 </Panel>
             </ReactFlow>
+            ) : (
+                <DomainsView />
+            )}
             
             {nodeToDelete && (
                 <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -223,6 +259,7 @@ const LifeMap: FC = () => {
             )}
 
             <ExecutionNodeDrawer />
+            <InboxPanel />
         </div>
     );
 };
