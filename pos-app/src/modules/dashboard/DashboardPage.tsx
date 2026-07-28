@@ -8,11 +8,7 @@ import { CalendarSection } from './components/CalendarSection';
 import { RemindersWidget } from './components/RemindersWidget';
 import { Sparkles, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
-
-
-
-
+import { useProfileStore } from '@/store/useProfileStore';
 
 const DashboardPage: FC = () => {
     const navigate = useNavigate();
@@ -30,9 +26,11 @@ const DashboardPage: FC = () => {
     // Local State
     const [showFocusSelector, setShowFocusSelector] = useState(false);
 
-    // Load life map from DB on mount
+
+    // Load life map and profile facts from DB on mount
     useEffect(() => {
         loadFromDB();
+        useProfileStore.getState().loadFacts();
     }, [loadFromDB]);
     
     // Live Time State

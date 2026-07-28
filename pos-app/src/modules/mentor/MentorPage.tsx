@@ -1,6 +1,7 @@
 import { FC, useState, useEffect, useRef } from 'react';
 import { useMentorStore } from '@/store/useMentorStore';
 import { useRemindersStore } from '@/store/useRemindersStore';
+import { useProfileStore } from '@/store/useProfileStore';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { 
   Sparkles, 
@@ -49,11 +50,11 @@ const MentorPage: FC = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isGenerating]);
-
-  // Load chat history on mount
+  // Load chat history and profile facts on mount
   useEffect(() => {
     loadHistoryFromDB();
     loadProfileMemory();
+    useProfileStore.getState().loadFacts();
   }, []);
 
   // Sync store profile memory to local textarea input

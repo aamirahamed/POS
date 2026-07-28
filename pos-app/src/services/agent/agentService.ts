@@ -5,7 +5,8 @@ import { useShoppingStore } from "@/store/useShoppingStore";
 import { useMentorStore } from "@/store/useMentorStore";
 import { useFinanceStore } from "@/store/useFinanceStore";
 import { useRemindersStore } from "@/store/useRemindersStore";
-import { supabase } from "@/lib/supabase";
+import { useProfileStore } from "@/store/useProfileStore";
+import { compileUnifiedContext } from "./contextEngine";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -239,6 +240,19 @@ const changeNodeTypeDecl: FunctionDeclaration = {
   }
 };
 
+const updateUserFactDecl: FunctionDeclaration = {
+  name: 'update_user_fact',
+  description: 'Add or update a structured life fact constraint for Aamir (e.g. graduation date, visa status, target job locations).',
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      key: { type: SchemaType.STRING, description: 'The fact key/label (e.g. "graduation_date", "visa_status", "target_locations"). Use lower_snake_case.' },
+      value: { type: SchemaType.STRING, description: 'The text value or JSON string value of the fact.' }
+    },
+    required: ['key', 'value']
+  }
+};
+
 const lifemapTools: Tool[] = [{
   functionDeclarations: [
     addDomainDecl, 
@@ -251,7 +265,8 @@ const lifemapTools: Tool[] = [{
     deleteNodeDecl,
     moveNodeDecl,
     renameNodeDecl,
-    changeNodeTypeDecl
+    changeNodeTypeDecl,
+    updateUserFactDecl
   ]
 }];
 
@@ -280,7 +295,8 @@ const mentorTools: Tool[] = [{
     moveNodeDecl,
     renameNodeDecl,
     changeNodeTypeDecl,
-    updateMentorProfileDecl
+    updateMentorProfileDecl,
+    updateUserFactDecl
   ]
 }];
 
@@ -360,11 +376,14 @@ export async function executeAgentCommand(
   const formattedHistory = formatHistory(history);
   onStatusUpdate("Secretary checking request...");
 
+  const unifiedContext = await compileUnifiedContext();
+  const orchestratorPromptWithContext = `${ORCHESTRATOR_PROMPT}\n\n${unifiedContext.markdown}`;
+
   let result;
   try {
     const orchestrator = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: ORCHESTRATOR_PROMPT,
+      systemInstruction: orchestratorPromptWithContext,
       tools: orchestratorTools
     });
     result = await orchestrator.generateContent({
@@ -374,7 +393,7 @@ export async function executeAgentCommand(
     console.warn("Orchestrator failed with gemini-2.5-flash, trying gemini-flash-latest", e);
     const orchestrator = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
-      systemInstruction: ORCHESTRATOR_PROMPT,
+      systemInstruction: orchestratorPromptWithContext,
       tools: orchestratorTools
     });
     result = await orchestrator.generateContent({
@@ -425,15 +444,8 @@ async function executeLifeMapAgent(
   query: string,
   onStatusUpdate: (status: string) => void
 ): Promise<AgentResponse> {
-  const { nodes } = useLifeMapStore.getState();
-  
-  // Compile current Life Map structure for context
-  const outlineText = nodes.map(n => {
-    const parent = n.data?.parentId ? ` (parent ID: "${n.data.parentId}")` : '';
-    return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}`;
-  }).join('\n');
-
-  const systemInstruction = `${LIFEMAP_PROMPT}\n\nCurrent Life Map Outline:\n${outlineText || "No nodes currently exist."}`;
+  const unifiedContext = await compileUnifiedContext();
+  const systemInstruction = `${LIFEMAP_PROMPT}\n\n${unifiedContext.markdown}`;
 
   let lifemapAgent;
   let result;
@@ -524,6 +536,9 @@ async function executeLifeMapAgent(
         const parsedDue = parseReminderDueDate(args.dueDate);
         await useRemindersStore.getState().addReminder(args.text, args.category || 'General', parsedDue);
         executionMessage = `✓ Created reminder "${args.text}" (Category: "${args.category || 'General'}"${args.dueDate ? `, Due: ${args.dueDate}` : ''}).`;
+      } else if (call.name === 'update_user_fact') {
+        await useProfileStore.getState().updateFact(args.key, args.value);
+        executionMessage = `✓ Updated user profile fact "${args.key}" to "${args.value}".`;
       }
 
       statusLog.push(executionMessage);
@@ -559,50 +574,8 @@ export async function executeMentorAgent(
   query: string,
   onStatusUpdate: (status: string) => void
 ): Promise<AgentResponse> {
-  const { nodes } = useLifeMapStore.getState();
-  
-  const outlineText = nodes.map(n => {
-    const parent = n.data?.parentId ? ` (parent ID: "${n.data.parentId}")` : '';
-    return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}`;
-  }).join('\n');
-
-  let mentorMemo = "";
-  try {
-    const res = await fetch('/MENTOR.md');
-    if (res.ok) {
-      mentorMemo = await res.text();
-    }
-  } catch (e) {
-    console.warn("Could not load MENTOR.md profile memo", e);
-  }
-
-  let cloudMemory = "";
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('mentor_profile_memory')
-        .select('content')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (data) {
-        cloudMemory = data.content;
-      }
-    }
-  } catch (e) {
-    console.warn("Could not load cloud profile memory", e);
-  }
-
-  const systemInstruction = `${MENTOR_PROMPT}
-
-Personal Strategy Profile (MENTOR.md):
-${mentorMemo}
-
-Dynamic Cloud Memory:
-${cloudMemory || "No additional dynamic notes saved."}
-
-Current Life Map Outline:
-${outlineText || "No nodes currently exist."}`;
+  const unifiedContext = await compileUnifiedContext();
+  const systemInstruction = `${MENTOR_PROMPT}\n\n${unifiedContext.markdown}`;
 
   let mentorAgent: any = null;
   let result: any = null;
@@ -701,6 +674,9 @@ ${outlineText || "No nodes currently exist."}`;
       } else if (call.name === 'update_mentor_profile') {
         await useMentorStore.getState().updateProfileMemory(args.content);
         executionMessage = `✓ Updated dynamic profile memory.`;
+      } else if (call.name === 'update_user_fact') {
+        await useProfileStore.getState().updateFact(args.key, args.value);
+        executionMessage = `✓ Updated user profile fact "${args.key}" to "${args.value}".`;
       }
 
       statusLog.push(executionMessage);
@@ -858,7 +834,11 @@ async function executeFinanceAgent(
     type: a.type,
   }));
 
+  const unifiedContext = await compileUnifiedContext();
+
   const systemInstruction = `${FINANCE_MENTOR_PROMPT}
+
+${unifiedContext.markdown}
 
 Connected Bank Accounts:
 ${JSON.stringify(accountSummary, null, 2)}
