@@ -3,6 +3,7 @@ import { Bot, Link as LinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage } from '@/store/useAgentStore';
+import { MiniMapTree } from './MiniMapTree';
 
 interface AgentMessageProps {
     msg: ChatMessage;
@@ -121,7 +122,26 @@ export const AgentMessage: FC<AgentMessageProps> = ({ msg, isLatest, onSendAnswe
                         </div>
                         <div className="flex flex-col gap-1.5">
                             {msg.statusLog.filter(log => log.startsWith('✓')).map((log, index) => {
-                                const cleanText = log.replace('✓ ', '');
+                                const parts = log.split('__JSON_PAYLOAD__');
+                                const cleanText = parts[0].replace('✓ ', '').trim();
+                                
+                                let payload = null;
+                                if (parts.length > 1) {
+                                    try {
+                                        payload = JSON.parse(parts[1]);
+                                    } catch (e) {
+                                        console.error("Failed to parse agent JSON payload", e);
+                                    }
+                                }
+
+                                if (payload) {
+                                    return (
+                                        <div key={index} className="my-3">
+                                            <MiniMapTree payload={payload} />
+                                        </div>
+                                    );
+                                }
+
                                 return (
                                     <div key={index} className="flex items-start gap-2 bg-indigo-500/5 hover:bg-indigo-500/10 border border-indigo-500/10 transition-colors px-3 py-2 rounded-xl">
                                         <div className="mt-[3px] w-3 h-3 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0">

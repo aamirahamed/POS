@@ -513,16 +513,16 @@ async function executeLifeMapAgent(
       // Dispatch stores actions
       if (call.name === 'add_domain') {
         const id = await useLifeMapStore.getState().addDomain(args.label);
-        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".`;
+        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}`;
       } else if (call.name === 'add_project') {
         const id = await useLifeMapStore.getState().addProject(args.parent_id, args.label);
-        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".`;
+        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}`;
       } else if (call.name === 'add_milestone') {
         const id = await useLifeMapStore.getState().addMilestone(args.parent_id, args.label);
-        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".`;
+        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}`;
       } else if (call.name === 'add_task_to_node') {
         await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".`;
+        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}`;
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);
         executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
@@ -651,16 +651,16 @@ export async function executeMentorAgent(
       // Dispatch stores actions
       if (call.name === 'add_domain') {
         const id = await useLifeMapStore.getState().addDomain(args.label);
-        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".`;
+        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}`;
       } else if (call.name === 'add_project') {
         const id = await useLifeMapStore.getState().addProject(args.parent_id, args.label);
-        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".`;
+        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}`;
       } else if (call.name === 'add_milestone') {
         const id = await useLifeMapStore.getState().addMilestone(args.parent_id, args.label);
-        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".`;
+        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}`;
       } else if (call.name === 'add_task_to_node') {
         await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".`;
+        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}`;
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);
         executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
