@@ -760,18 +760,60 @@ export const useLifeMapStore = create<LifeMapState>()(
                 changeNodeType: (id, type) => {
                     if (id.endsWith('-inbox')) return;
                     const state = get();
+                    let newEdges = [...state.edges];
+                    
                     const nodes = state.nodes.map(node => {
                         if (node.id === id) {
+                            let newParentId = node.data.parentId;
+
+                            // Enforce hierarchy when changing types
+                            if (type === 'project') {
+                                // A project must be under a domain.
+                                const currentParent = state.nodes.find(n => n.id === newParentId);
+                                if (currentParent && currentParent.type !== 'domain') {
+                                    // If current parent is not a domain, move it to the grandparent
+                                    if (currentParent.data?.parentId) {
+                                        newParentId = currentParent.data.parentId;
+                                    } else {
+                                        newParentId = 'center'; // fallback
+                                    }
+                                }
+                            } else if (type === 'domain') {
+                                // A domain must be under center
+                                newParentId = 'center';
+                            }
+                            
+                            // Ensure newParentId is always a string for edges
+                            newParentId = newParentId || 'center';
+                            
+                            // Update the edge to point to the new parent if it changed
+                            if (newParentId !== node.data.parentId) {
+                                newEdges = newEdges.filter(e => e.target !== id);
+                                newEdges.push({
+                                    id: `e-${newParentId}-${id}`,
+                                    source: newParentId,
+                                    target: id,
+                                    type: 'smoothstep',
+                                    animated: false,
+                                    style: { stroke: 'rgba(255,255,255,0.2)', strokeWidth: 2 }
+                                });
+                            }
+
                             return {
                                 ...node,
-                                type
+                                type,
+                                data: {
+                                    ...node.data,
+                                    parentId: newParentId
+                                }
                             };
                         }
                         return node;
                     });
-                    const layouted = calculateRadialLayout(nodes, state.edges);
-                    set({ nodes: layouted.nodes });
-                    immediateSync(layouted.nodes, state.edges);
+                    
+                    const layouted = calculateRadialLayout(nodes, newEdges);
+                    set({ nodes: layouted.nodes, edges: newEdges });
+                    immediateSync(layouted.nodes, newEdges);
                 },
 
                 setNodes: (nodes) => set({ nodes }),
