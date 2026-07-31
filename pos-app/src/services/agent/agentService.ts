@@ -554,7 +554,7 @@ async function executeLifeMapAgent(
         const textsToAdd = args.texts && args.texts.length > 0 ? args.texts : (args.text ? [args.text] : []);
         for (const text of textsToAdd) {
             await useLifeMapStore.getState().addTaskToNode(args.node_id, text);
-            executionMessages.push(`✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}`);
+            executionMessages.push(`✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id, taskText: text })}`);
         }
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);

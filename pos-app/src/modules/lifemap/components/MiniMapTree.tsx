@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { LifeMapNode } from '@/types/lifemap';
-import { Target, CheckCircle2, Hexagon, FolderDot } from 'lucide-react';
+import { Target, CheckCircle2, Hexagon, FolderDot, CheckSquare } from 'lucide-react';
 
 interface MiniMapTreeProps {
     payload: {
         type: string;
         nodeId: string;
+        taskText?: string;
     };
 }
 
@@ -109,7 +110,7 @@ export const MiniMapTree: React.FC<MiniMapTreeProps> = ({ payload }) => {
                                     </span>
 
                                     {/* New Item Indicator */}
-                                    {isTarget && (
+                                    {isTarget && payload.type !== 'add_task_to_node' && (
                                         <span 
                                             className="text-[10px] uppercase tracking-wider font-bold mt-1.5 flex items-center gap-1.5"
                                             style={{ color: `hsl(${hue}, 80%, 75%)` }}
@@ -127,6 +128,40 @@ export const MiniMapTree: React.FC<MiniMapTreeProps> = ({ payload }) => {
                     </div>
                 );
             })}
+
+            {payload.type === 'add_task_to_node' && payload.taskText && (
+                <div className="relative flex flex-col items-start w-full" style={{ zIndex: 90 }}>
+                    <div 
+                        className="relative flex items-center"
+                        style={{ marginLeft: `${lineage.length * 48}px` }}
+                    >
+                        <div 
+                            className="absolute border-l-2 border-b-2 border-white/20 rounded-bl-xl z-0"
+                            style={{ 
+                                width: '16px', 
+                                height: '64px',
+                                left: '-16px',
+                                top: '-40px'
+                            }}
+                        />
+                        <div 
+                            className="relative z-10 flex items-center gap-3 pr-3 py-2.5 pl-[15px] rounded-xl border border-indigo-500/40 bg-indigo-500/10 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.6)] ring-1 ring-white/10 my-2"
+                        >
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-inner bg-indigo-500/20 text-indigo-400">
+                                <CheckSquare size={16} />
+                            </div>
+                            <div className="flex flex-col min-w-[140px] max-w-[240px]">
+                                <span className="text-[9px] uppercase tracking-widest font-bold mb-0.5 opacity-80 text-indigo-400">
+                                    Action Item Added
+                                </span>
+                                <span className="text-[14px] font-semibold text-white break-words leading-tight">
+                                    {payload.taskText}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
