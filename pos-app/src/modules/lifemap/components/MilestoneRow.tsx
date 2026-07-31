@@ -158,6 +158,17 @@ const MilestoneRow = ({ milestone }: Props) => {
 
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsTasksExpanded(true);
+                        setIsAddingTask(true);
+                    }}
+                    className="p-1.5 rounded-md hover:bg-indigo-500/20 text-text-secondary hover:text-indigo-400 transition-colors"
+                    title="Add Action Item"
+                >
+                    <Plus size={14} />
+                </button>
+                <button
                     onClick={handleDelete}
                     className="p-1.5 rounded-md hover:bg-red-500/20 text-text-secondary hover:text-red-400 transition-colors"
                     title="Delete Milestone"
