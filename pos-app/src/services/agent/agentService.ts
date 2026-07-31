@@ -92,9 +92,10 @@ const addProjectDecl: FunctionDeclaration = {
     type: SchemaType.OBJECT,
     properties: {
       parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Domain node (e.g. d-1771055997407).' },
-      label: { type: SchemaType.STRING, description: 'The display name of the new Project.' }
+      label: { type: SchemaType.STRING, description: 'The display name of the new Project. (Use if adding a single project)' },
+      labels: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of display names. (Use to batch add multiple projects)' }
     },
-    required: ['parent_id', 'label']
+    required: ['parent_id']
   }
 };
 
@@ -105,9 +106,10 @@ const addMilestoneDecl: FunctionDeclaration = {
     type: SchemaType.OBJECT,
     properties: {
       parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Project node (e.g. pjt-1778287435069).' },
-      label: { type: SchemaType.STRING, description: 'The display name of the new Milestone.' }
+      label: { type: SchemaType.STRING, description: 'The display name of the new Milestone. (Use if adding a single milestone)' },
+      labels: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of display names. (Use to batch add multiple milestones)' }
     },
-    required: ['parent_id', 'label']
+    required: ['parent_id']
   }
 };
 
@@ -118,9 +120,10 @@ const addTaskToNodeDecl: FunctionDeclaration = {
     type: SchemaType.OBJECT,
     properties: {
       node_id: { type: SchemaType.STRING, description: 'The exact ID of the target Milestone node.' },
-      text: { type: SchemaType.STRING, description: 'The checklist task text to insert.' }
+      text: { type: SchemaType.STRING, description: 'The checklist task text. (Use if adding a single task)' },
+      texts: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of checklist task texts. (Use to batch add multiple tasks)' }
     },
-    required: ['node_id', 'text']
+    required: ['node_id']
   }
 };
 
@@ -515,14 +518,23 @@ async function executeLifeMapAgent(
         const id = await useLifeMapStore.getState().addDomain(args.label);
         executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}`;
       } else if (call.name === 'add_project') {
-        const id = await useLifeMapStore.getState().addProject(args.parent_id, args.label);
-        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}`;
+        const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
+        for (const label of labelsToAdd) {
+            const id = await useLifeMapStore.getState().addProject(args.parent_id, label);
+            executionMessage += `✓ Added Project "${label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}\n`;
+        }
       } else if (call.name === 'add_milestone') {
-        const id = await useLifeMapStore.getState().addMilestone(args.parent_id, args.label);
-        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}`;
+        const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
+        for (const label of labelsToAdd) {
+            const id = await useLifeMapStore.getState().addMilestone(args.parent_id, label);
+            executionMessage += `✓ Added Milestone "${label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}\n`;
+        }
       } else if (call.name === 'add_task_to_node') {
-        await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}`;
+        const textsToAdd = args.texts && args.texts.length > 0 ? args.texts : (args.text ? [args.text] : []);
+        for (const text of textsToAdd) {
+            await useLifeMapStore.getState().addTaskToNode(args.node_id, text);
+            executionMessage += `✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}\n`;
+        }
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);
         executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
@@ -653,14 +665,23 @@ export async function executeMentorAgent(
         const id = await useLifeMapStore.getState().addDomain(args.label);
         executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}`;
       } else if (call.name === 'add_project') {
-        const id = await useLifeMapStore.getState().addProject(args.parent_id, args.label);
-        executionMessage = `✓ Added Project "${args.label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}`;
+        const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
+        for (const label of labelsToAdd) {
+            const id = await useLifeMapStore.getState().addProject(args.parent_id, label);
+            executionMessage += `✓ Added Project "${label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}\n`;
+        }
       } else if (call.name === 'add_milestone') {
-        const id = await useLifeMapStore.getState().addMilestone(args.parent_id, args.label);
-        executionMessage = `✓ Added Milestone "${args.label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}`;
+        const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
+        for (const label of labelsToAdd) {
+            const id = await useLifeMapStore.getState().addMilestone(args.parent_id, label);
+            executionMessage += `✓ Added Milestone "${label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}\n`;
+        }
       } else if (call.name === 'add_task_to_node') {
-        await useLifeMapStore.getState().addTaskToNode(args.node_id, args.text);
-        executionMessage = `✓ Added task "${args.text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}`;
+        const textsToAdd = args.texts && args.texts.length > 0 ? args.texts : (args.text ? [args.text] : []);
+        for (const text of textsToAdd) {
+            await useLifeMapStore.getState().addTaskToNode(args.node_id, text);
+            executionMessage += `✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}\n`;
+        }
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);
         executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
