@@ -75,55 +75,52 @@ const orchestratorTools: Tool[] = [{
 // ──────────────────────────────────────────────────────────
 const addDomainDecl: FunctionDeclaration = {
   name: 'add_domain',
-  description: 'Create a new top-level Domain to the Life Map.',
+  description: 'Create one or more new top-level Domains to the Life Map.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
-      label: { type: SchemaType.STRING, description: 'The display name of the new Domain.' }
+      labels: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of display names of the new Domains.' }
     },
-    required: ['label']
+    required: ['labels']
   }
 };
 
 const addProjectDecl: FunctionDeclaration = {
   name: 'add_project',
-  description: 'Create a new Project node under a parent Domain node.',
+  description: 'Create one or more new Project nodes under a parent Domain node.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
       parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Domain node (e.g. d-1771055997407).' },
-      label: { type: SchemaType.STRING, description: 'The display name of the new Project. (Use if adding a single project)' },
-      labels: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of display names. (Use to batch add multiple projects)' }
+      labels: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of display names of the new Projects.' }
     },
-    required: ['parent_id']
+    required: ['parent_id', 'labels']
   }
 };
 
 const addMilestoneDecl: FunctionDeclaration = {
   name: 'add_milestone',
-  description: 'Create a new Milestone node under a parent Project node.',
+  description: 'Create one or more new Milestone nodes under a parent Project node.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
       parent_id: { type: SchemaType.STRING, description: 'The exact node ID of the parent Project node (e.g. pjt-1778287435069).' },
-      label: { type: SchemaType.STRING, description: 'The display name of the new Milestone. (Use if adding a single milestone)' },
-      labels: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of display names. (Use to batch add multiple milestones)' }
+      labels: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of display names of the new Milestones.' }
     },
-    required: ['parent_id']
+    required: ['parent_id', 'labels']
   }
 };
 
 const addTaskToNodeDecl: FunctionDeclaration = {
   name: 'add_task_to_node',
-  description: 'Create a task checklist item inside a specific Milestone node.',
+  description: 'Create one or more task checklist items inside a specific Milestone node.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
       node_id: { type: SchemaType.STRING, description: 'The exact ID of the target Milestone node.' },
-      text: { type: SchemaType.STRING, description: 'The checklist task text. (Use if adding a single task)' },
-      texts: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of checklist task texts. (Use to batch add multiple tasks)' }
+      texts: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: 'Array of checklist task texts to insert.' }
     },
-    required: ['node_id']
+    required: ['node_id', 'texts']
   }
 };
 
@@ -515,8 +512,11 @@ async function executeLifeMapAgent(
 
       // Dispatch stores actions
       if (call.name === 'add_domain') {
-        const id = await useLifeMapStore.getState().addDomain(args.label);
-        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}`;
+        const labelsToAdd = args.labels || (args.label ? [args.label] : []);
+        for (const label of labelsToAdd) {
+            const id = await useLifeMapStore.getState().addDomain(label);
+            executionMessage += `✓ Added Domain "${label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}\n`;
+        }
       } else if (call.name === 'add_project') {
         const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
         for (const label of labelsToAdd) {
@@ -662,8 +662,11 @@ export async function executeMentorAgent(
 
       // Dispatch stores actions
       if (call.name === 'add_domain') {
-        const id = await useLifeMapStore.getState().addDomain(args.label);
-        executionMessage = `✓ Added Domain "${args.label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}`;
+        const labelsToAdd = args.labels || (args.label ? [args.label] : []);
+        for (const label of labelsToAdd) {
+            const id = await useLifeMapStore.getState().addDomain(label);
+            executionMessage += `✓ Added Domain "${label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}\n`;
+        }
       } else if (call.name === 'add_project') {
         const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
         for (const label of labelsToAdd) {
