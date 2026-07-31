@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { LifeMapNode } from '@/types/lifemap';
-import { ChevronDown, ChevronRight, Plus, Trash2, Maximize2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, Target } from 'lucide-react';
 import MilestoneRow from './MilestoneRow';
 
 interface Props {
@@ -156,6 +156,18 @@ const ProjectRow = ({ project }: Props) => {
                                 </>
                             )}
                         </div>
+
+                        {/* Focus Mode Button */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setFocusedProject(project.id);
+                            }}
+                            className="ml-2 px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] uppercase font-bold tracking-widest rounded-full flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 shrink-0"
+                        >
+                            <Target size={12} />
+                            Focus Mode
+                        </button>
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -167,16 +179,6 @@ const ProjectRow = ({ project }: Props) => {
                         </div>
                         
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setFocusedProject(project.id);
-                                }}
-                                className="p-1.5 rounded-md hover:bg-white/10 text-text-secondary hover:text-indigo-400 transition-colors"
-                                title="Focus Mode"
-                            >
-                                <Maximize2 size={16} />
-                            </button>
                             <button
                                 onClick={() => addMilestone(project.id, "")}
                                 className="p-1.5 rounded-md hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors"
