@@ -346,6 +346,32 @@ const toggleShoppingItemDecl: FunctionDeclaration = {
   }
 };
 
+export function formatHistory(history: { role: 'user' | 'assistant'; text: string }[]): Content[] {
+  const formatted: Content[] = [];
+  
+  for (const msg of history) {
+    let role = msg.role === 'assistant' ? 'model' : 'user';
+    
+    if (formatted.length > 0 && formatted[formatted.length - 1].role === role) {
+      formatted[formatted.length - 1].parts.push({ text: "\n" + msg.text });
+    } else {
+      formatted.push({
+        role,
+        parts: [{ text: msg.text }]
+      });
+    }
+  }
+
+  if (formatted.length > 0 && formatted[formatted.length - 1].role === 'model') {
+    formatted.push({
+      role: 'user',
+      parts: [{ text: "Continue." }]
+    });
+  }
+
+  return formatted;
+}
+
 const deleteShoppingItemDecl: FunctionDeclaration = {
   name: 'delete_shopping_item',
   description: 'Delete/remove an item from the shopping list.',
@@ -366,13 +392,7 @@ const shoppingTools: Tool[] = [{
   ]
 }];
 
-// Helper: Converts state history to Gemini SDK format
-const formatHistory = (history: { role: 'user' | 'assistant'; text: string }[]): Content[] => {
-  return history.map(h => ({
-    role: h.role === 'user' ? 'user' : 'model',
-    parts: [{ text: h.text }]
-  }));
-};
+
 
 // ──────────────────────────────────────────────────────────
 // 4. Main Service Loop
@@ -425,22 +445,22 @@ export async function executeAgentCommand(
 
     if (call.name === 'route_to_lifemap_agent') {
       onStatusUpdate("Forwarding to Life Map Architect...");
-      return await executeLifeMapAgent(genAI, targetQuery, onStatusUpdate);
+      return await executeLifeMapAgent(genAI, targetQuery, formattedHistory, onStatusUpdate);
     } 
     
     if (call.name === 'route_to_shopping_agent') {
       onStatusUpdate("Forwarding to Shopping Assistant...");
-      return await executeShoppingAgent(genAI, targetQuery, onStatusUpdate);
+      return await executeShoppingAgent(genAI, targetQuery, formattedHistory, onStatusUpdate);
     }
 
     if (call.name === 'route_to_mentor_agent') {
       onStatusUpdate("Forwarding to Personal Mentor...");
-      return await executeMentorAgent(genAI, targetQuery, onStatusUpdate);
+      return await executeMentorAgent(genAI, targetQuery, formattedHistory, onStatusUpdate);
     }
 
     if (call.name === 'route_to_finance_agent') {
       onStatusUpdate("Forwarding to Finance Manager...");
-      return await executeFinanceAgent(genAI, targetQuery, onStatusUpdate);
+      return await executeFinanceAgent(genAI, targetQuery, formattedHistory, onStatusUpdate);
     }
   }
 
@@ -457,6 +477,7 @@ export async function executeAgentCommand(
 async function executeLifeMapAgent(
   genAI: GoogleGenerativeAI,
   query: string,
+  history: Content[],
   onStatusUpdate: (status: string) => void
 ): Promise<AgentResponse> {
   const unifiedContext = await compileUnifiedContext();
@@ -471,7 +492,7 @@ async function executeLifeMapAgent(
       tools: lifemapAgentTools()
     });
     result = await lifemapAgent.generateContent({
-      contents: [{ role: "user", parts: [{ text: query }] }]
+      contents: [...history, { role: "user", parts: [{ text: query }] }]
     });
   } catch (e) {
     console.warn("Life Map Agent failed with gemini-2.5-flash, trying gemini-flash-latest", e);
@@ -481,12 +502,12 @@ async function executeLifeMapAgent(
       tools: lifemapAgentTools()
     });
     result = await lifemapAgent.generateContent({
-      contents: [{ role: "user", parts: [{ text: query }] }]
+      contents: [...history, { role: "user", parts: [{ text: query }] }]
     });
   }
 
   const statusLog: string[] = [];
-  const contents: Content[] = [{ role: "user", parts: [{ text: query }] }];
+  const contents: Content[] = [...history, { role: "user", parts: [{ text: query }] }];
 
   let currentResult = result;
   let iterations = 0;
@@ -604,41 +625,37 @@ async function executeLifeMapAgent(
 export async function executeMentorAgent(
   genAI: GoogleGenerativeAI,
   query: string,
+  history: Content[],
   onStatusUpdate: (status: string) => void
 ): Promise<AgentResponse> {
   const unifiedContext = await compileUnifiedContext();
   const systemInstruction = `${MENTOR_PROMPT}\n\n${unifiedContext.markdown}`;
 
-  let mentorAgent: any = null;
-  let result: any = null;
-  const mentorModels = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-flash-latest"];
-  let success = false;
-  let lastError: any = null;
-
-  for (const modelName of mentorModels) {
-    try {
-      mentorAgent = genAI.getGenerativeModel({
-        model: modelName,
-        systemInstruction,
-        tools: mentorAgentTools()
-      });
-      result = await mentorAgent.generateContent({
-        contents: [{ role: "user", parts: [{ text: query }] }]
-      });
-      success = true;
-      break;
-    } catch (e) {
-      console.warn(`Mentor query failed with ${modelName}, trying next fallback.`, e);
-      lastError = e;
-    }
-  }
-
-  if (!success || !result) {
-    throw new Error(`All mentor models failed. Last error: ${lastError?.message || lastError}`);
+  let mentorAgent;
+  let result;
+  try {
+    mentorAgent = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction,
+      tools: mentorAgentTools()
+    });
+    result = await mentorAgent.generateContent({
+      contents: [...history, { role: "user", parts: [{ text: query }] }]
+    });
+  } catch (e) {
+    console.warn("Mentor Agent failed with gemini-2.5-flash, trying gemini-flash-latest", e);
+    mentorAgent = genAI.getGenerativeModel({
+      model: "gemini-flash-latest",
+      systemInstruction,
+      tools: mentorAgentTools()
+    });
+    result = await mentorAgent.generateContent({
+      contents: [...history, { role: "user", parts: [{ text: query }] }]
+    });
   }
 
   const statusLog: string[] = [];
-  const contents: Content[] = [{ role: "user", parts: [{ text: query }] }];
+  const contents: Content[] = [...history, { role: "user", parts: [{ text: query }] }];
 
   let currentResult = result;
   let iterations = 0;
@@ -757,6 +774,7 @@ export async function executeMentorAgent(
 async function executeShoppingAgent(
   genAI: GoogleGenerativeAI,
   query: string,
+  history: Content[],
   onStatusUpdate: (status: string) => void
 ): Promise<AgentResponse> {
   const { items } = useShoppingStore.getState();
@@ -777,7 +795,7 @@ async function executeShoppingAgent(
       tools: shoppingTools
     });
     result = await shoppingAgent.generateContent({
-      contents: [{ role: "user", parts: [{ text: query }] }]
+      contents: [...history, { role: "user", parts: [{ text: query }] }]
     });
   } catch (e) {
     console.warn("Shopping Agent failed with gemini-2.5-flash, trying gemini-flash-latest", e);
@@ -787,7 +805,7 @@ async function executeShoppingAgent(
       tools: shoppingTools
     });
     result = await shoppingAgent.generateContent({
-      contents: [{ role: "user", parts: [{ text: query }] }]
+      contents: [...history, { role: "user", parts: [{ text: query }] }]
     });
   }
 
@@ -827,6 +845,7 @@ async function executeShoppingAgent(
 
     const finalResult = await shoppingAgent.generateContent({
       contents: [
+        ...history,
         { role: 'user', parts: [{ text: query }] },
         result.response.candidates![0].content,
         {
@@ -859,6 +878,7 @@ function lifemapAgentTools(): Tool[] {
 async function executeFinanceAgent(
   genAI: GoogleGenerativeAI,
   query: string,
+  history: Content[],
   onStatusUpdate: (status: string) => void
 ): Promise<AgentResponse> {
   const { transactions, bankAccounts, updateTransactionCategory } = useFinanceStore.getState();
@@ -924,7 +944,7 @@ ${JSON.stringify(txSummary, null, 2)}`;
         tools: financeTools
       });
       result = await financeAgent.generateContent({
-        contents: [{ role: "user", parts: [{ text: query }] }]
+        contents: [...history, { role: "user", parts: [{ text: query }] }]
       });
       break;
     } catch (e) {
@@ -964,6 +984,7 @@ ${JSON.stringify(txSummary, null, 2)}`;
 
     const finalResult = await financeAgent.generateContent({
       contents: [
+        ...history,
         { role: 'user', parts: [{ text: query }] },
         result.response.candidates![0].content,
         { role: 'user', parts: functionResponses }

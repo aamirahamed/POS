@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import { executeMentorAgent } from '@/services/agent/agentService';
+import { executeMentorAgent, formatHistory } from '@/services/agent/agentService';
 import { useLifeMapStore } from './useLifeMapStore';
 import { supabase } from '@/lib/supabase';
 
@@ -95,10 +95,16 @@ export const useMentorStore = create<MentorState>()(
         try {
           const genAI = new GoogleGenerativeAI(API_KEY || '');
 
+          const historyForAgent = get().messages.map(m => ({
+            role: m.role,
+            text: m.text
+          }));
+          const formattedHistory = formatHistory(historyForAgent);
 
           const response = await executeMentorAgent(
             genAI,
             trimmed,
+            formattedHistory,
             (status) => set({ currentStatus: status })
           );
 
