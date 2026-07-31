@@ -505,7 +505,7 @@ async function executeLifeMapAgent(
 
     for (const call of calls) {
       const args = call.args as any;
-      let executionMessage = "";
+      let executionMessages: string[] = [];
 
       onStatusUpdate(`Architect executing: ${call.name}...`);
       statusLog.push(`Calling tool: ${call.name}`);
@@ -515,29 +515,29 @@ async function executeLifeMapAgent(
         const labelsToAdd = args.labels || (args.label ? [args.label] : []);
         for (const label of labelsToAdd) {
             const id = await useLifeMapStore.getState().addDomain(label);
-            executionMessage += `✓ Added Domain "${label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}\n`;
+            executionMessages.push(`✓ Added Domain "${label}" to Life Map. Generated Domain ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_domain', nodeId: id })}`);
         }
       } else if (call.name === 'add_project') {
         const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
         for (const label of labelsToAdd) {
             const id = await useLifeMapStore.getState().addProject(args.parent_id, label);
-            executionMessage += `✓ Added Project "${label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}\n`;
+            executionMessages.push(`✓ Added Project "${label}" under parent ID "${args.parent_id}". Generated Project ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_project', nodeId: id })}`);
         }
       } else if (call.name === 'add_milestone') {
         const labelsToAdd = args.labels && args.labels.length > 0 ? args.labels : (args.label ? [args.label] : []);
         for (const label of labelsToAdd) {
             const id = await useLifeMapStore.getState().addMilestone(args.parent_id, label);
-            executionMessage += `✓ Added Milestone "${label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}\n`;
+            executionMessages.push(`✓ Added Milestone "${label}" under parent ID "${args.parent_id}". Generated Milestone ID: "${id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_milestone', nodeId: id })}`);
         }
       } else if (call.name === 'add_task_to_node') {
         const textsToAdd = args.texts && args.texts.length > 0 ? args.texts : (args.text ? [args.text] : []);
         for (const text of textsToAdd) {
             await useLifeMapStore.getState().addTaskToNode(args.node_id, text);
-            executionMessage += `✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}\n`;
+            executionMessages.push(`✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}`);
         }
       } else if (call.name === 'add_inbox_item') {
         await useLifeMapStore.getState().addInboxItem(args.text);
-        executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
+        executionMessages.push(`✓ Saved thought "${args.text}" to Inbox.`);
       } else if (call.name === 'add_resource_to_node') {
         const id = `res-${Date.now()}`;
         await useLifeMapStore.getState().addResource(args.node_id, {
@@ -546,37 +546,39 @@ async function executeLifeMapAgent(
           url: args.url,
           type: args.type
         });
-        executionMessage = `✓ Added resource reference "${args.title}" to Milestone ID "${args.node_id}".`;
+        executionMessages.push(`✓ Added resource reference "${args.title}" to Milestone ID "${args.node_id}".`);
       } else if (call.name === 'delete_node') {
         await useLifeMapStore.getState().deleteNodeImmediately(args.node_id);
-        executionMessage = `✓ Deleted node ID "${args.node_id}".`;
+        executionMessages.push(`✓ Deleted node ID "${args.node_id}".`);
       } else if (call.name === 'move_node') {
         await useLifeMapStore.getState().moveNode(args.node_id, args.new_parent_id);
-        executionMessage = `✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`;
+        executionMessages.push(`✓ Moved node ID "${args.node_id}" to new parent ID "${args.new_parent_id}".`);
       } else if (call.name === 'rename_node') {
         await useLifeMapStore.getState().renameNode(args.node_id, args.label);
-        executionMessage = `✓ Renamed node ID "${args.node_id}" to "${args.label}".`;
+        executionMessages.push(`✓ Renamed node ID "${args.node_id}" to "${args.label}".`);
       } else if (call.name === 'change_node_type') {
         await useLifeMapStore.getState().changeNodeType(args.node_id, args.type);
-        executionMessage = `✓ Changed type of node ID "${args.node_id}" to "${args.type}".`;
+        executionMessages.push(`✓ Changed type of node ID "${args.node_id}" to "${args.type}".`);
       } else if (call.name === 'add_reminder') {
         const parsedDue = parseReminderDueDate(args.dueDate);
         await useRemindersStore.getState().addReminder(args.text, args.category || 'General', parsedDue);
-        executionMessage = `✓ Created reminder "${args.text}" (Category: "${args.category || 'General'}"${args.dueDate ? `, Due: ${args.dueDate}` : ''}).`;
+        executionMessages.push(`✓ Created reminder "${args.text}" (Category: "${args.category || 'General'}"${args.dueDate ? `, Due: ${args.dueDate}` : ''}).`);
       } else if (call.name === 'update_user_fact') {
         await useProfileStore.getState().updateFact(args.key, args.value);
-        executionMessage = `✓ Updated user profile fact "${args.key}" to "${args.value}".`;
+        executionMessages.push(`✓ Updated user profile fact "${args.key}" to "${args.value}".`);
       } else if (call.name === 'update_node_description') {
         await useLifeMapStore.getState().updateNode(args.node_id, { description: args.description });
-        executionMessage = `✓ Updated description for node ID "${args.node_id}".`;
+        executionMessages.push(`✓ Updated description for node ID "${args.node_id}".`);
       }
 
-      statusLog.push(executionMessage);
+      for (const msg of executionMessages) {
+          statusLog.push(msg);
+      }
 
       functionResponses.push({
         functionResponse: {
           name: call.name,
-          response: { result: executionMessage }
+          response: { result: executionMessages.join('\n') }
         }
       });
     }
