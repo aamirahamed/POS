@@ -303,6 +303,9 @@ export const useLifeMapStore = create<LifeMapState>()(
                 edges: initEdges,
                 inbox: [],
 
+                focusedProjectId: null,
+                setFocusedProject: (id) => set({ focusedProjectId: id }),
+
                 selectedExecutionNodeId: null,
                 setSelectedExecutionNodeId: (id) => set({ selectedExecutionNodeId: id }),
 

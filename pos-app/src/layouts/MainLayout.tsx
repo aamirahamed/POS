@@ -87,7 +87,7 @@ const SidebarNav: FC<SidebarNavProps> = ({ onClose, showClose }) => (
 const MainLayout: FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const location = useLocation();
-    const { setCommandCenterOpen } = useLifeMapStore();
+    const { setCommandCenterOpen, focusedProjectId } = useLifeMapStore();
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -102,13 +102,17 @@ const MainLayout: FC = () => {
         return () => window.removeEventListener('keydown', handler);
     }, []);
 
+    const isFocused = !!focusedProjectId;
+
     return (
         <div className="flex h-screen w-full bg-background text-text-primary overflow-hidden">
 
             {/* ── Desktop Sidebar (md+) ── */}
-            <aside className="hidden md:flex w-64 border-r border-border/80 bg-surface flex-col p-4 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] z-10 shrink-0">
-                <SidebarNav />
-            </aside>
+            {!isFocused && (
+                <aside className="hidden md:flex w-64 border-r border-border/80 bg-surface flex-col p-4 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.5)] z-10 shrink-0">
+                    <SidebarNav />
+                </aside>
+            )}
 
             {/* ── Mobile Drawer Overlay ── */}
             <AnimatePresence>

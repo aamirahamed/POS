@@ -52,11 +52,14 @@ export interface LifeMapState {
     nodes: LifeMapNode[];
     edges: Edge[];
     inbox: InboxItem[];
+    focusedProjectId: string | null;
+    
     addNode: (node: LifeMapNode) => void;
     updateNode: (id: string, data: Partial<LifeMapNode['data']>) => void;
     deleteNode: (id: string) => void;
     setNodes: (nodes: LifeMapNode[]) => void;
     setEdges: (edges: Edge[]) => void;
+    setFocusedProject: (id: string | null) => void;
 
     // Drawer State
     selectedExecutionNodeId: string | null;

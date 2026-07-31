@@ -94,10 +94,16 @@ export async function compileUnifiedContext(): Promise<UnifiedContext> {
         }
     }
 
+    const { focusedProjectId } = useLifeMapStore.getState();
+    const focusedProject = focusedProjectId ? nodes.find(n => n.id === focusedProjectId) : null;
+    const focusContextString = focusedProject 
+        ? `\n> [!IMPORTANT]\n> CURRENT CONTEXT: The user is currently in **FOCUS MODE** on Project: "${focusedProject.data.label}" (ID: "${focusedProject.id}"). Unless explicitly stated otherwise, assume all tasks, milestones, and questions relate to this project.\n`
+        : "";
+
     // Render markdown block
     const markdown = `
 # AAMIR'S PROFILE CONTEXT (UNIFIED BRAN STATE)
-
+${focusContextString}
 ## 1. STRATEGIC MEMO (MENTOR.md)
 ${mentorMemo || "No static strategy memo configured."}
 

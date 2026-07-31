@@ -1,11 +1,13 @@
 import { FC, useState, useEffect, useRef } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { useAgentStore } from '@/store/useAgentStore';
-import { X, ArrowRight, Bot, User, Loader2, Trash2 } from 'lucide-react';
+import { X, ArrowRight, Bot, User, Loader2, Trash2, Target } from 'lucide-react';
 import { AgentMessage } from './AgentMessage';
 
 const CommandCenter: FC = () => {
-    const { isCommandCenterOpen, setCommandCenterOpen } = useLifeMapStore();
+    const { isCommandCenterOpen, setCommandCenterOpen, nodes, focusedProjectId, setFocusedProject } = useLifeMapStore();
+    
+    const focusedProject = focusedProjectId ? nodes.find(n => n.id === focusedProjectId) : null;
     
     // We bind to our multi-agent store instead of local history now
     const {
@@ -149,7 +151,20 @@ const CommandCenter: FC = () => {
                 </div>
 
                 {/* Input Area */}
-                <form onSubmit={handleSubmit} className="shrink-0 p-5 bg-surface/50 border-t border-white/5 relative">
+                <div className="shrink-0 p-5 bg-surface/50 border-t border-white/5 relative flex flex-col gap-3">
+                    {focusedProject && (
+                        <div className="flex items-center self-start gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold shadow-sm animate-in slide-in-from-bottom-2">
+                            <Target size={14} className="text-indigo-400" />
+                            Focused on {focusedProject.data.label || 'Project'}
+                            <button 
+                                onClick={() => setFocusedProject(null)}
+                                className="ml-1 hover:text-white transition-colors"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+                    <form onSubmit={handleSubmit} className="relative w-full">
                     <div className="relative flex items-center">
                         <input
                             ref={inputRef}
@@ -170,7 +185,8 @@ const CommandCenter: FC = () => {
                             <ArrowRight size={18} />
                         </button>
                     </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     );

@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { LifeMapNode } from '@/types/lifemap';
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, Maximize2 } from 'lucide-react';
 import MilestoneRow from './MilestoneRow';
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 }
 
 const ProjectRow = ({ project }: Props) => {
-    const { nodes, addMilestone, updateNode, deleteNode, toggleNodeExpansion } = useLifeMapStore();
+    const { nodes, addMilestone, updateNode, deleteNode, toggleNodeExpansion, setFocusedProject } = useLifeMapStore();
     const [showStateMenu, setShowStateMenu] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState('');
@@ -18,6 +18,8 @@ const ProjectRow = ({ project }: Props) => {
     const isExpanded = data.expanded !== false; // Default to true if undefined
     const status = (data.status as string) || 'active';
     const hue = (data.hue as number) || 210;
+
+
 
     // Get children
     const milestones = nodes
@@ -165,6 +167,16 @@ const ProjectRow = ({ project }: Props) => {
                         </div>
                         
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFocusedProject(project.id);
+                                }}
+                                className="p-1.5 rounded-md hover:bg-white/10 text-text-secondary hover:text-indigo-400 transition-colors"
+                                title="Focus Mode"
+                            >
+                                <Maximize2 size={16} />
+                            </button>
                             <button
                                 onClick={() => addMilestone(project.id, "")}
                                 className="p-1.5 rounded-md hover:bg-white/10 text-text-secondary hover:text-text-primary transition-colors"

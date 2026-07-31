@@ -5,13 +5,16 @@ import { CheckCircle, Circle, Trash2, ChevronDown, ChevronRight, Square, CheckSq
 
 interface Props {
     milestone: LifeMapNode;
+    forceExpanded?: boolean;
 }
 
-const MilestoneRow = ({ milestone }: Props) => {
+const MilestoneRow = ({ milestone, forceExpanded }: Props) => {
     const { setSelectedExecutionNodeId, deleteNode, updateNode, toggleNodeTask, addTaskToNode, editTaskInNode } = useLifeMapStore();
-    const [isTasksExpanded, setIsTasksExpanded] = useState(false);
+    const [isTasksExpandedState, setIsTasksExpanded] = useState(false);
     const [isAddingTask, setIsAddingTask] = useState(false);
     const [newTaskText, setNewTaskText] = useState('');
+
+    const isTasksExpanded = forceExpanded || isTasksExpandedState;
     
     // Editing states
     const [isEditingTitle, setIsEditingTitle] = useState(false);

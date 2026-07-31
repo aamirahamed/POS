@@ -20,6 +20,7 @@ import ProjectNode from './nodes/ProjectNode';
 import MilestoneNode from './nodes/MilestoneNode';
 import ExecutionNodeDrawer from './components/ExecutionNodeDrawer';
 import DomainsView from './components/DomainsView';
+import FocusModeView from './components/FocusModeView';
 import { Layers, Map as MapIcon } from 'lucide-react';
 
 const nodeTypes: NodeTypes = {
@@ -44,7 +45,8 @@ const LifeMap: FC = () => {
         setNodeToDelete,
         loadFromDB,
         collapseAll,
-        expandAll
+        expandAll,
+        focusedProjectId
     } = useLifeMapStore();
 
     // Sync state
@@ -178,7 +180,9 @@ const LifeMap: FC = () => {
                 </button>
             </div>
 
-            {activeView === 'map' ? (
+            {focusedProjectId ? (
+                <FocusModeView />
+            ) : activeView === 'map' ? (
                 <ReactFlow
                 nodes={nodes}
                 edges={styledEdges}
