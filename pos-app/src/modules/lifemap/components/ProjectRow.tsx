@@ -166,7 +166,7 @@ const ProjectRow = ({ project }: Props) => {
                             className="ml-2 px-3 py-1 bg-indigo-500 hover:bg-indigo-600 text-white text-[10px] uppercase font-bold tracking-widest rounded-full flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 shrink-0"
                         >
                             <Target size={12} />
-                            Focus Mode
+                            Lock In
                         </button>
                     </div>
 
