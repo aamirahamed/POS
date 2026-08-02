@@ -516,6 +516,23 @@ async function executeLifeMapAgent(
   while (iterations < maxIterations) {
     const calls = currentResult.response.functionCalls();
     if (!calls || calls.length === 0) {
+      let text = "";
+      try {
+        text = currentResult.response.text();
+      } catch (e) {
+        // text() can throw if parts are empty
+      }
+      
+      if (!text.trim() && iterations === 0) {
+        // Model returned empty response and no tools. Retry once.
+        if (currentResult.response.candidates && currentResult.response.candidates[0]) {
+          contents.push(currentResult.response.candidates[0].content);
+        }
+        contents.push({ role: "user", parts: [{ text: "You returned an empty response with no tool calls. Please execute a tool or provide a text reply." }] });
+        currentResult = await lifemapAgent.generateContent({ contents });
+        iterations++;
+        continue;
+      }
       break;
     }
 
