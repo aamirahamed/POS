@@ -6,7 +6,17 @@ import {
   ListToolsRequestSchema,
   GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { fetchLifeMap, createProject, createMilestone, addTaskToNode } from './lifemapService.js';
+import { 
+  fetchLifeMap, 
+  createProject, 
+  createMilestone, 
+  addTaskToNode,
+  createDomain,
+  updateNode,
+  updateTask,
+  deleteNode,
+  deleteTask
+} from './lifemapService.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -55,16 +65,17 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
         role: "user",
         content: {
           type: "text",
-          text: `You are connected to Aamir's Personal Operating System (POS). You can read his Life Map and create projects, milestones, or add tasks.
+          text: `You are connected to Aamir's Personal Operating System (POS). You have FULL CRUD capabilities over his Life Map.
 
 CRITICAL RULES:
 1. The Life Map hierarchy is strictly: Domain -> Project -> Milestone -> Tasks.
 2. Tasks CANNOT be added directly to Domains or Projects. They MUST go inside a Milestone.
-3. If you have action items to save, first check the state of the Life Map using get_lifemap_state.
-4. If a relevant Milestone exists, add your tasks to it using add_task_to_node.
-5. If no relevant Milestone exists, but a relevant Project exists, use create_milestone to create one, then add tasks to the new milestone ID.
-6. If no relevant Project exists, use create_project first, then create a milestone, then add tasks.
-7. Be intelligent in your categorization. If you are generating software requirements, put them under the relevant software project.`
+3. If you are planning a completely new software or major initiative, you can use create_domain to start from scratch.
+4. If a relevant Domain exists but no Project, use create_project.
+5. If a relevant Project exists but no Milestone, use create_milestone.
+6. Use add_task_to_node to add action items.
+7. As the project evolves, you can use update_node and update_task to rename items, change statuses, or mark tasks as completed.
+8. If a node or task is no longer relevant, you can use delete_node or delete_task. (Be careful with delete_node as it recursively deletes all children).`
         }
       }
     ]
@@ -121,6 +132,67 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             task_text: { type: "string", description: "The text of the task to add." }
           },
           required: ["node_id", "task_text"]
+        }
+      },
+      {
+        name: "create_domain",
+        description: "Creates a new top-level Domain.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            label: { type: "string", description: "The name of the new domain." }
+          },
+          required: ["label"]
+        }
+      },
+      {
+        name: "update_node",
+        description: "Updates the label or status of an existing Domain, Project, or Milestone.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            label: { type: "string", description: "Optional new name for the node." },
+            status: { type: "string", description: "Optional new status (e.g. active, completed, backlog)." }
+          },
+          required: ["node_id"]
+        }
+      },
+      {
+        name: "update_task",
+        description: "Updates the text or completion status of an existing task.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string", description: "The ID of the milestone containing the task." },
+            task_id: { type: "string", description: "The ID of the task to update." },
+            text: { type: "string", description: "Optional new text for the task." },
+            completed: { type: "boolean", description: "Optional boolean to mark task as completed or incomplete." }
+          },
+          required: ["node_id", "task_id"]
+        }
+      },
+      {
+        name: "delete_node",
+        description: "Recursively deletes a node and all of its children.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" }
+          },
+          required: ["node_id"]
+        }
+      },
+      {
+        name: "delete_task",
+        description: "Deletes a specific task from a milestone.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            task_id: { type: "string" }
+          },
+          required: ["node_id", "task_id"]
         }
       }
     ]
@@ -192,6 +264,52 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       await addTaskToNode(node_id, task_text);
       return {
         content: [{ type: "text", text: `Successfully added task to milestone ${node_id}` }]
+      };
+    }
+
+    if (name === "create_domain") {
+      const label = String(args?.label);
+      const id = await createDomain(label);
+      return {
+        content: [{ type: "text", text: `Successfully created domain "${label}" with ID: ${id}` }]
+      };
+    }
+
+    if (name === "update_node") {
+      const node_id = String(args?.node_id);
+      const label = args?.label ? String(args.label) : undefined;
+      const status = args?.status ? String(args.status) : undefined;
+      await updateNode(node_id, label, status);
+      return {
+        content: [{ type: "text", text: `Successfully updated node ${node_id}` }]
+      };
+    }
+
+    if (name === "update_task") {
+      const node_id = String(args?.node_id);
+      const task_id = String(args?.task_id);
+      const text = args?.text ? String(args.text) : undefined;
+      const completed = args?.completed !== undefined ? Boolean(args.completed) : undefined;
+      await updateTask(node_id, task_id, text, completed);
+      return {
+        content: [{ type: "text", text: `Successfully updated task ${task_id}` }]
+      };
+    }
+
+    if (name === "delete_node") {
+      const node_id = String(args?.node_id);
+      await deleteNode(node_id);
+      return {
+        content: [{ type: "text", text: `Successfully deleted node ${node_id} and its children` }]
+      };
+    }
+
+    if (name === "delete_task") {
+      const node_id = String(args?.node_id);
+      const task_id = String(args?.task_id);
+      await deleteTask(node_id, task_id);
+      return {
+        content: [{ type: "text", text: `Successfully deleted task ${task_id}` }]
       };
     }
 
