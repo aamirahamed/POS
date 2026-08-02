@@ -228,7 +228,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 id: m.id,
                 label: m.data.label,
                 type: 'milestone',
-                tasks: m.data.tasks?.map((t: any) => t.text) || []
+                tasks: m.data.tasks?.map((t: any) => ({ id: t.id, text: t.text, completed: t.completed })) || []
               }))
             };
           })
