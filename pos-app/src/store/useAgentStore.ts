@@ -71,10 +71,19 @@ export const useAgentStore = create<AgentState>()(
             (status) => set({ currentStatus: status })
           );
 
+          let finalText = response.text;
+          const hasSuccessfulLogs = response.statusLog && response.statusLog.some(log => log.startsWith('✓'));
+          
+          if (!finalText && !hasSuccessfulLogs) {
+              finalText = "I've received your request, but I'm not exactly sure what action to take. Could you provide a bit more detail?";
+          } else if (!finalText && hasSuccessfulLogs) {
+              finalText = "Done!";
+          }
+
           const assistantMsg: ChatMessage = {
             id: `msg-agent-${Date.now()}`,
             role: 'assistant',
-            text: response.text,
+            text: finalText,
             statusLog: response.statusLog,
             timestamp: Date.now()
           };
