@@ -155,7 +155,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               milestones: pMilestones.map(m => ({
                 id: m.id,
                 label: m.data.label,
-                type: 'milestone'
+                type: 'milestone',
+                tasks: m.data.tasks?.map((t: any) => t.text) || []
               }))
             };
           })
