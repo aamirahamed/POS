@@ -24,7 +24,7 @@ const FocusModeView = () => {
 
     // Calculate progress across all milestones in this project
     const allTasks = milestones.flatMap(m => (m.data.tasks as any[]) || []);
-    const completedTasksCount = allTasks.filter(t => t.completed).length;
+    const completedTasksCount = allTasks.filter(t => t.completed || t.status === 'done').length;
     const totalTasksCount = allTasks.length;
     const progressPercentage = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 

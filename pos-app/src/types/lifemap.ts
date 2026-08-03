@@ -2,6 +2,21 @@ import { Node, Edge } from '@xyflow/react';
 
 export type NodeType = 'center' | 'domain' | 'project' | 'milestone';
 
+export type LifeMapStatus = 'not_started' | 'in_progress' | 'blocked' | 'parked' | 'done' | 'dropped';
+
+export interface LifeMapTask {
+    id: string;
+    text: string;
+    completed: boolean; // Retained for backward compatibility
+    status?: LifeMapStatus;
+    type?: 'task' | 'decision' | 'idea' | 'bug';
+    owner?: 'me' | 'claude';
+    position?: number;
+    createdAt?: number;
+    updatedAt?: number;
+    completedAt?: number | null;
+}
+
 export type ResourceType = 'youtube' | 'article' | 'attachment' | 'link';
 
 export interface Resource {
@@ -26,18 +41,23 @@ export interface LifeMapNode extends Node {
     data: {
         label: string;
         description?: string;
-        status?: 'active' | 'paused' | 'completed' | 'archived' | 'backlog';
+        status?: LifeMapStatus | 'active' | 'paused' | 'completed' | 'archived' | 'backlog';
+        manual_status_override?: LifeMapStatus;
         expanded?: boolean;
         parentId?: string;
         editing?: boolean;
         hue?: number;
-        tasks?: { id: string; text: string; completed: boolean; createdAt?: number }[]; // Action items
+        tasks?: LifeMapTask[]; // Action items
         priority?: 'low' | 'medium' | 'high';
         notes?: string;
         contextRich?: string;
         canvases?: ContextCanvas[];
         resources?: Resource[];
         lastUpdated?: number;
+        createdAt?: number;
+        updatedAt?: number;
+        completedAt?: number | null;
+        position?: number;
         streak?: number;
     };
 }

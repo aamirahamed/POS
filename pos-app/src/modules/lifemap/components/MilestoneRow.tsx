@@ -23,11 +23,11 @@ const MilestoneRow = ({ milestone, forceExpanded }: Props) => {
     const [editingTaskText, setEditingTaskText] = useState('');
 
     const data = milestone.data;
-    const isCompleted = data.status === 'completed';
-    const tasks = (data.tasks as { id: string; text: string; completed: boolean }[]) || [];
+    const isCompleted = data.status === 'completed' || data.status === 'done';
+    const tasks = (data.tasks as any[]) || [];
     const priority = (data.priority as string) || 'medium';
 
-    const completedTasksCount = tasks.filter(t => t.completed).length;
+    const completedTasksCount = tasks.filter(t => t.completed || t.status === 'done').length;
     const totalTasksCount = tasks.length;
     const progressPercentage = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 
@@ -39,8 +39,8 @@ const MilestoneRow = ({ milestone, forceExpanded }: Props) => {
 
     const toggleStatus = (e: React.MouseEvent) => {
         e.stopPropagation();
-        const newStatus = isCompleted ? 'active' : 'completed';
-        updateNode(milestone.id, { status: newStatus as LifeMapNode['data']['status'], lastUpdated: Date.now() });
+        const newStatus = isCompleted ? 'in_progress' : 'done';
+        updateNode(milestone.id, { status: newStatus as any, lastUpdated: Date.now() });
     };
 
     const handleDelete = (e: React.MouseEvent) => {
@@ -189,9 +189,9 @@ const MilestoneRow = ({ milestone, forceExpanded }: Props) => {
                         <div key={task.id} className="flex items-start gap-3 group/task">
                             <button
                                 onClick={() => toggleNodeTask(milestone.id, task.id)}
-                                className={`mt-0.5 flex-shrink-0 transition-colors ${task.completed ? 'text-green-500/70' : 'text-text-secondary hover:text-green-400/80'}`}
+                                className={`mt-0.5 flex-shrink-0 transition-colors ${task.completed || task.status === 'done' ? 'text-green-500/70' : 'text-text-secondary hover:text-green-400/80'}`}
                             >
-                                {task.completed ? <CheckSquare size={13} /> : <Square size={13} />}
+                                {task.completed || task.status === 'done' ? <CheckSquare size={13} /> : <Square size={13} />}
                             </button>
                             {editingTaskId === task.id ? (
                                 <input
@@ -224,7 +224,7 @@ const MilestoneRow = ({ milestone, forceExpanded }: Props) => {
                                         setEditingTaskText(task.text);
                                         setEditingTaskId(task.id);
                                     }}
-                                    className={`text-[13px] leading-relaxed ${task.completed ? 'text-text-secondary line-through' : 'text-text-secondary hover:text-text-primary transition-colors cursor-text'}`}
+                                    className={`text-[13px] leading-relaxed ${task.completed || task.status === 'done' ? 'text-text-secondary line-through' : 'text-text-secondary hover:text-text-primary transition-colors cursor-text'}`}
                                 >
                                     {task.text}
                                 </span>

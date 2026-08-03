@@ -82,15 +82,7 @@ const initialEdges = [
 ];
 
 export const migrateNodesAndEdges = (nodes: any[], edges: any[]): { nodes: LifeMapNode[], edges: any[] } => {
-    // Check if migration is needed (checks for presence of 'thread' or old types)
-    const hasThread = nodes.some(n => n.type === 'thread');
-    const hasOldTypes = nodes.some(n => n.type === 'pillar' || n.type === 'initiative' || n.type === 'subnode');
-
-    if (!hasThread && !hasOldTypes) {
-        return { nodes: nodes as LifeMapNode[], edges };
-    }
-
-    console.log("Migrating Life Map data to 4-level PM Standard structure...");
+    console.log("Migrating Life Map data...");
 
     const parentMap: Record<string, string> = {};
     const typeMap: Record<string, string> = {};
@@ -111,7 +103,29 @@ export const migrateNodesAndEdges = (nodes: any[], edges: any[]): { nodes: LifeM
         return parentId;
     };
 
-    // Filter out threads and update type names + parentIds
+    const parseCreatedAt = (id: string) => {
+        if (!id) return null;
+        const parts = id.split('-');
+        const lastPart = parts[parts.length - 1];
+        const num = parseInt(lastPart, 10);
+        if (!isNaN(num) && num > 1000000000000) return num;
+        return null;
+    };
+
+    const mapNodeStatus = (oldStatus?: string) => {
+        if (!oldStatus) return undefined;
+        if (oldStatus === 'active') return 'in_progress';
+        if (oldStatus === 'completed') return 'done';
+        if (oldStatus === 'backlog') return 'not_started';
+        if (oldStatus === 'paused' || oldStatus === 'archived') return 'parked';
+        // retain valid statuses
+        if (['not_started', 'in_progress', 'blocked', 'parked', 'done', 'dropped'].includes(oldStatus)) {
+            return oldStatus;
+        }
+        return undefined;
+    };
+
+    // Filter out threads and update type names + parentIds + new schemas
     const migratedNodes = nodes
         .filter(n => n.type !== 'thread')
         .map(n => {
@@ -123,13 +137,29 @@ export const migrateNodesAndEdges = (nodes: any[], edges: any[]): { nodes: LifeM
 
             const parentId = n.data?.parentId || '';
             const newParentId = getNewParent(parentId);
+            
+            const createdAt = n.data?.createdAt || parseCreatedAt(n.id) || null;
+            const updatedAt = n.data?.updatedAt || createdAt;
+
+            const migratedTasks = (n.data?.tasks || []).map((t: any) => ({
+                ...t,
+                status: t.status || (t.completed ? 'done' : 'not_started'),
+                type: t.type || 'task',
+                owner: t.owner || 'me',
+                createdAt: t.createdAt || parseCreatedAt(t.id) || null,
+                updatedAt: t.updatedAt || t.createdAt || null,
+            }));
 
             return {
                 ...n,
                 type: newType,
                 data: {
                     ...n.data,
-                    parentId: newParentId
+                    parentId: newParentId,
+                    status: mapNodeStatus(n.data?.status),
+                    createdAt,
+                    updatedAt,
+                    tasks: migratedTasks
                 }
             };
         });
@@ -518,9 +548,20 @@ export const useLifeMapStore = create<LifeMapState>()(
                                 ...node,
                                 data: {
                                     ...node.data,
-                                    tasks: node.data.tasks.map(t =>
-                                        t.id === taskId ? { ...t, completed: !t.completed } : t
-                                    )
+                                    tasks: node.data.tasks.map(t => {
+                                        if (t.id === taskId) {
+                                            const wasCompleted = t.completed || t.status === 'done';
+                                            const isNowCompleted = !wasCompleted;
+                                            return { 
+                                                ...t, 
+                                                completed: isNowCompleted,
+                                                status: (isNowCompleted ? 'done' : 'not_started') as any,
+                                                updatedAt: Date.now(),
+                                                completedAt: isNowCompleted ? Date.now() : null
+                                            };
+                                        }
+                                        return t;
+                                    })
                                 }
                             };
                         }

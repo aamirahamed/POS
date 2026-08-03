@@ -25,8 +25,8 @@ const ProjectRow = ({ project }: Props) => {
     const milestones = nodes
         .filter(n => n.data.parentId === project.id && n.type === 'milestone')
         .sort((a, b) => {
-            const aCompleted = a.data.status === 'completed';
-            const bCompleted = b.data.status === 'completed';
+            const aCompleted = a.data.status === 'completed' || a.data.status === 'done';
+            const bCompleted = b.data.status === 'completed' || b.data.status === 'done';
             
             if (aCompleted && !bCompleted) return 1;
             if (!aCompleted && bCompleted) return -1;
@@ -38,9 +38,9 @@ const ProjectRow = ({ project }: Props) => {
     let totalTasks = 0;
     let completedTasks = 0;
     milestones.forEach(m => {
-        const mTasks = (m.data.tasks as { completed: boolean }[]) || [];
+        const mTasks = (m.data.tasks as any[]) || [];
         totalTasks += mTasks.length;
-        completedTasks += mTasks.filter(t => t.completed).length;
+        completedTasks += mTasks.filter(t => t.completed || t.status === 'done').length;
     });
     const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -51,16 +51,28 @@ const ProjectRow = ({ project }: Props) => {
 
     const stateColors: any = {
         active: `text-[hsl(${hue},80%,60%)] bg-[hsl(${hue},80%,60%)]/10 border-[hsl(${hue},80%,60%)]/30`,
+        in_progress: `text-[hsl(${hue},80%,60%)] bg-[hsl(${hue},80%,60%)]/10 border-[hsl(${hue},80%,60%)]/30`,
         backlog: 'text-gray-400 bg-gray-400/10 border-gray-400/30',
+        not_started: 'text-gray-400 bg-gray-400/10 border-gray-400/30',
         paused: 'text-orange-400 bg-orange-400/10 border-orange-400/30',
-        completed: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30'
+        parked: 'text-orange-400 bg-orange-400/10 border-orange-400/30',
+        blocked: 'text-red-400 bg-red-400/10 border-red-400/30',
+        completed: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30',
+        done: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30',
+        dropped: 'text-stone-500 bg-stone-500/10 border-stone-500/30'
     };
 
     const stateIcons: any = {
         active: '🟢',
+        in_progress: '🟢',
         backlog: '⚪',
-        paused: '⏸',
-        completed: '✓'
+        not_started: '⚪',
+        paused: '⏸️',
+        parked: '⏸️',
+        blocked: '🛑',
+        completed: '✓',
+        done: '✓',
+        dropped: '⨯'
     };
 
     let stripeColor = `hsl(${hue}, 80%, 60%)`;
@@ -74,8 +86,8 @@ const ProjectRow = ({ project }: Props) => {
         stripeColor = `hsl(0, 0%, 40%)`;
         opacity = 0.7;
         filter = 'grayscale(30%)';
-    } else if (status === 'completed') {
-        stripeColor = `hsl(${hue}, 20%, 30%)`;
+    } else if (status === 'completed' || status === 'done') {
+        stripeColor = 'transparent'; // No glow when done
         opacity = 0.5;
     }
 
@@ -127,7 +139,7 @@ const ProjectRow = ({ project }: Props) => {
                                     setEditingTitle(data.label as string);
                                     setIsEditingTitle(true);
                                 }}
-                                className={`text-base font-bold truncate ${status === 'completed' ? 'line-through text-text-secondary' : 'text-text-primary cursor-text'}`}
+                                className={`text-base font-bold truncate ${status === 'completed' || status === 'done' ? 'line-through text-text-secondary' : 'text-text-primary cursor-text'}`}
                             >
                                 {data.label as string}
                             </span>

@@ -57,7 +57,7 @@ const ExecutionNodeDrawer: FC = () => {
     const hue = (data.hue as number) || 210;
     const lastUpdated = data.lastUpdated as number || Date.now();
 
-    const completedTasksCount = tasks.filter(t => t.completed).length;
+    const completedTasksCount = tasks.filter(t => t.completed || t.status === 'done').length;
     const totalTasksCount = tasks.length;
     const progressPercentage = totalTasksCount > 0 ? Math.round((completedTasksCount / totalTasksCount) * 100) : 0;
 
@@ -151,7 +151,7 @@ const ExecutionNodeDrawer: FC = () => {
                 <div className="relative z-10 flex items-start justify-between">
                     <div>
                         <div className="flex items-center gap-2 mb-3 text-[10px] uppercase font-bold tracking-widest">
-                            <span className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${status === 'active' ? 'bg-green-500 animate-pulse' : status === 'completed' ? 'bg-indigo-500' : 'bg-gray-500'}`} /> {status}</span>
+                            <span className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${status === 'active' || status === 'in_progress' ? 'bg-green-500 animate-pulse' : status === 'completed' || status === 'done' ? 'bg-indigo-500' : 'bg-gray-500'}`} /> {status}</span>
                             <span className="text-white/20">•</span>
                             <span className={`px-2 py-0.5 rounded border ${priorityColor}`}>{priority}</span>
                         </div>
@@ -181,7 +181,7 @@ const ExecutionNodeDrawer: FC = () => {
                     <Button variant="secondary" size="sm" onClick={() => setStatus('active')} className={`h-8 text-xs ${status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
                         <Play size={12} className="mr-1.5" /> Resume
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setStatus('completed')} className={`h-8 text-xs ${status === 'completed' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
+                    <Button variant="secondary" size="sm" onClick={() => setStatus('done')} className={`h-8 text-xs ${status === 'completed' || status === 'done' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
                         <CheckCircle size={12} className="mr-1.5" /> Done
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => setStatus('paused')} className={`h-8 text-xs ${status === 'paused' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
@@ -207,10 +207,10 @@ const ExecutionNodeDrawer: FC = () => {
                         {tasks.length > 0 ? tasks.map(task => (
                             <div key={task.id} className="flex items-start gap-3 p-2.5 rounded-lg hover:bg-white/5 group transition-all">
                                 <div 
-                                    className={`mt-0.5 flex-shrink-0 transition-colors cursor-pointer ${task.completed ? 'text-green-500' : 'text-text-secondary group-hover:text-blue-400'}`}
+                                    className={`mt-0.5 flex-shrink-0 transition-colors cursor-pointer ${task.completed || task.status === 'done' ? 'text-green-500' : 'text-text-secondary group-hover:text-blue-400'}`}
                                     onClick={() => toggleNodeTask(node.id, task.id)}
                                 >
-                                    {task.completed ? <CheckCircle size={16} /> : <Circle size={16} />}
+                                    {task.completed || task.status === 'done' ? <CheckCircle size={16} /> : <Circle size={16} />}
                                 </div>
                                 
                                 {editingTaskId === task.id ? (
@@ -237,7 +237,7 @@ const ExecutionNodeDrawer: FC = () => {
                                     </div>
                                 ) : (
                                     <span 
-                                        className={`text-sm flex-1 font-medium leading-snug cursor-pointer ${task.completed ? 'line-through text-text-secondary opacity-60' : 'text-text-primary opacity-90'}`}
+                                        className={`text-sm flex-1 font-medium leading-snug cursor-pointer ${task.completed || task.status === 'done' ? 'line-through text-text-secondary opacity-60' : 'text-text-primary opacity-90'}`}
                                         onClick={() => toggleNodeTask(node.id, task.id)}
                                     >
                                         {task.text}

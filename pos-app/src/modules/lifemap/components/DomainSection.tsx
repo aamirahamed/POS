@@ -28,14 +28,14 @@ const DomainSection = ({ domain }: Props) => {
     let activeProjects = 0;
 
     projects.forEach(p => {
-        if (p.data.status !== 'completed' && p.data.status !== 'paused') {
+        if (p.data.status !== 'completed' && p.data.status !== 'done' && p.data.status !== 'paused' && p.data.status !== 'parked') {
             activeProjects++;
         }
         const milestones = nodes.filter(n => n.data.parentId === p.id && n.type === 'milestone');
         milestones.forEach(m => {
-            const mTasks = (m.data.tasks as { completed: boolean }[]) || [];
+            const mTasks = (m.data.tasks as any[]) || [];
             totalTasks += mTasks.length;
-            completedTasks += mTasks.filter(t => t.completed).length;
+            completedTasks += mTasks.filter(t => t.completed || t.status === 'done').length;
         });
     });
 
