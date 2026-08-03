@@ -533,3 +533,37 @@ export const applyTemplate = async (templateName: string, label: string, parentI
     }
     throw new Error(`Unknown template: ${templateName}`);
 };
+
+export const addRelation = async (sourceId: string, targetId: string, relationType: string) => {
+    const { error } = await supabase
+        .from('lifemap_relations')
+        .insert([{
+            user_id: MCP_USER_ID,
+            source_id: sourceId,
+            target_id: targetId,
+            relation_type: relationType
+        }]);
+    
+    if (error) {
+        if (error.code === '23505') return; // Unique constraint violation, already exists
+        throw new Error(`Failed to add relation: ${error.message}`);
+    }
+    await logActivity(sourceId, null, 'claude', 'relation_added', `Added ${relationType} relation to ${targetId}`);
+};
+
+export const removeRelation = async (sourceId: string, targetId: string, relationType?: string) => {
+    let query = supabase
+        .from('lifemap_relations')
+        .delete()
+        .eq('user_id', MCP_USER_ID)
+        .eq('source_id', sourceId)
+        .eq('target_id', targetId);
+    
+    if (relationType) {
+        query = query.eq('relation_type', relationType);
+    }
+
+    const { error } = await query;
+    if (error) throw new Error(`Failed to remove relation: ${error.message}`);
+    await logActivity(sourceId, null, 'claude', 'relation_removed', `Removed relation to ${targetId}`);
+};

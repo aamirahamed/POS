@@ -133,16 +133,23 @@ const ProjectRow = ({ project }: Props) => {
                                 className="bg-black/40 border border-white/20 rounded px-2 py-0.5 text-base font-bold text-text-primary focus:outline-none w-48"
                             />
                         ) : (
-                            <span 
-                                onDoubleClick={(e) => {
-                                    e.stopPropagation();
-                                    setEditingTitle(data.label as string);
-                                    setIsEditingTitle(true);
-                                }}
-                                className={`text-base font-bold truncate ${status === 'completed' || status === 'done' ? 'line-through text-text-secondary' : 'text-text-primary cursor-text'}`}
-                            >
-                                {data.label as string}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                {data.kind && data.kind !== 'project' && (
+                                    <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-md border border-white/20 text-text-secondary bg-white/5">
+                                        {String(data.kind)}
+                                    </span>
+                                )}
+                                <span 
+                                    onDoubleClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingTitle(data.label as string);
+                                        setIsEditingTitle(true);
+                                    }}
+                                    className={`text-base font-bold truncate ${status === 'completed' || status === 'done' ? 'line-through text-text-secondary' : 'text-text-primary cursor-text'}`}
+                                >
+                                    {data.label as string}
+                                </span>
+                            </div>
                         )}
                         
                         {/* Status Badge */}

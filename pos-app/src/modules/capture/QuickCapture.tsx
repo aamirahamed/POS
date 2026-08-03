@@ -222,7 +222,7 @@ const QuickCapture: FC = () => {
             return;
         }
 
-        const targetNode = selectedNodeId || 'subnode-inbox';
+        const targetNode = selectedNodeId || 'milestone-inbox';
         const targetNodeLabel = nodes.find(n => n.id === targetNode)?.data.label || 'Inbox';
 
         if (captureType === 'task') {

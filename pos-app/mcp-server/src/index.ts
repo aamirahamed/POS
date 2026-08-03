@@ -21,7 +21,9 @@ import {
   getActivity,
   getNeedsYou,
   createSubtree,
-  applyTemplate
+  applyTemplate,
+  addRelation,
+  removeRelation
 } from './lifemapService.js';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -283,6 +285,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["template_name", "label", "parent_id"]
         }
+      },
+      {
+        name: "add_relation",
+        description: "Adds a dependency relation between two nodes or tasks.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            source_id: { type: "string", description: "The ID of the node/task that depends on or blocks." },
+            target_id: { type: "string", description: "The ID of the target node/task." },
+            relation_type: { type: "string", description: "Must be: blocks, depends_on, related_to, duplicate_of" }
+          },
+          required: ["source_id", "target_id", "relation_type"]
+        }
+      },
+      {
+        name: "remove_relation",
+        description: "Removes a dependency relation between two nodes or tasks.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            source_id: { type: "string" },
+            target_id: { type: "string" },
+            relation_type: { type: "string", description: "Optional filter by relation type." }
+          },
+          required: ["source_id", "target_id"]
+        }
       }
     ]
   };
@@ -465,6 +493,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const id = await applyTemplate(template_name, label, parent_id);
       return {
         content: [{ type: "text", text: `Successfully applied template "${template_name}" as "${label}" under ${parent_id}. Top node ID: ${id}` }]
+      };
+    }
+
+    if (name === "add_relation") {
+      const source_id = String(args?.source_id);
+      const target_id = String(args?.target_id);
+      const relation_type = String(args?.relation_type);
+      await addRelation(source_id, target_id, relation_type);
+      return {
+        content: [{ type: "text", text: `Successfully added ${relation_type} relation.` }]
+      };
+    }
+
+    if (name === "remove_relation") {
+      const source_id = String(args?.source_id);
+      const target_id = String(args?.target_id);
+      const relation_type = args?.relation_type ? String(args.relation_type) : undefined;
+      await removeRelation(source_id, target_id, relation_type);
+      return {
+        content: [{ type: "text", text: `Successfully removed relation.` }]
       };
     }
 
