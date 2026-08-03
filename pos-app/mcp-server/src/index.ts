@@ -15,7 +15,13 @@ import {
   updateNode,
   updateTask,
   deleteNode,
-  deleteTask
+  deleteTask,
+  getProject,
+  searchMap,
+  getActivity,
+  getNeedsYou,
+  createSubtree,
+  applyTemplate
 } from './lifemapService.js';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -129,7 +135,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             node_id: { type: "string", description: "The exact node ID of the target Milestone." },
-            task_text: { type: "string", description: "The text of the task to add." }
+            task_text: { type: "string", description: "The text of the task to add." },
+            type: { type: "string", description: "Optional type: task, decision, idea, bug." },
+            owner: { type: "string", description: "Optional owner: me or claude." },
+            position: { type: "number", description: "Optional position integer." },
+            external_key: { type: "string", description: "Optional external idempotency key." }
           },
           required: ["node_id", "task_text"]
         }
@@ -153,7 +163,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             node_id: { type: "string" },
             label: { type: "string", description: "Optional new name for the node." },
-            status: { type: "string", description: "Optional new status (e.g. active, completed, backlog)." }
+            status: { type: "string", description: "Optional new status (e.g. active, completed, backlog)." },
+            manual_status_override: { type: "boolean", description: "Optional boolean to manually override computed status." },
+            kind: { type: "string", description: "Optional project kind string." },
+            repo_url: { type: "string", description: "Optional repo URL string." }
           },
           required: ["node_id"]
         }
@@ -167,7 +180,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             node_id: { type: "string", description: "The ID of the milestone containing the task." },
             task_id: { type: "string", description: "The ID of the task to update." },
             text: { type: "string", description: "Optional new text for the task." },
-            completed: { type: "boolean", description: "Optional boolean to mark task as completed or incomplete." }
+            completed: { type: "boolean", description: "Optional boolean to mark task as completed or incomplete." },
+            status: { type: "string", description: "Optional status (done, not_started, blocked, parked)." },
+            type: { type: "string", description: "Optional type." },
+            owner: { type: "string", description: "Optional owner." },
+            position: { type: "number", description: "Optional position integer." }
           },
           required: ["node_id", "task_id"]
         }
@@ -193,6 +210,78 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             task_id: { type: "string" }
           },
           required: ["node_id", "task_id"]
+        }
+      },
+      {
+        name: "get_project",
+        description: "Fetches a single project and its full depth (milestones and tasks).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_id: { type: "string" }
+          },
+          required: ["project_id"]
+        }
+      },
+      {
+        name: "get_activity",
+        description: "Fetches recent activity logs.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            limit: { type: "number", description: "Optional limit. Default 50." },
+            project_id: { type: "string", description: "Optional filter by project." },
+            actor: { type: "string", description: "Optional filter by actor." }
+          }
+        }
+      },
+      {
+        name: "search_map",
+        description: "Searches nodes and tasks by text.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            project_id: { type: "string" }
+          },
+          required: ["query"]
+        }
+      },
+      {
+        name: "get_needs_you",
+        description: "Returns tasks that are blocked, need decisions, or are owned by 'me'.",
+        inputSchema: {
+          type: "object",
+          properties: {}
+        }
+      },
+      {
+        name: "create_subtree",
+        description: "Creates multiple nested nodes in one operation.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            parent_id: { type: "string" },
+            nodes: { 
+              type: "array", 
+              items: { type: "object" },
+              description: "Array of objects with { label, type, tasks: [{text, type, ...}] }"
+            }
+          },
+          required: ["parent_id", "nodes"]
+        }
+      },
+      {
+        name: "apply_template",
+        description: "Creates a pre-defined tree template.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            template_name: { type: "string" },
+            label: { type: "string" },
+            parent_id: { type: "string" }
+          },
+          required: ["template_name", "label", "parent_id"]
         }
       }
     ]
@@ -261,7 +350,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === "add_task_to_node") {
       const node_id = String(args?.node_id);
       const task_text = String(args?.task_text);
-      await addTaskToNode(node_id, task_text);
+      const type = args?.type ? String(args.type) : undefined;
+      const owner = args?.owner ? String(args.owner) : undefined;
+      const position = args?.position !== undefined ? Number(args.position) : undefined;
+      const external_key = args?.external_key ? String(args.external_key) : undefined;
+      await addTaskToNode(node_id, task_text, type, owner, position, external_key);
       return {
         content: [{ type: "text", text: `Successfully added task to milestone ${node_id}` }]
       };
@@ -279,7 +372,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const node_id = String(args?.node_id);
       const label = args?.label ? String(args.label) : undefined;
       const status = args?.status ? String(args.status) : undefined;
-      await updateNode(node_id, label, status);
+      const manual_status_override = args?.manual_status_override !== undefined ? Boolean(args.manual_status_override) : undefined;
+      const kind = args?.kind ? String(args.kind) : undefined;
+      const repo_url = args?.repo_url ? String(args.repo_url) : undefined;
+      
+      await updateNode(node_id, label, status, manual_status_override, kind, repo_url, undefined);
       return {
         content: [{ type: "text", text: `Successfully updated node ${node_id}` }]
       };
@@ -290,7 +387,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const task_id = String(args?.task_id);
       const text = args?.text ? String(args.text) : undefined;
       const completed = args?.completed !== undefined ? Boolean(args.completed) : undefined;
-      await updateTask(node_id, task_id, text, completed);
+      const status = args?.status ? String(args.status) : undefined;
+      const type = args?.type ? String(args.type) : undefined;
+      const owner = args?.owner ? String(args.owner) : undefined;
+      const position = args?.position !== undefined ? Number(args.position) : undefined;
+      
+      await updateTask(node_id, task_id, text, completed, status, type, owner, position);
       return {
         content: [{ type: "text", text: `Successfully updated task ${task_id}` }]
       };
@@ -310,6 +412,59 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       await deleteTask(node_id, task_id);
       return {
         content: [{ type: "text", text: `Successfully deleted task ${task_id}` }]
+      };
+    }
+
+    if (name === "get_project") {
+      const project_id = String(args?.project_id);
+      const project = await getProject(project_id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(project, null, 2) }]
+      };
+    }
+
+    if (name === "search_map") {
+      const query = String(args?.query);
+      const project_id = args?.project_id ? String(args.project_id) : undefined;
+      const results = await searchMap(query, project_id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }]
+      };
+    }
+
+    if (name === "get_activity") {
+      const limit = args?.limit ? Number(args.limit) : 50;
+      const project_id = args?.project_id ? String(args.project_id) : undefined;
+      const actor = args?.actor ? String(args.actor) : undefined;
+      const activity = await getActivity(limit, project_id, actor);
+      return {
+        content: [{ type: "text", text: JSON.stringify(activity, null, 2) }]
+      };
+    }
+
+    if (name === "get_needs_you") {
+      const needsYou = await getNeedsYou();
+      return {
+        content: [{ type: "text", text: JSON.stringify(needsYou, null, 2) }]
+      };
+    }
+
+    if (name === "create_subtree") {
+      const parent_id = String(args?.parent_id);
+      const nodes = args?.nodes as any[];
+      const addedIds = await createSubtree(parent_id, nodes);
+      return {
+        content: [{ type: "text", text: `Successfully created subtree. IDs: ${addedIds.join(', ')}` }]
+      };
+    }
+
+    if (name === "apply_template") {
+      const template_name = String(args?.template_name);
+      const label = String(args?.label);
+      const parent_id = String(args?.parent_id);
+      const id = await applyTemplate(template_name, label, parent_id);
+      return {
+        content: [{ type: "text", text: `Successfully applied template "${template_name}" as "${label}" under ${parent_id}. Top node ID: ${id}` }]
       };
     }
 
