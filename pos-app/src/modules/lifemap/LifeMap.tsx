@@ -21,7 +21,9 @@ import MilestoneNode from './nodes/MilestoneNode';
 import ExecutionNodeDrawer from './components/ExecutionNodeDrawer';
 import DomainsView from './components/DomainsView';
 import FocusModeView from './components/FocusModeView';
-import { Layers, Map as MapIcon } from 'lucide-react';
+import { NeedsYouBanner } from './components/NeedsYouBanner';
+import { ActivityLogView } from './components/ActivityLogView';
+import { Layers, Map as MapIcon, History } from 'lucide-react';
 
 const nodeTypes: NodeTypes = {
     center: CenterNode,
@@ -53,6 +55,7 @@ const LifeMap: FC = () => {
     const [userId, setUserId] = useState<string | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [activeView, setActiveView] = useState<'domains' | 'map'>('domains');
+    const [showActivityLog, setShowActivityLog] = useState(false);
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // 1. Fetch user and load data
@@ -178,7 +181,18 @@ const LifeMap: FC = () => {
                 >
                     <MapIcon size={16} /> Map
                 </button>
+                <div className="w-[1px] h-4 bg-white/10 mx-1" />
+                <button
+                    onClick={() => setShowActivityLog(true)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/5 transition-all"
+                    title="View Activity Log"
+                >
+                    <History size={16} /> Log
+                </button>
             </div>
+
+            {/* Needs You Banner */}
+            {!focusedProjectId && <NeedsYouBanner />}
 
             {focusedProjectId ? (
                 <FocusModeView />
@@ -260,6 +274,8 @@ const LifeMap: FC = () => {
                     </div>
                 </div>
             )}
+
+            {showActivityLog && <ActivityLogView onClose={() => setShowActivityLog(false)} />}
 
             <ExecutionNodeDrawer />
         </div>

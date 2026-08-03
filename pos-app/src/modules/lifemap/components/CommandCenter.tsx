@@ -155,7 +155,7 @@ const CommandCenter: FC = () => {
                     {focusedProject && (
                         <div className="flex items-center self-start gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold shadow-sm animate-in slide-in-from-bottom-2">
                             <Target size={14} className="text-indigo-400" />
-                            Focused on {focusedProject.data.label || 'Project'}
+                            Sam is locked in on: {focusedProject.data.label || 'Project'}
                             <button 
                                 onClick={() => setFocusedProject(null)}
                                 className="ml-1 hover:text-white transition-colors"
