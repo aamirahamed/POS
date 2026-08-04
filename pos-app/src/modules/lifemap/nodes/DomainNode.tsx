@@ -4,7 +4,7 @@ import { Plus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 
 const DomainNode = ({ id, data, selected }: NodeProps) => {
-    const { addProject, toggleNodeExpansion, deleteNode, updateNode } = useLifeMapStore();
+    const { addProject, toggleNodeExpansion, deleteNode, updateNode, setSelectedBriefNodeId } = useLifeMapStore();
     const childCount = useLifeMapStore(state => state.nodes.filter(n => n.data.parentId === id).length);
     const [isHovered, setIsHovered] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -69,6 +69,10 @@ const DomainNode = ({ id, data, selected }: NodeProps) => {
       `}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            onClick={(e) => {
+                e.stopPropagation();
+                setSelectedBriefNodeId(id);
+            }}
             onDoubleClick={() => {
                 if (id !== 'domain-inbox' && id !== 'pillar-inbox') {
                     setIsEditing(true);

@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { LifeMapNode } from '@/types/lifemap';
-import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, FileText } from 'lucide-react';
 import ProjectRow from './ProjectRow';
 
 interface Props {
@@ -95,6 +95,17 @@ const DomainSection = ({ domain }: Props) => {
                                 {activeProjects} active
                             </span>
                         )}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                useLifeMapStore.getState().setSelectedBriefNodeId(domain.id);
+                            }}
+                            className="px-3 py-1 bg-surface-elevated hover:bg-surface-hover text-text-secondary hover:text-white border border-white/10 text-[10px] uppercase font-bold tracking-widest rounded-full flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 shrink-0 ml-1"
+                            title="Open Domain Brief"
+                        >
+                            <FileText size={12} />
+                            Brief
+                        </button>
                     </div>
                 </div>
 

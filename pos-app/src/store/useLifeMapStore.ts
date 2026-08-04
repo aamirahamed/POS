@@ -339,6 +339,9 @@ export const useLifeMapStore = create<LifeMapState>()(
                 selectedExecutionNodeId: null,
                 setSelectedExecutionNodeId: (id) => set({ selectedExecutionNodeId: id }),
 
+                selectedBriefNodeId: null,
+                setSelectedBriefNodeId: (id) => set({ selectedBriefNodeId: id }),
+
                 isCommandCenterOpen: false,
                 setCommandCenterOpen: (isOpen) => set({ isCommandCenterOpen: isOpen }),
 

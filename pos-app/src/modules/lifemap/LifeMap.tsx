@@ -19,6 +19,7 @@ import DomainNode from './nodes/DomainNode';
 import ProjectNode from './nodes/ProjectNode';
 import MilestoneNode from './nodes/MilestoneNode';
 import ExecutionNodeDrawer from './components/ExecutionNodeDrawer';
+import { BriefDrawer } from './components/BriefDrawer';
 import DomainsView from './components/DomainsView';
 import FocusModeView from './components/FocusModeView';
 import { NeedsYouBanner } from './components/NeedsYouBanner';
@@ -276,8 +277,8 @@ const LifeMap: FC = () => {
             )}
 
             {showActivityLog && <ActivityLogView onClose={() => setShowActivityLog(false)} />}
-
             <ExecutionNodeDrawer />
+            <BriefDrawer />
         </div>
     );
 };

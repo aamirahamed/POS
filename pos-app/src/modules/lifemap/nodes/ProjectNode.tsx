@@ -5,7 +5,7 @@ import { LifeMapNode } from '@/types/lifemap';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 
 const ProjectNode = ({ id, data, selected }: NodeProps) => {
-    const { addMilestone, toggleNodeExpansion, deleteNode, updateNode } = useLifeMapStore();
+    const { addMilestone, toggleNodeExpansion, deleteNode, updateNode, setSelectedBriefNodeId } = useLifeMapStore();
     const [isHovered, setIsHovered] = useState(false);
     const [isEditing, setIsEditing] = useState(data.editing as boolean || false);
     const [editValue, setEditValue] = useState(data.label as string);
@@ -77,13 +77,13 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
         bgColor = `hsla(${hue}, 20%, 10%, 0.6)`;
         opacity = 0.85;
         stripeColor = `hsl(${hue}, 30%, 40%)`;
-    } else if (status === 'paused') {
+    } else if (status === 'parked') {
         borderStyle = `solid 1px hsl(0, 0%, 40%)`;
         bgColor = `hsla(0, 0%, 15%, 0.6)`;
         opacity = 0.7;
         filter = 'grayscale(30%)';
         stripeColor = `hsl(0, 0%, 40%)`;
-    } else if (status === 'completed') {
+    } else if (status === 'done') {
         borderStyle = `solid 1px hsl(${hue}, 20%, 30%)`;
         bgColor = `hsla(${hue}, 20%, 10%, 0.4)`;
         opacity = 0.5;
@@ -91,17 +91,30 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
     }
 
     const stateColors: any = {
-        active: 'text-green-400 bg-green-400/10 border-green-400/30',
-        backlog: 'text-gray-300 bg-gray-400/10 border-gray-400/30',
-        paused: 'text-orange-400 bg-orange-400/10 border-orange-400/30',
-        completed: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30'
+        in_progress: `text-[hsl(${hue},80%,60%)] bg-[hsl(${hue},80%,60%)]/10 border-[hsl(${hue},80%,60%)]/30`,
+        not_started: 'text-gray-400 bg-gray-400/10 border-gray-400/30',
+        parked: 'text-orange-400 bg-orange-400/10 border-orange-400/30',
+        blocked: 'text-red-400 bg-red-400/10 border-red-400/30',
+        done: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30',
+        dropped: 'text-stone-500 bg-stone-500/10 border-stone-500/30'
     };
 
     const stateIcons: any = {
-        active: '🟢',
-        backlog: '⚪',
-        paused: '⏸',
-        completed: '✓'
+        in_progress: '🟢',
+        not_started: '⚪',
+        parked: '⏸️',
+        blocked: '🛑',
+        done: '✓',
+        dropped: '⨯'
+    };
+
+    const stateLabels: any = {
+        in_progress: 'In Progress',
+        not_started: 'Not Started',
+        parked: 'Parked',
+        blocked: 'Blocked',
+        done: 'Done',
+        dropped: 'Dropped'
     };
 
     return (
@@ -114,7 +127,12 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
       `}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            onDoubleClick={() => {
+            onClick={(e) => {
+                e.stopPropagation();
+                setSelectedBriefNodeId(id);
+            }}
+            onDoubleClick={(e) => {
+                e.stopPropagation();
                 if (id !== 'project-inbox' && id !== 'initiative-inbox') {
                     setIsEditing(true);
                     setEditValue(data.label as string);
@@ -127,9 +145,9 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
                 <NodeToolbar isVisible={selected || isHovered} position={Position.Top} className="flex gap-2">
                 {id !== 'project-inbox' && id !== 'initiative-inbox' && (
                     <>
-                        <button onClick={() => setStatus('active')} className="p-1 rounded-full bg-surface hover:bg-green-600/30 text-green-400 transition-colors" title="Activate"><Play size={12} /></button>
-                        <button onClick={() => setStatus('paused')} className="p-1 rounded-full bg-surface hover:bg-orange-600/30 text-orange-400 transition-colors" title="Pause"><Pause size={12} /></button>
-                        <button onClick={() => setStatus('completed')} className="p-1 rounded-full bg-surface hover:bg-indigo-600/30 text-indigo-400 transition-colors" title="Complete"><CheckCircle size={12} /></button>
+                        <button onClick={() => setStatus('in_progress')} className="p-1 rounded-full bg-surface hover:bg-green-600/30 text-green-400 transition-colors" title="Activate"><Play size={12} /></button>
+                        <button onClick={() => setStatus('parked')} className="p-1 rounded-full bg-surface hover:bg-orange-600/30 text-orange-400 transition-colors" title="Pause"><Pause size={12} /></button>
+                        <button onClick={() => setStatus('done')} className="p-1 rounded-full bg-surface hover:bg-indigo-600/30 text-indigo-400 transition-colors" title="Complete"><CheckCircle size={12} /></button>
                         <div className="w-[1px] h-4 bg-white/20 self-center mx-1" />
                         <button onClick={handleAddMilestone} className="p-1 rounded-full bg-surface hover:bg-accent text-text-primary transition-colors" title="Add Milestone"><Plus size={12} /></button>
                     </>
@@ -157,7 +175,7 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
                     className="w-full bg-transparent text-sm font-bold text-text-primary text-center focus:outline-none border-b border-accent"
                 />
             ) : (
-                <div className={`text-sm font-bold tracking-wide text-text-primary ${status === 'completed' ? 'line-through opacity-60' : ''}`}>
+                <div className={`text-sm font-bold tracking-wide text-text-primary ${status === 'done' ? 'line-through opacity-60' : ''}`}>
                     {data.label as string}
                 </div>
             )}
@@ -167,7 +185,7 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
                 {id === 'project-inbox' || id === 'initiative-inbox' ? (
                     <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] uppercase font-bold tracking-widest ${stateColors[status]}`}>
                         <span>{stateIcons[status]}</span>
-                        <span>{status}</span>
+                        <span>{stateLabels[status] || status}</span>
                     </div>
                 ) : (
                     <div 
@@ -175,18 +193,23 @@ const ProjectNode = ({ id, data, selected }: NodeProps) => {
                         className={`cursor-pointer inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] uppercase font-bold tracking-widest transition-colors ${stateColors[status]}`}
                     >
                         <span>{stateIcons[status]}</span>
-                        <span>{status}</span>
+                        <span>{stateLabels[status] || status}</span>
                         <span className="opacity-50 ml-0.5">▼</span>
                     </div>
                 )}
                 
                 {showStateMenu && id !== 'project-inbox' && id !== 'initiative-inbox' && (
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-surface-elevated border border-white/10 rounded-lg shadow-2xl flex flex-col z-[100] text-[10px] uppercase font-bold tracking-widest w-32 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <button onClick={(e) => { e.stopPropagation(); setStatus('active'); }} className="px-3 py-2 hover:bg-white/10 text-left text-green-400 flex items-center gap-2"><span>🟢</span> Active</button>
-                        <button onClick={(e) => { e.stopPropagation(); setStatus('backlog'); }} className="px-3 py-2 hover:bg-white/10 text-left text-gray-300 flex items-center gap-2"><span>⚪</span> Backlog</button>
-                        <button onClick={(e) => { e.stopPropagation(); setStatus('paused'); }} className="px-3 py-2 hover:bg-white/10 text-left text-orange-400 flex items-center gap-2"><span>⏸</span> Paused</button>
-                        <button onClick={(e) => { e.stopPropagation(); setStatus('completed'); }} className="px-3 py-2 hover:bg-white/10 text-left text-indigo-400 flex items-center gap-2"><span>✓</span> Completed</button>
-                    </div>
+                    <>
+                        <div className="fixed inset-0 z-[90]" onClick={(e) => { e.stopPropagation(); setShowStateMenu(false); }} />
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-surface-elevated border border-white/10 rounded-lg shadow-2xl flex flex-col z-[100] text-[10px] uppercase font-bold tracking-widest w-40 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            <button onClick={(e) => { e.stopPropagation(); setStatus('not_started'); }} className="px-3 py-2 hover:bg-white/10 text-left text-gray-400 flex items-center gap-2"><span>⚪</span> Not Started</button>
+                            <button onClick={(e) => { e.stopPropagation(); setStatus('in_progress'); }} className="px-3 py-2 hover:bg-white/10 text-left text-green-400 flex items-center gap-2"><span>🟢</span> In Progress</button>
+                            <button onClick={(e) => { e.stopPropagation(); setStatus('blocked'); }} className="px-3 py-2 hover:bg-white/10 text-left text-red-400 flex items-center gap-2"><span>🛑</span> Blocked</button>
+                            <button onClick={(e) => { e.stopPropagation(); setStatus('parked'); }} className="px-3 py-2 hover:bg-white/10 text-left text-orange-400 flex items-center gap-2"><span>⏸️</span> Parked</button>
+                            <button onClick={(e) => { e.stopPropagation(); setStatus('done'); }} className="px-3 py-2 hover:bg-white/10 text-left text-indigo-400 flex items-center gap-2"><span>✓</span> Done</button>
+                            <button onClick={(e) => { e.stopPropagation(); setStatus('dropped'); }} className="px-3 py-2 hover:bg-white/10 text-left text-stone-500 flex items-center gap-2"><span>⨯</span> Dropped</button>
+                        </div>
+                    </>
                 )}
             </div>
 

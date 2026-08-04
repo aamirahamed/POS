@@ -58,6 +58,8 @@ export interface LifeMapNode extends Node {
         updatedAt?: number;
         completedAt?: number | null;
         position?: number;
+        kind?: string;
+        repo_url?: string;
         streak?: number;
     };
 }
@@ -84,6 +86,8 @@ export interface LifeMapState {
     // Drawer State
     selectedExecutionNodeId: string | null;
     setSelectedExecutionNodeId: (id: string | null) => void;
+    selectedBriefNodeId: string | null;
+    setSelectedBriefNodeId: (id: string | null) => void;
     nodeToDelete: string | null;
     setNodeToDelete: (id: string | null) => void;
     confirmDeleteNode: () => void;

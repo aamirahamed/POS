@@ -25,6 +25,17 @@ import {
   addRelation,
   removeRelation
 } from './lifemapService.js';
+import {
+  createProjectBrief,
+  updateProjectBrief,
+  appendToBriefList,
+  resolveBriefSuggestion,
+  getProjectBrief,
+  searchBriefs,
+  getBriefHistory,
+  listProjectBriefs,
+  renderBrief
+} from './briefService.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -311,6 +322,112 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["source_id", "target_id"]
         }
+      },
+      {
+        name: "create_project_brief",
+        description: "Creates a Project Brief for a Domain or Project. The depth rule: recruiter-readable, engineer-respectable.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            fields: { type: "object", description: "Initial fields to set." }
+          },
+          required: ["node_id", "fields"]
+        }
+      },
+      {
+        name: "update_project_brief",
+        description: "Partially updates a Project Brief. Resolves stickiness rules. The depth rule: recruiter-readable, engineer-respectable.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            fields: { type: "object" },
+            reason: { type: "string" }
+          },
+          required: ["node_id", "fields"]
+        }
+      },
+      {
+        name: "append_to_brief_list",
+        description: "Appends an item to a list field in a brief (e.g. features, outcomes). The depth rule: recruiter-readable, engineer-respectable.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            list_name: { type: "string" },
+            item: { type: "object" },
+            external_key: { type: "string" }
+          },
+          required: ["node_id", "list_name", "item"]
+        }
+      },
+      {
+        name: "resolve_brief_suggestion",
+        description: "Accepts or rejects a pending brief suggestion.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            suggestion_id: { type: "string" },
+            accept: { type: "boolean" }
+          },
+          required: ["suggestion_id", "accept"]
+        }
+      },
+      {
+        name: "get_project_brief",
+        description: "Fetches a project brief. The depth rule: recruiter-readable, engineer-respectable.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            sections: { type: "array", items: { type: "string" } }
+          },
+          required: ["node_id"]
+        }
+      },
+      {
+        name: "list_project_briefs",
+        description: "Lists all project briefs.",
+        inputSchema: {
+          type: "object",
+          properties: {}
+        }
+      },
+      {
+        name: "search_briefs",
+        description: "Searches project briefs by text.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" }
+          },
+          required: ["query"]
+        }
+      },
+      {
+        name: "get_brief_history",
+        description: "Fetches revision history for a brief.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            field: { type: "string" }
+          },
+          required: ["node_id"]
+        }
+      },
+      {
+        name: "render_brief",
+        description: "Deterministically renders a brief variant (portfolio, cv_entry, elevator, agent_context).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            node_id: { type: "string" },
+            variant: { type: "string", description: "portfolio, cv_entry, elevator, or agent_context" }
+          },
+          required: ["node_id", "variant"]
+        }
       }
     ]
   };
@@ -514,6 +631,69 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return {
         content: [{ type: "text", text: `Successfully removed relation.` }]
       };
+    }
+
+    if (name === "create_project_brief") {
+      const node_id = String(args?.node_id);
+      const fields = args?.fields as any;
+      await createProjectBrief(node_id, fields);
+      return { content: [{ type: "text", text: `Successfully created project brief.` }] };
+    }
+    
+    if (name === "update_project_brief") {
+      const node_id = String(args?.node_id);
+      const fields = args?.fields as any;
+      const reason = args?.reason ? String(args.reason) : undefined;
+      const res = await updateProjectBrief(node_id, fields, reason);
+      return { content: [{ type: "text", text: `Update processed. Applied fields: ${res.applied.join(', ')}. Queued suggestions: ${res.queued.join(', ')}.` }] };
+    }
+    
+    if (name === "append_to_brief_list") {
+      const node_id = String(args?.node_id);
+      const list_name = String(args?.list_name);
+      const item = args?.item as any;
+      const external_key = args?.external_key ? String(args.external_key) : undefined;
+      const res = await appendToBriefList(node_id, list_name, item, external_key);
+      return { content: [{ type: "text", text: res.message }] };
+    }
+    
+    if (name === "resolve_brief_suggestion") {
+      const suggestion_id = String(args?.suggestion_id);
+      const accept = Boolean(args?.accept);
+      const res = await resolveBriefSuggestion(suggestion_id, accept);
+      return { content: [{ type: "text", text: `Suggestion ${res.status}.` }] };
+    }
+    
+    if (name === "get_project_brief") {
+      const node_id = String(args?.node_id);
+      const sections = args?.sections as string[] | undefined;
+      const res = await getProjectBrief(node_id, sections);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+    
+    if (name === "list_project_briefs") {
+      const res = await listProjectBriefs();
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+    
+    if (name === "search_briefs") {
+      const query = String(args?.query);
+      const res = await searchBriefs(query);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+    
+    if (name === "get_brief_history") {
+      const node_id = String(args?.node_id);
+      const field = args?.field ? String(args.field) : undefined;
+      const res = await getBriefHistory(node_id, field);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+    
+    if (name === "render_brief") {
+      const node_id = String(args?.node_id);
+      const variant = String(args?.variant);
+      const res = await renderBrief(node_id, variant);
+      return { content: [{ type: "text", text: res }] };
     }
 
     throw new Error(`Unknown tool: ${name}`);

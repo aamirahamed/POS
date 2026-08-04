@@ -1,7 +1,7 @@
 import { memo, useState } from 'react';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
 import { LifeMapNode } from '@/types/lifemap';
-import { ChevronDown, ChevronRight, Plus, Trash2, Target } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Trash2, Target, FileText } from 'lucide-react';
 import MilestoneRow from './MilestoneRow';
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 }
 
 const ProjectRow = ({ project }: Props) => {
-    const { nodes, addMilestone, updateNode, deleteNode, toggleNodeExpansion, setFocusedProject } = useLifeMapStore();
+    const { nodes, addMilestone, updateNode, deleteNode, toggleNodeExpansion, setSelectedBriefNodeId, setFocusedProject } = useLifeMapStore();
     const [showStateMenu, setShowStateMenu] = useState(false);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [editingTitle, setEditingTitle] = useState('');
@@ -50,29 +50,30 @@ const ProjectRow = ({ project }: Props) => {
     };
 
     const stateColors: any = {
-        active: `text-[hsl(${hue},80%,60%)] bg-[hsl(${hue},80%,60%)]/10 border-[hsl(${hue},80%,60%)]/30`,
         in_progress: `text-[hsl(${hue},80%,60%)] bg-[hsl(${hue},80%,60%)]/10 border-[hsl(${hue},80%,60%)]/30`,
-        backlog: 'text-gray-400 bg-gray-400/10 border-gray-400/30',
         not_started: 'text-gray-400 bg-gray-400/10 border-gray-400/30',
-        paused: 'text-orange-400 bg-orange-400/10 border-orange-400/30',
         parked: 'text-orange-400 bg-orange-400/10 border-orange-400/30',
         blocked: 'text-red-400 bg-red-400/10 border-red-400/30',
-        completed: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30',
         done: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/30',
         dropped: 'text-stone-500 bg-stone-500/10 border-stone-500/30'
     };
 
     const stateIcons: any = {
-        active: '🟢',
         in_progress: '🟢',
-        backlog: '⚪',
         not_started: '⚪',
-        paused: '⏸️',
         parked: '⏸️',
         blocked: '🛑',
-        completed: '✓',
         done: '✓',
         dropped: '⨯'
+    };
+
+    const stateLabels: any = {
+        in_progress: 'In Progress',
+        not_started: 'Not Started',
+        parked: 'Parked',
+        blocked: 'Blocked',
+        done: 'Done',
+        dropped: 'Dropped'
     };
 
     let stripeColor = `hsl(${hue}, 80%, 60%)`;
@@ -159,23 +160,37 @@ const ProjectRow = ({ project }: Props) => {
                                 className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] uppercase font-bold tracking-widest transition-colors ${stateColors[status]}`}
                             >
                                 <span>{stateIcons[status]}</span>
-                                <span>{status}</span>
+                                <span>{stateLabels[status] || status}</span>
                                 <span className="opacity-50 ml-0.5 text-[8px]">▼</span>
                             </button>
                             
                             {showStateMenu && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setShowStateMenu(false)} />
-                                    <div className="absolute top-full left-0 mt-1 bg-surface-elevated border border-white/10 rounded-lg shadow-2xl flex flex-col z-50 text-[10px] uppercase font-bold tracking-widest w-32 overflow-hidden animate-in fade-in duration-100">
-                                        <button onClick={() => setStatus('active')} className="px-3 py-2 hover:bg-white/10 text-left text-green-400 flex items-center gap-2"><span>🟢</span> Active</button>
-                                        <button onClick={() => setStatus('backlog')} className="px-3 py-2 hover:bg-white/10 text-left text-gray-400 flex items-center gap-2"><span>⚪</span> Backlog</button>
-                                        <button onClick={() => setStatus('paused')} className="px-3 py-2 hover:bg-white/10 text-left text-orange-400 flex items-center gap-2"><span>⏸</span> Paused</button>
-                                        <button onClick={() => setStatus('completed')} className="px-3 py-2 hover:bg-white/10 text-left text-indigo-400 flex items-center gap-2"><span>✓</span> Completed</button>
+                                    <div className="absolute top-full left-0 mt-1 bg-surface-elevated border border-white/10 rounded-lg shadow-2xl flex flex-col z-50 text-[10px] uppercase font-bold tracking-widest w-40 overflow-hidden animate-in fade-in duration-100">
+                                        <button onClick={() => setStatus('not_started')} className="px-3 py-2 hover:bg-white/10 text-left text-gray-400 flex items-center gap-2"><span>⚪</span> Not Started</button>
+                                        <button onClick={() => setStatus('in_progress')} className="px-3 py-2 hover:bg-white/10 text-left text-green-400 flex items-center gap-2"><span>🟢</span> In Progress</button>
+                                        <button onClick={() => setStatus('blocked')} className="px-3 py-2 hover:bg-white/10 text-left text-red-400 flex items-center gap-2"><span>🛑</span> Blocked</button>
+                                        <button onClick={() => setStatus('parked')} className="px-3 py-2 hover:bg-white/10 text-left text-orange-400 flex items-center gap-2"><span>⏸️</span> Parked</button>
+                                        <button onClick={() => setStatus('done')} className="px-3 py-2 hover:bg-white/10 text-left text-indigo-400 flex items-center gap-2"><span>✓</span> Done</button>
+                                        <button onClick={() => setStatus('dropped')} className="px-3 py-2 hover:bg-white/10 text-left text-stone-500 flex items-center gap-2"><span>⨯</span> Dropped</button>
                                     </div>
                                 </>
                             )}
                         </div>
 
+                        {/* Brief Button */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedBriefNodeId(project.id);
+                            }}
+                            className="ml-2 px-3 py-1 bg-surface-elevated hover:bg-surface-hover text-text-secondary hover:text-white border border-white/10 text-[10px] uppercase font-bold tracking-widest rounded-full flex items-center gap-1.5 shadow-sm transition-all hover:scale-105 active:scale-95 shrink-0"
+                            title="Open Project Brief"
+                        >
+                            <FileText size={12} />
+                            Brief
+                        </button>
                         {/* Focus Mode Button */}
                         <button
                             onClick={(e) => {

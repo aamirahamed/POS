@@ -138,7 +138,15 @@ const ExecutionNodeDrawer: FC = () => {
     };
 
     const priorityColor = priority === 'high' ? 'text-red-400 border-red-400/20 bg-red-400/10' : priority === 'medium' ? 'text-amber-400 border-amber-400/20 bg-amber-400/10' : 'text-blue-400 border-blue-400/20 bg-blue-400/10';
-    // const statusColor = status === 'active' ? 'text-green-400' : status === 'completed' ? 'text-indigo-400' : status === 'paused' ? 'text-orange-400' : 'text-gray-400';
+
+    const stateLabels: any = {
+        in_progress: 'In Progress',
+        not_started: 'Not Started',
+        parked: 'Parked',
+        blocked: 'Blocked',
+        done: 'Done',
+        dropped: 'Dropped'
+    };
 
     return (
         <div className="absolute top-0 right-0 h-full w-[450px] bg-surface-elevated/95 backdrop-blur-2xl border-l border-white/5 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out">
@@ -151,7 +159,7 @@ const ExecutionNodeDrawer: FC = () => {
                 <div className="relative z-10 flex items-start justify-between">
                     <div>
                         <div className="flex items-center gap-2 mb-3 text-[10px] uppercase font-bold tracking-widest">
-                            <span className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${status === 'active' || status === 'in_progress' ? 'bg-green-500 animate-pulse' : status === 'completed' || status === 'done' ? 'bg-indigo-500' : 'bg-gray-500'}`} /> {status}</span>
+                            <span className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${status === 'in_progress' ? 'bg-green-500 animate-pulse' : status === 'done' ? 'bg-indigo-500' : 'bg-gray-500'}`} /> {stateLabels[status] || status}</span>
                             <span className="text-white/20">•</span>
                             <span className={`px-2 py-0.5 rounded border ${priorityColor}`}>{priority}</span>
                         </div>
@@ -177,18 +185,24 @@ const ExecutionNodeDrawer: FC = () => {
                     </div>
                 </div>
 
-                <div className="relative z-10 grid grid-cols-4 gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => setStatus('active')} className={`h-8 text-xs ${status === 'active' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
-                        <Play size={12} className="mr-1.5" /> Resume
+                <div className="relative z-10 grid grid-cols-3 gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => setStatus('not_started')} className={`h-8 text-xs ${status === 'not_started' ? 'bg-gray-500/20 text-gray-300 border-gray-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
+                        <Archive size={12} className="mr-1.5" /> Not Started
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setStatus('done')} className={`h-8 text-xs ${status === 'completed' || status === 'done' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
+                    <Button variant="secondary" size="sm" onClick={() => setStatus('in_progress')} className={`h-8 text-xs ${status === 'in_progress' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
+                        <Play size={12} className="mr-1.5" /> In Progress
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setStatus('blocked')} className={`h-8 text-xs ${status === 'blocked' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
+                        <X size={12} className="mr-1.5" /> Blocked
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setStatus('parked')} className={`h-8 text-xs ${status === 'parked' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
+                        <Pause size={12} className="mr-1.5" /> Parked
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => setStatus('done')} className={`h-8 text-xs ${status === 'done' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
                         <CheckCircle size={12} className="mr-1.5" /> Done
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setStatus('paused')} className={`h-8 text-xs ${status === 'paused' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
-                        <Pause size={12} className="mr-1.5" /> Pause
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setStatus('backlog')} className={`h-8 text-xs ${status === 'backlog' ? 'bg-gray-500/20 text-gray-300 border-gray-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
-                        <Archive size={12} className="mr-1.5" /> Backlog
+                    <Button variant="secondary" size="sm" onClick={() => setStatus('dropped')} className={`h-8 text-xs ${status === 'dropped' ? 'bg-stone-500/20 text-stone-400 border-stone-500/30' : 'bg-white/5 text-text-secondary'} border hover:bg-white/10`}>
+                        <Trash2 size={12} className="mr-1.5" /> Dropped
                     </Button>
                 </div>
             </div>
