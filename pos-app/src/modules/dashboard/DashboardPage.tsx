@@ -6,7 +6,7 @@ import { useShoppingStore } from '@/store/useShoppingStore';
 import { useTodayStore, FocusItem } from '@/store/useTodayStore';
 import { CalendarSection } from './components/CalendarSection';
 import { RemindersWidget } from './components/RemindersWidget';
-import { Sparkles, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Clock, Calendar } from 'lucide-react';
+import { Sparkles, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { useProfileStore } from '@/store/useProfileStore';
 
@@ -21,7 +21,7 @@ const DashboardPage: FC = () => {
     } = useLifeMapStore();
     const { reminders } = useRemindersStore();
     const { items: shoppingItems } = useShoppingStore();
-    const { focusItems, addFocusNode, removeFocusNode } = useTodayStore();
+    const { focusItems, addFocusNode, removeFocusNode, loadFromDB: loadTodayFromDB } = useTodayStore();
 
     // Local State
     const [showFocusSelector, setShowFocusSelector] = useState(false);
@@ -30,8 +30,9 @@ const DashboardPage: FC = () => {
     // Load life map and profile facts from DB on mount
     useEffect(() => {
         loadFromDB();
+        loadTodayFromDB();
         useProfileStore.getState().loadFacts();
-    }, [loadFromDB]);
+    }, [loadFromDB, loadTodayFromDB]);
     
     // Live Time State
     const [now, setNow] = useState(new Date());
@@ -62,18 +63,21 @@ const DashboardPage: FC = () => {
 
     // Render Focus Items with Notes & Duration
     const renderFocusItem = (focus: FocusItem) => {
-        const node = nodes.find(n => n.id === focus.id);
-        if (!node) return null;
+        const node = nodes.find(n => n.id === focus.id || (focus.lifemapNodeId && n.id === focus.lifemapNodeId));
+        
+        if (!node && !focus.isManual) return null;
 
-        const isExecution = node.type === 'milestone';
-        const parentNode = nodes.find(n => n.id === node.data.parentId);
+        const isExecution = node ? node.type === 'milestone' : false;
+        const parentNode = node ? nodes.find(n => n.id === node.data.parentId) : undefined;
         const daysInFocus = Math.floor((Date.now() - focus.addedAt) / (1000 * 60 * 60 * 24));
         const durationText = daysInFocus === 0 ? 'Today' : daysInFocus === 1 ? '1 day' : `${daysInFocus}d`;
-        const latestNote = focus.notes[focus.notes.length - 1];
+        const latestNote = focus.notes && focus.notes.length > 0 ? focus.notes[focus.notes.length - 1] : null;
 
         const goToLifeMap = () => {
-            if (isExecution) useLifeMapStore.getState().setSelectedExecutionNodeId(node.id);
-            navigate('/life-map');
+            if (node) {
+                if (isExecution) useLifeMapStore.getState().setSelectedExecutionNodeId(node.id);
+                navigate('/life-map');
+            }
         };
 
         return (
@@ -81,34 +85,38 @@ const DashboardPage: FC = () => {
                 {/* Icon */}
                 <div
                     onClick={goToLifeMap}
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-pointer ${isExecution ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${node ? 'cursor-pointer' : ''} ${isExecution ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}
                 >
-                    {isExecution ? <ListTodo size={15} /> : <Target size={15} />}
+                    {node ? (isExecution ? <Zap size={14} /> : <Target size={14} />) : <ListTodo size={14} />}
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 min-w-0" onClick={goToLifeMap}>
-                    <div className="flex items-center gap-2 cursor-pointer">
-                        <span className="text-sm font-semibold text-text-primary hover:text-white truncate leading-tight">{node.data.label}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-text-primary truncate">
+                            {node ? node.data.label : focus.title}
+                        </span>
                         {parentNode && (
-                            <span className="text-[11px] font-medium text-text-secondary/70 truncate">{parentNode.data.label}</span>
+                            <span className="text-[10px] font-medium text-text-secondary bg-surface px-1.5 py-0.5 rounded-md truncate max-w-[120px]">
+                                {parentNode.data.label}
+                            </span>
                         )}
-                        <span className="text-[10px] text-text-secondary/50 flex items-center gap-1 shrink-0">
-                            <Clock size={10} />
+                        <span className="text-[10px] font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded-md whitespace-nowrap ml-auto">
                             {durationText}
                         </span>
-                        {latestNote && (
-                            <span className="text-[11px] text-text-secondary/60 italic truncate max-w-[140px]">"{latestNote.text}"</span>
-                        )}
                     </div>
+                    {latestNote && (
+                        <p className="text-xs text-text-secondary truncate mt-0.5">
+                            {latestNote.text}
+                        </p>
+                    )}
                 </div>
 
                 {/* Remove */}
                 <button
                     onClick={() => removeFocusNode(focus.id)}
-                    className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded-lg opacity-0 lg:group-hover:opacity-100 transition-all shrink-0"
+                    className="p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded-md opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                    title="Remove from Focus"
                 >
                     <X size={14} />
                 </button>
@@ -201,24 +209,44 @@ const DashboardPage: FC = () => {
                             </div>
 
                             {showFocusSelector && (
-                                <div className="p-3 bg-surface-elevated border border-border rounded-xl animate-in fade-in slide-in-from-top-2 shadow-lg">
-                                    <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">Select from Life Map</h3>
-                                    <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
-                                        {focusCandidates.length === 0 ? (
-                                            <p className="text-sm text-text-secondary">No available active projects or milestones.</p>
-                                        ) : (
-                                            focusCandidates.map(node => (
-                                                <div key={node.id} className="flex items-center justify-between p-2.5 bg-surface hover:bg-surface-hover rounded-lg cursor-pointer border border-transparent hover:border-border transition-colors" onClick={() => { addFocusNode(node.id); setShowFocusSelector(false); }}>
-                                                    <div className="flex items-center gap-2.5 min-w-0">
-                                                        <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${node.type === 'milestone' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                                                            {node.type === 'milestone' ? <ListTodo size={12} /> : <Target size={12} />}
+                                <div className="p-3 bg-surface-elevated border border-border rounded-xl animate-in fade-in slide-in-from-top-2 shadow-lg flex flex-col gap-3">
+                                    {/* Manual Entry */}
+                                    <div>
+                                        <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">Add Custom Focus</h3>
+                                        <input 
+                                            type="text"
+                                            placeholder="E.g. buy protein powder... (Press Enter)"
+                                            className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-white placeholder:text-text-secondary focus:outline-none focus:border-accent"
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                                    addFocusNode(crypto.randomUUID(), true, e.currentTarget.value.trim());
+                                                    e.currentTarget.value = '';
+                                                    setShowFocusSelector(false);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="h-px bg-border my-1" />
+                                    {/* Life Map Selection */}
+                                    <div>
+                                        <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">Select from Life Map</h3>
+                                        <div className="max-h-44 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
+                                            {focusCandidates.length === 0 ? (
+                                                <p className="text-sm text-text-secondary">No available active projects or milestones.</p>
+                                            ) : (
+                                                focusCandidates.map(node => (
+                                                    <div key={node.id} className="flex items-center justify-between p-2.5 bg-surface hover:bg-surface-hover rounded-lg cursor-pointer border border-transparent hover:border-border transition-colors" onClick={() => { addFocusNode(node.id); setShowFocusSelector(false); }}>
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${node.type === 'milestone' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                                                                {node.type === 'milestone' ? <ListTodo size={12} /> : <Target size={12} />}
+                                                            </div>
+                                                            <span className="text-sm font-medium text-white truncate">{node.data.label}</span>
                                                         </div>
-                                                        <span className="text-sm font-medium text-white truncate">{node.data.label}</span>
+                                                        <Plus size={13} className="text-text-secondary shrink-0" />
                                                     </div>
-                                                    <Plus size={13} className="text-text-secondary shrink-0" />
-                                                </div>
-                                            ))
-                                        )}
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

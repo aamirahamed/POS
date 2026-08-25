@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { fetchTodayFocusItems, saveTodayFocusItem, deleteTodayFocusItem, updateFocusItemNotes } from '@/services/todayService';
+import { supabase } from '@/lib/supabase';
 
 export interface BrainDumpItem {
     id: string;
@@ -18,6 +20,9 @@ export interface QuickNote {
 
 export interface FocusItem {
     id: string;
+    lifemapNodeId?: string; // Optional for manual items
+    isManual?: boolean;
+    title?: string;
     addedAt: number;
     notes: QuickNote[];
 }
@@ -25,13 +30,20 @@ export interface FocusItem {
 interface TodayState {
     focusItems: FocusItem[];
     brainDumpHistory: BrainDumpItem[];
-    addFocusNode: (id: string) => void;
-    removeFocusNode: (id: string) => void;
-    clearFocusNodes: () => void;
-    addFocusNote: (focusId: string, text: string) => void;
-    editFocusNote: (focusId: string, noteId: string, text: string) => void;
-    deleteFocusNote: (focusId: string, noteId: string) => void;
     
+    // Remote Sync
+    loadFromDB: () => Promise<void>;
+    
+    addFocusNode: (id: string, isManual?: boolean, title?: string) => Promise<FocusItem | null>;
+    removeFocusNode: (id: string) => Promise<void>;
+    clearFocusNodes: () => void;
+    
+    // Notes
+    addFocusNote: (focusId: string, text: string) => Promise<QuickNote | null>;
+    editFocusNote: (focusId: string, noteId: string, text: string) => Promise<void>;
+    deleteFocusNote: (focusId: string, noteId: string) => Promise<void>;
+    
+    // Brain Dump
     addBrainDump: (item: Omit<BrainDumpItem, 'id' | 'createdAt'>) => void;
     updateBrainDump: (id: string, updates: Partial<BrainDumpItem>) => void;
     deleteBrainDump: (id: string) => void;
@@ -40,35 +52,115 @@ interface TodayState {
 
 export const useTodayStore = create<TodayState>()(
     persist(
-        (set) => ({
+        (set, get) => ({
             focusItems: [],
             brainDumpHistory: [],
-            addFocusNode: (id) => set((state) => {
-                if (state.focusItems.some(f => f.id === id)) return state;
-                return { focusItems: [...state.focusItems, { id, addedAt: Date.now(), notes: [] }] };
-            }),
-            removeFocusNode: (id) => set((state) => ({ 
-                focusItems: state.focusItems.filter(f => f.id !== id) 
-            })),
-            clearFocusNodes: () => set({ focusItems: [] }),
-            addFocusNote: (focusId, text) => set((state) => ({
-                focusItems: state.focusItems.map(f => f.id === focusId ? {
-                    ...f,
-                    notes: [...f.notes, { id: `note-${Date.now()}`, text, createdAt: Date.now() }]
-                } : f)
-            })),
-            editFocusNote: (focusId, noteId, text) => set((state) => ({
-                focusItems: state.focusItems.map(f => f.id === focusId ? {
-                    ...f,
-                    notes: f.notes.map(n => n.id === noteId ? { ...n, text } : n)
-                } : f)
-            })),
-            deleteFocusNote: (focusId, noteId) => set((state) => ({
-                focusItems: state.focusItems.map(f => f.id === focusId ? {
-                    ...f,
-                    notes: f.notes.filter(n => n.id !== noteId)
-                } : f)
-            })),
+            
+            loadFromDB: async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                
+                const items = await fetchTodayFocusItems(user.id);
+                if (items) {
+                    set({ focusItems: items });
+                }
+            },
+
+            addFocusNode: async (id, isManual = false, title = "") => {
+                const state = get();
+                // Avoid duplicates by lifemapNodeId if not manual
+                if (!isManual && state.focusItems.some(f => f.lifemapNodeId === id)) {
+                    return state.focusItems.find(f => f.lifemapNodeId === id)!;
+                }
+                
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return null;
+                
+                const tempItem: FocusItem = {
+                    id: `temp-${Date.now()}`,
+                    lifemapNodeId: isManual ? undefined : id,
+                    isManual,
+                    title,
+                    addedAt: Date.now(),
+                    notes: []
+                };
+                
+                // Optimistic UI update
+                set({ focusItems: [...state.focusItems, tempItem] });
+                
+                const savedItem = await saveTodayFocusItem(user.id, tempItem);
+                
+                if (savedItem) {
+                    set((s) => ({
+                        focusItems: s.focusItems.map(f => f.id === tempItem.id ? savedItem : f)
+                    }));
+                    return savedItem;
+                } else {
+                    // Revert if error
+                    set((s) => ({
+                        focusItems: s.focusItems.filter(f => f.id !== tempItem.id)
+                    }));
+                    return null;
+                }
+            },
+            
+            removeFocusNode: async (id) => {
+                const state = get();
+                const item = state.focusItems.find(f => f.id === id || f.lifemapNodeId === id);
+                if (!item) return;
+
+                // Optimistic delete
+                set({ focusItems: state.focusItems.filter(f => f.id !== id && f.lifemapNodeId !== id) });
+                
+                await deleteTodayFocusItem(item.id);
+            },
+            
+            clearFocusNodes: () => set({ focusItems: [] }), // We don't delete all from DB immediately here as there is no single service function
+            
+            addFocusNote: async (focusId, text) => {
+                const state = get();
+                const item = state.focusItems.find(f => f.id === focusId || f.lifemapNodeId === focusId);
+                if (!item) return null;
+
+                const newNote: QuickNote = { id: `note-${Date.now()}`, text, createdAt: Date.now() };
+                const updatedNotes = [...item.notes, newNote];
+                
+                // Optimistic UI
+                set((s) => ({
+                    focusItems: s.focusItems.map(f => f.id === item.id ? { ...f, notes: updatedNotes } : f)
+                }));
+                
+                await updateFocusItemNotes(item.id, updatedNotes);
+                return newNote;
+            },
+            
+            editFocusNote: async (focusId, noteId, text) => {
+                const state = get();
+                const item = state.focusItems.find(f => f.id === focusId || f.lifemapNodeId === focusId);
+                if (!item) return;
+
+                const updatedNotes = item.notes.map(n => n.id === noteId ? { ...n, text } : n);
+                
+                set((s) => ({
+                    focusItems: s.focusItems.map(f => f.id === item.id ? { ...f, notes: updatedNotes } : f)
+                }));
+                
+                await updateFocusItemNotes(item.id, updatedNotes);
+            },
+            
+            deleteFocusNote: async (focusId, noteId) => {
+                const state = get();
+                const item = state.focusItems.find(f => f.id === focusId || f.lifemapNodeId === focusId);
+                if (!item) return;
+
+                const updatedNotes = item.notes.filter(n => n.id !== noteId);
+                
+                set((s) => ({
+                    focusItems: s.focusItems.map(f => f.id === item.id ? { ...f, notes: updatedNotes } : f)
+                }));
+                
+                await updateFocusItemNotes(item.id, updatedNotes);
+            },
 
             addBrainDump: (item) => set((state) => ({
                 brainDumpHistory: [{ id: `bd-${Date.now()}`, createdAt: Date.now(), ...item }, ...state.brainDumpHistory]
@@ -81,6 +173,9 @@ export const useTodayStore = create<TodayState>()(
             })),
             clearBrainDump: () => set({ brainDumpHistory: [] })
         }),
-        { name: 'pos-today-storage-v2' }
+        { 
+            name: 'pos-today-storage-v2',
+            partialize: (state) => ({ brainDumpHistory: state.brainDumpHistory }) // Only persist braindump, DB handles focusItems
+        }
     )
 );
