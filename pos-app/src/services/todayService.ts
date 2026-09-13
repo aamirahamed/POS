@@ -18,6 +18,7 @@ export const fetchTodayFocusItems = async (userId: string): Promise<FocusItem[] 
         lifemapNodeId: row.lifemap_node_id,
         isManual: row.is_manual,
         title: row.title,
+        completed: row.completed || false,
         addedAt: new Date(row.added_at).getTime(),
         notes: row.notes || []
     }));
@@ -28,6 +29,7 @@ export const saveTodayFocusItem = async (userId: string, item: FocusItem): Promi
         user_id: userId,
         title: item.title || null,
         is_manual: item.isManual || false,
+        completed: item.completed || false,
         lifemap_node_id: item.lifemapNodeId || null,
         added_at: new Date(item.addedAt).toISOString(),
         notes: item.notes || []
@@ -51,6 +53,7 @@ export const saveTodayFocusItem = async (userId: string, item: FocusItem): Promi
             lifemapNodeId: data.lifemap_node_id,
             isManual: data.is_manual,
             title: data.title,
+            completed: data.completed,
             addedAt: new Date(data.added_at).getTime(),
             notes: data.notes || []
         };
@@ -71,6 +74,7 @@ export const saveTodayFocusItem = async (userId: string, item: FocusItem): Promi
             lifemapNodeId: data.lifemap_node_id,
             isManual: data.is_manual,
             title: data.title,
+            completed: data.completed,
             addedAt: new Date(data.added_at).getTime(),
             notes: data.notes || []
         };
@@ -93,4 +97,13 @@ export const updateFocusItemNotes = async (id: string, notes: any[]) => {
         .update({ notes, updated_at: new Date().toISOString() })
         .eq('id', id);
     if (error) console.error('Error updating focus item notes:', error);
+};
+
+export const updateFocusItemCompletion = async (id: string, completed: boolean) => {
+    if (id.startsWith('temp-') || id.startsWith('node-')) return;
+    const { error } = await supabase
+        .from('today_focus_items')
+        .update({ completed, updated_at: new Date().toISOString() })
+        .eq('id', id);
+    if (error) console.error('Error updating focus item completion:', error);
 };

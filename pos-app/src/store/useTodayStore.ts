@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { fetchTodayFocusItems, saveTodayFocusItem, deleteTodayFocusItem, updateFocusItemNotes } from '@/services/todayService';
+import { fetchTodayFocusItems, saveTodayFocusItem, deleteTodayFocusItem, updateFocusItemNotes, updateFocusItemCompletion } from '@/services/todayService';
 import { supabase } from '@/lib/supabase';
 
 export interface BrainDumpItem {
@@ -23,6 +23,7 @@ export interface FocusItem {
     lifemapNodeId?: string; // Optional for manual items
     isManual?: boolean;
     title?: string;
+    completed?: boolean;
     addedAt: number;
     notes: QuickNote[];
 }
@@ -36,6 +37,7 @@ interface TodayState {
     
     addFocusNode: (id: string, isManual?: boolean, title?: string) => Promise<FocusItem | null>;
     removeFocusNode: (id: string) => Promise<void>;
+    toggleFocusNodeCompletion: (id: string) => Promise<void>;
     clearFocusNodes: () => void;
     
     // Notes
@@ -81,6 +83,7 @@ export const useTodayStore = create<TodayState>()(
                     lifemapNodeId: isManual ? undefined : id,
                     isManual,
                     title,
+                    completed: false,
                     addedAt: Date.now(),
                     notes: []
                 };
@@ -113,6 +116,23 @@ export const useTodayStore = create<TodayState>()(
                 set({ focusItems: state.focusItems.filter(f => f.id !== id && f.lifemapNodeId !== id) });
                 
                 await deleteTodayFocusItem(item.id);
+            },
+            
+            toggleFocusNodeCompletion: async (id) => {
+                const state = get();
+                const item = state.focusItems.find(f => f.id === id || f.lifemapNodeId === id);
+                if (!item) return;
+                
+                const newCompleted = !item.completed;
+
+                // Optimistic update
+                set({
+                    focusItems: state.focusItems.map(f => 
+                        (f.id === id || f.lifemapNodeId === id) ? { ...f, completed: newCompleted } : f
+                    )
+                });
+                
+                await updateFocusItemCompletion(item.id, newCompleted);
             },
             
             clearFocusNodes: () => set({ focusItems: [] }), // We don't delete all from DB immediately here as there is no single service function

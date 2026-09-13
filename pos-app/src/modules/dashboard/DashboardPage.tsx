@@ -9,6 +9,7 @@ import { RemindersWidget } from './components/RemindersWidget';
 import { Sparkles, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { useProfileStore } from '@/store/useProfileStore';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const DashboardPage: FC = () => {
     const navigate = useNavigate();
@@ -21,7 +22,7 @@ const DashboardPage: FC = () => {
     } = useLifeMapStore();
     const { reminders } = useRemindersStore();
     const { items: shoppingItems } = useShoppingStore();
-    const { focusItems, addFocusNode, removeFocusNode, loadFromDB: loadTodayFromDB } = useTodayStore();
+    const { focusItems, addFocusNode, removeFocusNode, toggleFocusNodeCompletion, loadFromDB: loadTodayFromDB } = useTodayStore();
 
     // Local State
     const [showFocusSelector, setShowFocusSelector] = useState(false);
@@ -81,7 +82,14 @@ const DashboardPage: FC = () => {
         };
 
         return (
-            <div key={focus.id} className="flex items-center gap-3 bg-surface-elevated border border-border rounded-xl px-3 py-2.5 hover:bg-surface-hover transition-colors group relative shadow-sm">
+            <div key={focus.id} className={`flex items-center gap-3 bg-surface-elevated border border-border rounded-xl px-3 py-2.5 hover:bg-surface-hover transition-colors group relative shadow-sm ${focus.completed ? 'opacity-50' : ''}`}>
+                {/* Completion Checkbox */}
+                <Checkbox 
+                    checked={focus.completed || false} 
+                    onCheckedChange={() => toggleFocusNodeCompletion(focus.id)} 
+                    className="border-text-secondary/50 data-[state=checked]:bg-accent data-[state=checked]:border-accent shrink-0"
+                />
+
                 {/* Icon */}
                 <div
                     onClick={goToLifeMap}
@@ -93,7 +101,7 @@ const DashboardPage: FC = () => {
                 {/* Content */}
                 <div className="flex-1 min-w-0 flex flex-col justify-center py-0.5">
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-text-primary truncate">
+                        <span className={`text-sm font-semibold truncate transition-all ${focus.completed ? 'text-text-secondary line-through' : 'text-text-primary'}`}>
                             {node ? node.data.label : focus.title}
                         </span>
                         {parentNode && (
