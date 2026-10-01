@@ -13,16 +13,12 @@ export interface UnifiedContext {
 }
 
 export async function compileUnifiedContext(): Promise<UnifiedContext> {
-    // 1. Static Strategy Memo (MENTOR.md)
-    let mentorMemo = "";
-    try {
-        const res = await fetch('/MENTOR.md');
-        if (res.ok) {
-            mentorMemo = await res.text();
-        }
-    } catch (e) {
-        console.warn("Could not load MENTOR.md profile memo", e);
+    // 1. Static Strategy Memo — stored privately as the `strategy_memo` profile fact
+    if (Object.keys(useProfileStore.getState().facts).length === 0) {
+        await useProfileStore.getState().loadFacts();
     }
+    const { facts } = useProfileStore.getState();
+    const mentorMemo = typeof facts.strategy_memo === 'string' ? facts.strategy_memo : "";
 
     // 2. Dynamic Cloud Memory (From mentor store / DB)
     let cloudMemory = "";
@@ -59,10 +55,10 @@ export async function compileUnifiedContext(): Promise<UnifiedContext> {
         return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}${extra}`;
     }).join('\n');
 
-    // 4. Structured Facts
-    const { facts } = useProfileStore.getState();
-    const factsText = Object.keys(facts).length > 0 
-        ? Object.entries(facts).map(([k, v]) => `- **${k}**: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n')
+    // 4. Structured Facts (the strategy memo is rendered separately above)
+    const otherFacts = Object.entries(facts).filter(([k]) => k !== 'strategy_memo');
+    const factsText = otherFacts.length > 0 
+        ? otherFacts.map(([k, v]) => `- **${k}**: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n')
         : "No structured profile facts registered.";
 
     // 5. Finance Metrics (Liquidity, Spending, Runway)
@@ -104,7 +100,7 @@ export async function compileUnifiedContext(): Promise<UnifiedContext> {
     const markdown = `
 # AAMIR'S PROFILE CONTEXT (UNIFIED BRAN STATE)
 ${focusContextString}
-## 1. STRATEGIC MEMO (MENTOR.md)
+## 1. STRATEGIC MEMO
 ${mentorMemo || "No static strategy memo configured."}
 
 ## 2. DYNAMIC MEMORY

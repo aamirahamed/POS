@@ -6,6 +6,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const REDBARK_API_KEY = Deno.env.get('REDBARK_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// The Redbark key belongs to one person's bank connection, so only that user may sync
+const OWNER_USER_ID = Deno.env.get('OWNER_USER_ID');
 
 const REDBARK_BASE = 'https://api.redbark.com/v1';
 
@@ -85,6 +87,10 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!OWNER_USER_ID || user.id !== OWNER_USER_ID) {
+      return Response.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const userId = user.id;

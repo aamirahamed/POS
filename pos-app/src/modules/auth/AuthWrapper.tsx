@@ -12,7 +12,6 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
     const [isConfigured, setIsConfigured] = useState(true);
     const [checkingSession, setCheckingSession] = useState(true);
     const [loading, setLoading] = useState(false);
-    const [isSignUp, setIsSignUp] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -83,14 +82,8 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
         setMessage(null);
 
         try {
-            if (isSignUp) {
-                const { error } = await supabase.auth.signUp({ email, password });
-                if (error) throw error;
-                setMessage({ type: 'success', text: 'Account created! You are now logged in.' });
-            } else {
-                const { error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) throw error;
-            }
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) throw error;
         } catch (error: unknown) {
             const authError = error as AuthError;
             setMessage({ type: 'error', text: authError.message || 'An error occurred' });
@@ -147,7 +140,7 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
                     <div className="mb-8 text-center">
                         <h1 className="text-3xl font-bold text-text-primary tracking-tight mb-1">POS</h1>
                         <p className="text-text-secondary text-sm">
-                            {isSignUp ? 'Create your account' : 'Welcome back'}
+                            Welcome back
                         </p>
                     </div>
 
@@ -184,7 +177,7 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
                                         className="w-full bg-background border border-border rounded-xl px-4 py-3 pr-11 text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-[16px]"
                                         required
                                         minLength={6}
-                                        autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                                        autoComplete="current-password"
                                     />
                                     <button
                                         type="button"
@@ -214,8 +207,8 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
                                 className="w-full bg-gradient-to-r from-accent to-indigo-400 text-white font-semibold py-3 rounded-xl transition-all hover:from-accent-hover hover:to-indigo-500 hover:shadow-lg hover:-translate-y-[1px] disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 mt-2"
                             >
                                 {loading
-                                    ? (isSignUp ? 'Creating account...' : 'Signing in...')
-                                    : (isSignUp ? 'Create Account' : 'Sign In')
+                                    ? 'Signing in...'
+                                    : 'Sign In'
                                 }
                             </button>
 
@@ -258,17 +251,6 @@ const AuthWrapper = ({ children }: AuthWrapperProps) => {
                             </button>
                         </form>
                     </div>
-
-                    {/* Toggle Sign up / Sign in */}
-                    <p className="text-center text-sm text-text-secondary mt-6">
-                        {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-                        <button
-                            onClick={() => { setIsSignUp(!isSignUp); setMessage(null); }}
-                            className="text-accent hover:text-accent-hover font-medium transition-colors"
-                        >
-                            {isSignUp ? 'Sign in' : 'Create one'}
-                        </button>
-                    </p>
                 </div>
             </div>
         );
