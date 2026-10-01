@@ -18,8 +18,8 @@ These come first because the live site exposes private data now, and because eve
 | S4 | **Stop exposing the Gemini key.** **Your step:** create a new key, restrict it to the Vercel domain and localhost (HTTP referrers), delete the old one, then update `pos-app/.env` and the Vercel env var. The full fix (no LLM key in the browser) comes with A2. | S | [~] |
 | S5 | **Make `MENTOR.md` private.** Done: the memo now lives in `user_facts` (key `strategy_memo`), the public file is deleted, and the Finance prompt no longer contains your account details. Goes live on the next deploy. | S | [x] |
 | S6 | **Stop the web app overwriting Claude's changes.** Right now the app and the MCP server both save the whole map at once, so whichever saves last wins. **Decided: split the map into one database row per node and task**, with live updates in the app. | L | [ ] |
-| S7 | **Capture the full database schema in the repo.** About 15 tables only exist in the live Supabase project. Dump a baseline migration so every later change is tracked. | S | [ ] |
-| S8 | **Delete the `inspect-db` debug function.** It's deployed but not in the repo, and returns every user's full Life Map with no check on who's asking. Source saved before deleting. | S | [?] |
+| S7 | **Capture the full database schema in the repo.** Done: `supabase/migrations/20261001000000_baseline.sql` (25 tables, 52 access rules) replaces the 7 partial migrations, tested on an empty database, and Supabase's migration history now matches. All 52 rules limit rows to their owner. | S | [x] |
+| S8 | **Delete the `inspect-db` debug function.** It's deployed but not in the repo, and returns every user's full Life Map with no check on who's asking. Source saved. **Your step:** Claude Code's permission check blocked me, so delete it in Supabase → Edge Functions. | S | [~] |
 | S9 | **Make the GitHub repo private.** `aamirahamed/POS` is public: your strategy memo, full profile, and finance rules (rent amounts) are readable, including in git history. No keys were ever committed. **Your step:** GitHub → Settings → Danger Zone → Change visibility. | S | [?] |
 
 ## P1 — Remove stale features
@@ -36,7 +36,7 @@ This is cheap, low-risk, and shrinks the code before the bigger redesigns. Code 
 | R6 | Remove the leftover pillar/thread/initiative/subnode migration code once the stored map is confirmed clean. | S | [ ] |
 | R7 | **Clean the root folder.** Archive or delete the stale docs (`codebase_architecture.md`, `system_overview.md`, `context.md`, the duplicate `pos_detailed_features.md`, and the old build prompts), fix `.gitignore`, and add a `CLAUDE.md`. | S | [ ] |
 | R8 | **Decided: keep** Job Tracker + extension, Shopping, Wishlist, Finance, Mentor page, YD roster/earnings for now. | — | [x] |
-| R9 | Export and then drop the database tables of removed features (`assignments`, `semesters`, `subjects`). Only after you confirm. | S | [?] |
+| R9 | Export and then drop the `subjects` table (the only Assignment Tracker table that exists; `assignments` and `semesters` were never created in the live database). Only after you confirm. | S | [?] |
 
 ## P3 — Product features
 
