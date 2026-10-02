@@ -28,13 +28,13 @@ This is cheap, low-risk, and shrinks the code before the bigger redesigns. Code 
 
 | ID | Item | Size | Status |
 |---|---|---|---|
-| R1 | Remove **Assignment Tracker** (module, route, nav item, hooks) and detach the `SemesterTracker` submodule from this repo. | S | [ ] |
-| R2 | Remove **Thought Incubator** (page, store, route, nav). | S | [ ] |
-| R3 | Remove **Quick Capture** (page, route, nav). | S | [ ] |
-| R4 | Remove **Briefs page** and its nav item. Brief data and the MCP brief tools stay; the brief moves into project context in A5. | S | [ ] |
-| R5 | Remove dead code: `geminiService.ts`, 11 unused components (3 dashboard widgets, 5 finance components, ImportModal, 2 tracker components), and the local-only Life Map `inbox` list plus Sam's `add_inbox_item` tool. | S | [ ] |
-| R6 | Remove the leftover pillar/thread/initiative/subnode migration code once the stored map is confirmed clean. | S | [ ] |
-| R7 | **Clean the root folder.** Archive or delete the stale docs (`codebase_architecture.md`, `system_overview.md`, `context.md`, the duplicate `pos_detailed_features.md`, and the old build prompts), fix `.gitignore`, and add a `CLAUDE.md`. | S | [ ] |
+| R1 | **Remove Assignment Tracker.** Done: module, route, nav item, and the `SemesterTracker` link removed (that folder is a clean copy of its own GitHub repo, now gitignored). | S | [x] |
+| R2 | **Remove Thought Incubator.** Done: page, store, route, nav. | S | [x] |
+| R3 | **Remove Quick Capture.** Done: page, route, nav. | S | [x] |
+| R4 | **Remove Briefs page.** Done: page, route, nav. Briefs are still reachable from the Brief buttons on domains and projects; the MCP brief tools are unchanged. Better placement comes in A5. | S | [x] |
+| R5 | **Remove dead code.** Done: `geminiService.ts`, 8 unused components, the local-only inbox list and Sam's `add_inbox_item` tool. Lint errors 188 → 174. Possible follow-up: some helper functions in `financeUtils.ts` and the CSV import path in `useFinanceStore.ts` were only used by the removed components. | S | [x] |
+| R6 | **Remove the legacy pillar/thread/initiative/subnode migration code.** Moved into S6. The stored map has no legacy types or statuses, but three inbox nodes still use legacy IDs, so the code can only go once S6 renames them. | S | [ ] |
+| R7 | **Clean the root folder.** Done: stale docs moved to `docs/archive`, specs to `docs/specs`, your profile to the gitignored `private/` folder; `CLAUDE.md` added; `.gitignore` fixed and `supabase/.temp` untracked. Duplicate `pos-app/pos_detailed_features.md` deleted. | S | [x] |
 | R8 | **Decided: keep** Job Tracker + extension, Shopping, Wishlist, Finance, Mentor page, YD roster/earnings for now. | — | [x] |
 | R9 | Export and then drop the `subjects` table (the only Assignment Tracker table that exists; `assignments` and `semesters` were never created in the live database). Only after you confirm. | S | [?] |
 
@@ -44,7 +44,7 @@ This is cheap, low-risk, and shrinks the code before the bigger redesigns. Code 
 |---|---|---|---|
 | D1 | **One to-do model.** Merge Today's Focus items, Reminders and "my" Life Map tasks into a single list with due dates. This also fixes reminders that only save while the Reminders page is open. | M | [?] |
 | D2 | **Dashboard redesign: action-oriented.** Lead with what to do today: to-dos, what's waiting on you, decisions pending, and today's calendar. Move the clock, stats and roster detail lower or onto their own pages. | M | [ ] |
-| D3 | **Brain Gym.** A daily morning routine: thinking exercises, a writing prompt, and briefings on your areas of interest and career goals. Brainstorm first, then build. Its AI-generated content needs a server-side model call, so it will either pull in a small slice of A2 or wait for it. | L | [?] |
+| D3 | **Brain Gym.** Spec agreed: [docs/specs/BRAIN_GYM.md](docs/specs/BRAIN_GYM.md). 60-day morning routine, Gemini server-side, built in 4 phases. | L | [~] |
 | D4 | **Fix the extension's account sync** (broken since 5 May). | S | [ ] |
 
 ## P2 — Make POS agent-driven (PARKED)

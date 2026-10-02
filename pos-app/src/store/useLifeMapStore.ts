@@ -331,7 +331,6 @@ export const useLifeMapStore = create<LifeMapState>()(
             return {
                 nodes: initNodes,
                 edges: initEdges,
-                inbox: [],
 
                 focusedProjectId: null,
                 setFocusedProject: (id) => set({ focusedProjectId: id }),
@@ -884,14 +883,6 @@ export const useLifeMapStore = create<LifeMapState>()(
                     const layouted = calculateRadialLayout(get().nodes, newEdges);
                     set({ nodes: layouted.nodes });
                 },
-
-                addInboxItem: (text: string) => set({
-                    inbox: [{ id: `inbox-${Date.now()}`, text, createdAt: Date.now() }, ...get().inbox]
-                }),
-
-                removeInboxItem: (id: string) => set({
-                    inbox: get().inbox.filter(item => item.id !== id)
-                }),
             };
         },
         {

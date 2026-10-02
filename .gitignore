@@ -30,4 +30,11 @@ Thumbs.db
 
 # Project specific
 .gemini/
-SemesterTracker/ # Already a separate repo
+# Separate repo (github.com/aamirsautomation/semester-spark-97), no longer part of POS
+SemesterTracker/
+
+# Supabase CLI scratch files
+pos-app/supabase/.temp/
+
+# Personal material (career history, portfolio). Never commit.
+private/

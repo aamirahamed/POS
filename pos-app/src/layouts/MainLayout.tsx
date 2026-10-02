@@ -1,6 +1,6 @@
 import { FC, useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Network, Bell, Settings, LayoutGrid, GraduationCap, Briefcase, ShoppingCart, Menu, X, Lightbulb, Wallet, Zap, BrainCircuit, FileText } from 'lucide-react';
+import { LayoutDashboard, Network, Bell, Settings, LayoutGrid, Briefcase, ShoppingCart, Menu, X, Wallet, BrainCircuit } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import CommandCenter from '@/modules/lifemap/components/CommandCenter';
@@ -10,16 +10,12 @@ import { Command } from 'lucide-react';
 const NAV_ITEMS = [
     { path: '/', label: 'Overview', icon: LayoutDashboard },
     { path: '/life-map', label: 'Life Map', icon: Network },
-    { path: '/briefs', label: 'Project Briefs', icon: FileText },
     { path: '/mentor', label: 'Life Map Mentor', icon: BrainCircuit },
     { path: '/reminders', label: 'Reminders', icon: Bell },
     { path: '/wishlist', label: 'Wishlist', icon: LayoutGrid },
-    { path: '/tracker', label: 'Assignments', icon: GraduationCap },
     { path: '/jobs', label: 'Job Tracker', icon: Briefcase },
     { path: '/shopping',   label: 'Shopping',          icon: ShoppingCart },
-    { path: '/incubator',  label: 'Thought Incubator', icon: Lightbulb },
     { path: '/finance',    label: 'Finance',            icon: Wallet },
-    { path: '/quick-capture', label: 'Quick Capture',     icon: Zap },
     { path: '/settings',   label: 'Settings',          icon: Settings, disabled: true },
 ] as const;
 
@@ -145,18 +141,16 @@ const MainLayout: FC = () => {
             {/* ── Main Content ── */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 {/* Mobile Top Bar */}
-                {location.pathname !== '/quick-capture' && (
-                    <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface/80 backdrop-blur-md border-b border-border/50 shrink-0 z-30">
-                        <button
-                            onClick={() => setSidebarOpen(true)}
-                            className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors"
-                            aria-label="Open menu"
-                        >
-                            <Menu size={22} />
-                        </button>
-                        <span className="text-base font-bold text-text-primary tracking-tight">POS</span>
-                    </header>
-                )}
+                <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-surface/80 backdrop-blur-md border-b border-border/50 shrink-0 z-30">
+                    <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors"
+                        aria-label="Open menu"
+                    >
+                        <Menu size={22} />
+                    </button>
+                    <span className="text-base font-bold text-text-primary tracking-tight">POS</span>
+                </header>
 
                 <main className="flex-1 overflow-auto relative">
                     <Outlet />

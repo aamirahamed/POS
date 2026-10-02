@@ -124,18 +124,6 @@ const addTaskToNodeDecl: FunctionDeclaration = {
   }
 };
 
-const addInboxItemDecl: FunctionDeclaration = {
-  name: 'add_inbox_item',
-  description: 'Create a raw capture or thought item in the Inbox.',
-  parameters: {
-    type: SchemaType.OBJECT,
-    properties: {
-      text: { type: SchemaType.STRING, description: 'The text of the capture/thought.' }
-    },
-    required: ['text']
-  }
-};
-
 const addResourceToNodeDecl: FunctionDeclaration = {
   name: 'add_resource_to_node',
   description: 'Add a reference resource link (url, youtube link, article link, design resource) inside a specific Milestone node.',
@@ -272,7 +260,6 @@ const lifemapTools: Tool[] = [{
     addProjectDecl, 
     addMilestoneDecl, 
     addTaskToNodeDecl, 
-    addInboxItemDecl,
     addResourceToNodeDecl,
     addReminderDecl,
     deleteNodeDecl,
@@ -302,7 +289,6 @@ const mentorTools: Tool[] = [{
     addProjectDecl, 
     addMilestoneDecl, 
     addTaskToNodeDecl, 
-    addInboxItemDecl,
     addResourceToNodeDecl,
     addReminderDecl,
     deleteNodeDecl,
@@ -573,9 +559,6 @@ async function executeLifeMapAgent(
             await useLifeMapStore.getState().addTaskToNode(args.node_id, text);
             executionMessages.push(`✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id, taskText: text })}`);
         }
-      } else if (call.name === 'add_inbox_item') {
-        await useLifeMapStore.getState().addInboxItem(args.text);
-        executionMessages.push(`✓ Saved thought "${args.text}" to Inbox.`);
       } else if (call.name === 'add_resource_to_node') {
         const id = `res-${Date.now()}`;
         await useLifeMapStore.getState().addResource(args.node_id, {
@@ -721,9 +704,6 @@ export async function executeMentorAgent(
             await useLifeMapStore.getState().addTaskToNode(args.node_id, text);
             executionMessage += `✓ Added task "${text}" into Milestone node ID "${args.node_id}".\n\n__JSON_PAYLOAD__${JSON.stringify({ type: 'add_task_to_node', nodeId: args.node_id })}\n`;
         }
-      } else if (call.name === 'add_inbox_item') {
-        await useLifeMapStore.getState().addInboxItem(args.text);
-        executionMessage = `✓ Saved thought "${args.text}" to Inbox.`;
       } else if (call.name === 'add_resource_to_node') {
         const id = `res-${Date.now()}`;
         await useLifeMapStore.getState().addResource(args.node_id, {

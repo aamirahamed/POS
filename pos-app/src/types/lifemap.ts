@@ -64,16 +64,9 @@ export interface LifeMapNode extends Node {
     };
 }
 
-export interface InboxItem {
-    id: string;
-    text: string;
-    createdAt: number;
-}
-
 export interface LifeMapState {
     nodes: LifeMapNode[];
     edges: Edge[];
-    inbox: InboxItem[];
     focusedProjectId: string | null;
     
     addNode: (node: LifeMapNode) => void;
@@ -126,8 +119,4 @@ export interface LifeMapState {
     // Resource actions
     addResource: (nodeId: string, resource: Resource) => void;
     removeResource: (nodeId: string, resourceId: string) => void;
-
-    // Inbox actions
-    addInboxItem: (text: string) => void;
-    removeInboxItem: (id: string) => void;
 }
