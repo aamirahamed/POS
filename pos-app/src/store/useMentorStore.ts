@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { SchemaType } from '@google/generative-ai';
+import { createGenAI } from '@/services/agent/gemini';
 import { executeMentorAgent, formatHistory } from '@/services/agent/agentService';
 import { useLifeMapStore } from './useLifeMapStore';
 import { supabase } from '@/lib/supabase';
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 export interface ChatMessage {
   id: string;
@@ -93,7 +93,7 @@ export const useMentorStore = create<MentorState>()(
         }
 
         try {
-          const genAI = new GoogleGenerativeAI(API_KEY || '');
+          const genAI = await createGenAI();
 
           const historyForAgent = get().messages.map(m => ({
             role: m.role,
@@ -240,7 +240,6 @@ export const useMentorStore = create<MentorState>()(
       },
 
       runAudit: async () => {
-        if (!API_KEY) return;
         set({ isAuditing: true });
 
         try {
@@ -250,7 +249,7 @@ export const useMentorStore = create<MentorState>()(
             return `- [${n.type.toUpperCase()}] ID: "${n.id}", Label: "${n.data?.label}"${parent}`;
           }).join('\n');
 
-          const genAI = new GoogleGenerativeAI(API_KEY);
+          const genAI = await createGenAI();
           
           const auditSchema: any = {
             type: SchemaType.OBJECT,

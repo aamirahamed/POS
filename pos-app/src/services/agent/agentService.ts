@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI, FunctionDeclaration, Tool, Content, SchemaType } from "@google/generative-ai";
+import { FunctionDeclaration, Tool, Content, SchemaType } from "@google/generative-ai";
+import { createGenAI, GenAI } from "./gemini";
 import { ORCHESTRATOR_PROMPT, LIFEMAP_PROMPT, SHOPPING_PROMPT, MENTOR_PROMPT, FINANCE_MENTOR_PROMPT } from "./prompts";
 import { useLifeMapStore } from "@/store/useLifeMapStore";
 import { useShoppingStore } from "@/store/useShoppingStore";
@@ -8,7 +9,6 @@ import { useRemindersStore } from "@/store/useRemindersStore";
 import { useProfileStore } from "@/store/useProfileStore";
 import { compileUnifiedContext } from "./contextEngine";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 export interface AgentResponse {
   text: string;
@@ -388,11 +388,7 @@ export async function executeAgentCommand(
   history: { role: 'user' | 'assistant'; text: string }[],
   onStatusUpdate: (status: string) => void
 ): Promise<AgentResponse> {
-  if (!API_KEY) {
-    throw new Error("Gemini API key is not configured.");
-  }
-
-  const genAI = new GoogleGenerativeAI(API_KEY);
+  const genAI = await createGenAI();
   
   const formattedHistory = formatHistory(history);
   onStatusUpdate("Secretary checking request...");
@@ -461,7 +457,7 @@ export async function executeAgentCommand(
 // 5. Life Map Sub-Agent Runner
 // ──────────────────────────────────────────────────────────
 async function executeLifeMapAgent(
-  genAI: GoogleGenerativeAI,
+  genAI: GenAI,
   query: string,
   history: Content[],
   onStatusUpdate: (status: string) => void
@@ -623,7 +619,7 @@ async function executeLifeMapAgent(
 // 5.5. Personal Mentor Sub-Agent Runner
 // ──────────────────────────────────────────────────────────
 export async function executeMentorAgent(
-  genAI: GoogleGenerativeAI,
+  genAI: GenAI,
   query: string,
   history: Content[],
   onStatusUpdate: (status: string) => void
@@ -769,7 +765,7 @@ export async function executeMentorAgent(
 // 6. Shopping List Sub-Agent Runner
 // ──────────────────────────────────────────────────────────
 async function executeShoppingAgent(
-  genAI: GoogleGenerativeAI,
+  genAI: GenAI,
   query: string,
   history: Content[],
   onStatusUpdate: (status: string) => void
@@ -873,7 +869,7 @@ function lifemapAgentTools(): Tool[] {
 // 7. Finance Manager Sub-Agent Runner
 // ──────────────────────────────────────────────────────────
 async function executeFinanceAgent(
-  genAI: GoogleGenerativeAI,
+  genAI: GenAI,
   query: string,
   history: Content[],
   onStatusUpdate: (status: string) => void
