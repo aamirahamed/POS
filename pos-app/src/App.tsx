@@ -8,6 +8,7 @@ import { JobTrackerPage } from '@/modules/job-tracker/JobTrackerPage';
 import ShoppingListPage from '@/modules/shopping/ShoppingListPage';
 import AuthWrapper from '@/modules/auth/AuthWrapper';
 import FinancePage from '@/modules/finance/FinancePage';
+import BrainGymPage from '@/modules/brain-gym/BrainGymPage';
 import MentorPage from '@/modules/mentor/MentorPage';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -18,6 +19,7 @@ function App() {
         <Routes>
           <Route path="/" element={<MainLayout />}>
             <Route index element={<DashboardPage />} />
+            <Route path="brain-gym" element={<BrainGymPage />} />
             <Route path="life-map" element={<LifeMap />} />
             <Route path="reminders" element={<Reminders />} />
             <Route path="wishlist" element={<Wishlist />} />

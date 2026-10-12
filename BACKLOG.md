@@ -15,7 +15,7 @@ These come first because the live site exposes private data now, and because eve
 | S1 | **Lock down bank sync.** Done: `sync-redbark` now only runs for the `OWNER_USER_ID` secret (your user ID). Deployed 2026-10-01. | S | [x] |
 | S2 | **Turn off public sign-up.** Done in code: the login screen no longer offers sign-up. **Your step:** Supabase → Authentication → Sign In / Providers → turn off "Allow new users to sign up". Google sign-in still creates accounts until you do. | S | [~] |
 | S3 | **Remove the daily summary email function.** Done: code removed and the live function deleted 2026-10-01. **Your step:** check Supabase → Integrations → Cron for a job that called it, and delete it. | S | [~] |
-| S4 | **Stop exposing the Gemini key.** **Your step:** create a new key, restrict it to the Vercel domain and localhost (HTTP referrers), delete the old one, then update `pos-app/.env` and the Vercel env var. The full fix (no LLM key in the browser) comes with A2. | S | [~] |
+| S4 | **Stop exposing the Gemini key.** Done 2026-10-03: Sam and the Mentor now call Gemini through the `gemini-proxy` edge function (owner-only, text generation only); the key is a Supabase secret and no longer in the website build. **Your steps:** (1) delete `VITE_GEMINI_API_KEY` from Vercel's environment variables; (2) when convenient, create a fresh key, run `supabase secrets set GEMINI_API_KEY=...`, update `supabase/functions/.env`, and delete the old key, because old Vercel deployments still contain it. | S | [~] |
 | S5 | **Make `MENTOR.md` private.** Done: the memo now lives in `user_facts` (key `strategy_memo`), the public file is deleted, and the Finance prompt no longer contains your account details. Goes live on the next deploy. | S | [x] |
 | S6 | **Stop the web app overwriting Claude's changes.** Right now the app and the MCP server both save the whole map at once, so whichever saves last wins. **Decided: split the map into one database row per node and task**, with live updates in the app. | L | [ ] |
 | S7 | **Capture the full database schema in the repo.** Done: `supabase/migrations/20261001000000_baseline.sql` (25 tables, 52 access rules) replaces the 7 partial migrations, tested on an empty database, and Supabase's migration history now matches. All 52 rules limit rows to their owner. | S | [x] |
@@ -44,7 +44,7 @@ This is cheap, low-risk, and shrinks the code before the bigger redesigns. Code 
 |---|---|---|---|
 | D1 | **One to-do model.** Merge Today's Focus items, Reminders and "my" Life Map tasks into a single list with due dates. This also fixes reminders that only save while the Reminders page is open. | M | [?] |
 | D2 | **Dashboard redesign: action-oriented.** Lead with what to do today: to-dos, what's waiting on you, decisions pending, and today's calendar. Move the clock, stats and roster detail lower or onto their own pages. | M | [ ] |
-| D3 | **Brain Gym.** Spec agreed: [docs/specs/BRAIN_GYM.md](docs/specs/BRAIN_GYM.md). 60-day morning routine, Gemini server-side, built in 4 phases. | L | [~] |
+| D3 | **Brain Gym.** Spec: [docs/specs/BRAIN_GYM.md](docs/specs/BRAIN_GYM.md). **Phase 1 built** (tables live, page, quest map, streak/freeze/catch-up rules with tests, sample content, dashboard card); awaiting your test. Next: phase 2 content agents (needs the server Gemini key). | L | [~] |
 | D4 | **Fix the extension's account sync** (broken since 5 May). | S | [ ] |
 
 ## P2 — Make POS agent-driven (PARKED)
@@ -66,3 +66,4 @@ Parked until after P3. A1 and A2 need a design conversation before any code is w
 |---|---|---|---|
 | H1 | Add tests for the agent tools and the data-change layer (A3). | M | [ ] |
 | H2 | Run lint and tests before every deploy. | S | [ ] |
+| H3 | **Update Sam's model names.** Sam, the Mentor and the Finance agent ask for `gemini-2.5-*` models; `gemini-2.5-pro` is no longer available on this key, so Finance silently falls back to Flash. Pin current versions (the helper uses `gemini-3.8-flash` and `gemini-3.1-pro-preview`). | S | [ ] |

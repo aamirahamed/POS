@@ -6,6 +6,7 @@ import { useShoppingStore } from '@/store/useShoppingStore';
 import { useTodayStore, FocusItem } from '@/store/useTodayStore';
 import { CalendarSection } from './components/CalendarSection';
 import { RemindersWidget } from './components/RemindersWidget';
+import { BrainGymCard } from './components/BrainGymCard';
 import { Sparkles, Bot, Plus, ListTodo, Target, Map, ShoppingCart, Zap, X, Bell, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { useProfileStore } from '@/store/useProfileStore';
@@ -191,6 +192,8 @@ const DashboardPage: FC = () => {
 
                 {/* ── TWO-ZONE GRID ─────────────────────────────────────── */}
                 <div className="flex flex-col gap-6 lg:gap-8">
+
+                    <BrainGymCard />
 
                     {/* ══ ZONE 1: FOCUS & CAPTURE ════════════════════════════
                         Horizontal split: Focus (left 62%) | Brain Dump (right 38%) */}

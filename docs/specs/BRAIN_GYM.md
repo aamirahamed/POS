@@ -93,6 +93,7 @@ Depth: PM level daily, with a technical section (how it works, notable papers) i
 | Session Builder | Nightly (scheduled) | Plans and writes tomorrow's session from: due recall items, series progress, weak skills, story bank coverage, last week's review. |
 | News Curator | Nightly, before the builder | Fetches sources, dedupes, ranks, writes the briefing and technical notes. |
 | Market Analyst | Setup, then monthly | Collects 50+ PM postings, builds the requirements matrix, rates readiness against it. |
+| Helper (coach / tutor / reflect / review) | On demand, beside any module | One helper with a mode set by the module. **Coach** (Think, Numbers, Interview Rep, Mock Interview, Teardown, Recall): the lightest nudge that unblocks Aamir, never the answer; the model never sees the answer key, and a second model call checks every reply for leaks and forces a rewrite or safe fallback. **Tutor** (Lesson, History, AI Briefing): explains freely, goes deeper, suggests further reading, but won't write his "Lock it in" answer. **Reflect** (Close, Weekly Review): asks questions, never writes the reflection. **Review** (any coach module once submitted): discusses the answer openly. Conversations are stored for the Coach and Weekly Reviewer. Built: `supabase/functions/bg-coach`. Planned to become a Brain Gym skill of the unified agent (A2). |
 | Grader | On each submit (non-interview modules) | Scores answers, gives feedback, creates recall items. |
 | Interviewer | Interview Rep and Saturday mock | Asks questions and follow-ups, in character. Never coaches mid-interview. |
 | Coach | After each interview answer, and weekly | Scores interview answers with the feedback set above. Keeps the coaching file: weak areas with evidence and trend (improving / stuck / solved), readiness against the requirements matrix. Decides what to practise next; the Session Builder follows its plan. |
@@ -105,8 +106,9 @@ Plain code (no agent): streaks, freezes, recall scheduling, numeric answer check
 
 - **Model:** Gemini (Aamir's existing API). Pro for generation and grading, Flash for news summarising. Called only server-side (Supabase Edge Functions) with a key stored in Supabase secrets, never in the browser.
 - **Scheduling:** `pg_cron` + `pg_net` in Supabase trigger the nightly build around 3am Melbourne time.
-- **Edge functions:** `bg-build-session` (curator + builder), `bg-grade`, `bg-interview` (interviewer + coach), `bg-stories`, `bg-market`, `bg-weekly-review`.
+- **Edge functions:** `bg-coach` (built), `bg-build-session` (curator + builder), `bg-grade`, `bg-interview` (interviewer + coach), `bg-stories`, `bg-market`, `bg-weekly-review`.
 - **Tables** (all owner-scoped by RLS): `bg_days`, `bg_modules`, `bg_attempts`, `bg_recall_items`, `bg_series`, `bg_stories`, `bg_news_items`, `bg_reviews`, `bg_job_postings`, `bg_requirements` (the matrix plus readiness), `bg_coaching_notes` (weak areas, evidence, trend).
+- **Content format:** module content is a list of typed blocks (`pos-app/src/modules/brain-gym/blocks.ts`): markdown, callout, key term, timeline, people, payoff matrix, bars, tree, cards, steps, compare, news cards, stats, chat, rubric. The Session Builder must output this JSON, choosing the block that fits the information (a timeline for events, a tree for probabilities, a matrix for payoffs) rather than prose. Written answers can be one box or labelled fields.
 - **UI:** a `/brain-gym` page (today's session, step by step), a quest map / stats view, a story bank view. A dashboard card shows today's progress and the streak.
 
 ## Build phases

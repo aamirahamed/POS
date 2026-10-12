@@ -22,7 +22,8 @@ Aamir's personal tool: a Life Map (Domain → Project → Milestone → Task) pl
 ## Things to know
 
 - **Life Map storage:** the whole map is one JSON row per user in `life_maps`, saved wholesale by both the web app and the MCP server, so the last writer wins. Splitting it into per-node rows is backlog item S6.
-- **Two separate AIs:** Sam (Cmd+K in the app, Gemini, runs in the browser, key exposed) and Claude (via the MCP server, writes straight to the database). Unifying them is parked (A2).
+- **AI calls:** Sam (Cmd+K) and the Mentor run in the browser but call Gemini through the `gemini-proxy` edge function, which holds the key (Supabase secret `GEMINI_API_KEY`, owner-only). Never put an AI key in a `VITE_` variable. Claude reaches the data via the MCP server. Unifying the agents is parked (A2).
+- **Brain Gym helper** (`supabase/functions/bg-coach`, logic in `helper.ts`): run `npx --yes tsx scripts/eval-helper.ts` after changing its prompts or models; it reads the key from `supabase/functions/.env`. Pin exact Gemini model versions, never `-latest` aliases.
 - **Legacy inbox IDs:** the live map still has `pillar-inbox`, `initiative-inbox`, `subnode-inbox`. Code handles both old and new names; don't remove that until the IDs are renamed during S6.
 - **Statuses:** the model is `not_started | in_progress | blocked | parked | done | dropped`, with a tested derivation in `src/utils/lifemapDerivation.ts`, but many screens still use old values (`active`, `backlog`, `completed`). Backlog item A4.
 - **Altitude rule for map text:** Life Map tasks describe what is happening, never how it is built. Project Briefs may name the stack but stop before implementation detail.

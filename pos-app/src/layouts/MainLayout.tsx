@@ -1,6 +1,6 @@
 import { FC, useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Network, Bell, Settings, LayoutGrid, Briefcase, ShoppingCart, Menu, X, Wallet, BrainCircuit } from 'lucide-react';
+import { LayoutDashboard, Brain, Network, Bell, Settings, LayoutGrid, Briefcase, ShoppingCart, Menu, X, Wallet, BrainCircuit } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import CommandCenter from '@/modules/lifemap/components/CommandCenter';
@@ -9,6 +9,7 @@ import { Command } from 'lucide-react';
 
 const NAV_ITEMS = [
     { path: '/', label: 'Overview', icon: LayoutDashboard },
+    { path: '/brain-gym', label: 'Brain Gym', icon: Brain },
     { path: '/life-map', label: 'Life Map', icon: Network },
     { path: '/mentor', label: 'Life Map Mentor', icon: BrainCircuit },
     { path: '/reminders', label: 'Reminders', icon: Bell },
