@@ -44,7 +44,7 @@ This is cheap, low-risk, and shrinks the code before the bigger redesigns. Code 
 |---|---|---|---|
 | D1 | **One to-do model.** Merge Today's Focus items, Reminders and "my" Life Map tasks into a single list with due dates. This also fixes reminders that only save while the Reminders page is open. | M | [?] |
 | D2 | **Dashboard redesign: action-oriented.** Lead with what to do today: to-dos, what's waiting on you, decisions pending, and today's calendar. Move the clock, stats and roster detail lower or onto their own pages. | M | [ ] |
-| D3 | **Brain Gym.** Spec: [docs/specs/BRAIN_GYM.md](docs/specs/BRAIN_GYM.md). **Phase 1 built** (tables live, page, quest map, streak/freeze/catch-up rules with tests, sample content, dashboard card); awaiting your test. Next: phase 2 content agents (needs the server Gemini key). | L | [~] |
+| D3 | **Brain Gym.** Spec: [docs/specs/BRAIN_GYM.md](docs/specs/BRAIN_GYM.md). Phase 1 (routine, visuals, helper) and phase 2 (News Curator, Session Builder, series, verified Numbers, Grader, nightly schedule, interview level pinned to APM–PM) shipped. Next: phase 3 interview prep (market analysis, story bank, spoken answers, mock interviewer). | L | [~] |
 | D4 | **Fix the extension's account sync** (broken since 5 May). | S | [ ] |
 
 ## P2 — Make POS agent-driven (PARKED)

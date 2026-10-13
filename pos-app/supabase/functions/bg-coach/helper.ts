@@ -1,10 +1,12 @@
 // Brain Gym helper: modes, prompts and the reply pipeline, shared by the bg-coach edge function
 // and the eval script (pos-app/scripts/eval-helper.ts). No Deno- or Node-specific APIs here.
 
-// Explaining needs accuracy more than speed; short nudges and leak checks don't
-const FAST_MODEL = 'gemini-3.8-flash';
-const CAREFUL_MODEL = 'gemini-3.1-pro-preview';
+import { CAREFUL_MODEL, FAST_MODEL, GeminiContent, callGemini } from '../_shared/gemini.ts';
+
+// Explaining needs accuracy more than speed; short nudges and leak checks don't use the careful model
 const HISTORY_TURNS = 20;
+
+interface HelperReply { move: string; level: number; reply: string }
 
 export type Mode = 'coach' | 'tutor' | 'reflect' | 'review';
 
@@ -92,26 +94,6 @@ Naming or explaining the general METHOD for this type of problem is NOT a leak, 
 
 Be strict about applied content and specific answer content; be lenient about general technique.`;
 
-interface GeminiPart { text: string }
-interface GeminiContent { role: 'user' | 'model'; parts: GeminiPart[] }
-
-const callGemini = async (apiKey: string, system: string, contents: GeminiContent[], schema: Record<string, unknown>, temperature: number, model = FAST_MODEL) => {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents,
-      generationConfig: { temperature, responseMimeType: 'application/json', responseSchema: schema },
-    }),
-  });
-  if (!res.ok) throw new Error(`Gemini error ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((p: GeminiPart) => p.text ?? '').join('') ?? '';
-  if (!text) throw new Error('Gemini returned an empty response');
-  return JSON.parse(text);
-};
-
 export const MOVES: Record<Mode, string[]> = {
   coach: ['question', 'pointer', 'method', 'example', 'feedback', 'concept', 'decline'],
   tutor: ['explain', 'deeper', 'example', 'connect', 'further_reading', 'check_understanding', 'decline'],
@@ -188,7 +170,7 @@ export const generateReply = async (input: ReplyInput): Promise<ReplyResult> => 
   });
 
   const model = mode === 'tutor' || mode === 'review' ? CAREFUL_MODEL : FAST_MODEL;
-  let result = await callGemini(apiKey, PROMPTS[mode], [...turns, finalTurn()], replySchema(mode), mode === 'tutor' ? 0.4 : 0.6, model);
+  let result: HelperReply = await callGemini<HelperReply>(apiKey, PROMPTS[mode], [...turns, finalTurn()], replySchema(mode), mode === 'tutor' ? 0.4 : 0.6, model);
   const leakChecks: { leaks: boolean; reason: string }[] = [];
 
   if (mode === 'coach') {
@@ -205,7 +187,7 @@ export const generateReply = async (input: ReplyInput): Promise<ReplyResult> => 
     let verdict = await judge(result.reply);
     leakChecks.push(verdict);
     if (verdict.leaks) {
-      result = await callGemini(
+      result = await callGemini<HelperReply>(
         apiKey,
         PROMPTS.coach,
         [...turns, finalTurn(`\n\n[Note: a previous draft of your reply was rejected because it gave away part of the answer: ${verdict.reason}. Write a lighter hint that does not.]`)],

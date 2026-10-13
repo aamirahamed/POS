@@ -24,27 +24,31 @@ export const helperModeFor = (moduleKey: ModuleKey, completed: boolean): HelperM
     return base === 'coach' && completed ? 'review' : base;
 };
 
-export const HELPER_IDENTITY: Record<HelperMode, { name: string; tagline: string; icon: LucideIcon; intro: string }> = {
+export const HELPER_IDENTITY: Record<HelperMode, { name: string; button: string; tagline: string; icon: LucideIcon; intro: string }> = {
     coach: {
         name: 'Coach',
+        button: 'Ask the coach',
         tagline: 'Nudges you. Never answers for you.',
         icon: Compass,
         intro: 'Try it first. If you get stuck, ask anything: what a term means, how to approach it, or whether your draft is heading somewhere useful. The coach starts with the lightest hint and only goes further if you need it.',
     },
     tutor: {
         name: 'Tutor',
+        button: 'Ask the tutor',
         tagline: 'Ask anything. Go as deep as you like.',
         icon: GraduationCap,
         intro: 'Curious about something you just read? Ask for a simpler explanation, more depth, what happened next, or where to read further. The one thing it won\'t do is write your "Lock it in" answer.',
     },
     reflect: {
         name: 'Reflect',
+        button: 'Reflect with help',
         tagline: 'Asks, listens. The words stay yours.',
         icon: MessageCircle,
         intro: 'Not sure what to write? Ask for a question to get you started, and it will help you sharpen what you say.',
     },
     review: {
         name: 'Review',
+        button: 'Go over it',
         tagline: "You've submitted, so nothing is off limits now.",
         icon: SearchCheck,
         intro: 'Ask what a strong answer looks like, what you missed, or to walk through the solution step by step.',

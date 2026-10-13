@@ -3,3 +3,6 @@ project_id = "iykdzhvlgraafoalzlbf"
 [functions.refresh-google-token]
 verify_jwt = false
 
+
+[functions.bg-build-session]
+verify_jwt = false

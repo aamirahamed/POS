@@ -1,10 +1,11 @@
 import { FC, useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Brain, Network, Bell, Settings, LayoutGrid, Briefcase, ShoppingCart, Menu, X, Wallet, BrainCircuit } from 'lucide-react';
+import { LayoutDashboard, Brain, Network, Bell, Settings, LayoutGrid, Briefcase, ShoppingCart, Menu, X, Wallet, BrainCircuit, LogOut } from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import CommandCenter from '@/modules/lifemap/components/CommandCenter';
 import { useLifeMapStore } from '@/store/useLifeMapStore';
+import { supabase } from '@/lib/supabase';
 import { Command } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -68,19 +69,43 @@ const SidebarNav: FC<SidebarNavProps> = ({ onClose, showClose }) => (
             ))}
         </nav>
 
+        <AccountFooter />
+    </>
+);
+
+// Shows which account is signed in, so a second login can't go unnoticed
+const AccountFooter: FC = () => {
+    const [email, setEmail] = useState<string | null>(null);
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => setEmail(user?.email ?? null));
+    }, []);
+
+    const signOut = async () => {
+        await supabase.auth.signOut();
+        // Reload so no store keeps the previous account's data in memory
+        window.location.reload();
+    };
+
+    return (
         <div className="mt-auto px-2 py-4 border-t border-border">
             <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-surface-hover flex-center text-xs font-bold text-text-secondary shrink-0">
-                    AA
+                    {email ? email[0].toUpperCase() : '?'}
                 </div>
-                <div className="flex flex-col">
-                    <span className="text-sm font-medium text-text-primary">Aamir</span>
-                    <span className="text-xs text-text-secondary">Basic Plan</span>
-                </div>
+                <span className="flex-1 min-w-0 text-xs text-text-secondary truncate" title={email ?? undefined}>{email ?? '…'}</span>
+                <button
+                    onClick={signOut}
+                    className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors shrink-0"
+                    title="Sign out"
+                    aria-label="Sign out"
+                >
+                    <LogOut size={16} />
+                </button>
             </div>
         </div>
-    </>
-);
+    );
+};
 
 const MainLayout: FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);

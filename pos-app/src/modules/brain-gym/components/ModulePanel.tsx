@@ -5,7 +5,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { BgDay, BgModule, isDoneOnTime } from '../quest';
 import { ModuleContent, NumbersProblem, ResponseField } from '../sampleContent';
 import { MODULE_META, hsl } from '../moduleMeta';
-import { BgAttempt } from '@/services/brainGymService';
+import { BgAttempt, GRADED_MODULES } from '@/services/brainGymService';
+import { useBrainGymStore } from '@/store/useBrainGymStore';
+import { Feedback, FeedbackView } from './FeedbackView';
 import { BlockList, BlockView, Markdown } from './Blocks';
 import { HelperPanel } from './HelperPanel';
 import { HELPER_IDENTITY, helperModeFor } from '../helperModes';
@@ -108,7 +110,7 @@ const NumbersInput: FC<{
                             {p.unit && <span className="text-xs text-text-secondary">{p.unit}</span>}
                             {checked && (correct
                                 ? <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400"><CheckCircle2 size={14} /> Correct</span>
-                                : <span className="flex items-center gap-1 text-xs font-semibold text-rose-300"><XCircle size={14} /> Answer: {p.answer}{p.unit ? ` ${p.unit}` : ''}</span>)}
+                                : <span className="flex items-center gap-1 text-xs font-semibold text-rose-300"><XCircle size={14} /> Answer: {p.answer.toLocaleString('en-AU', { maximumFractionDigits: 2 })}{p.unit ? ` ${p.unit}` : ''}</span>)}
                         </div>
                         {checked && (
                             <div className="ml-10 border-t border-border pt-4 flex flex-col gap-4">
@@ -140,7 +142,14 @@ const WrittenAnswer: FC<{
     saving: boolean;
     onSave: (response: Record<string, unknown>) => Promise<void>;
     onDraftChange?: (draft: string) => void;
-}> = ({ content, done, latestAttempt, saving, onSave, onDraftChange }) => {
+    moduleId: string;
+    graded: boolean;
+}> = ({ content, done, latestAttempt, saving, onSave, onDraftChange, moduleId, graded }) => {
+    const { attempts, grading, gradeErrors, gradeLatest } = useBrainGymStore();
+    // The previous graded attempt's score, so a redo shows the change
+    const moduleAttempts = attempts.filter(a => a.moduleId === moduleId);
+    const previousGraded = moduleAttempts.slice(0, -1).reverse().find(a => a.feedback);
+    const previousScore = previousGraded ? Number((previousGraded.feedback as unknown as Feedback).score) : undefined;
     const fields = useMemo(() => (content.responseType === 'fields' ? content.fields ?? [] : []), [content]);
     const previousFields = (latestAttempt?.response.fields as Record<string, string> | undefined) ?? undefined;
     const previousText = typeof latestAttempt?.response.text === 'string' ? latestAttempt.response.text : null;
@@ -190,8 +199,18 @@ const WrittenAnswer: FC<{
                     <button onClick={startRevising} className="flex items-center gap-1.5 text-xs font-medium text-accent hover:text-accent-hover">
                         <RotateCcw size={12} /> Write a better version
                     </button>
-                    <span className="text-xs text-text-secondary/70">Feedback on answers arrives with the Grader in phase 2.</span>
+                    {latestAttempt && gradeErrors[latestAttempt.id] && (
+                        <button onClick={() => gradeLatest(latestAttempt.id)} className="text-xs text-text-secondary hover:text-text-primary underline">Try grading again</button>
+                    )}
                 </div>
+                {graded && latestAttempt && (
+                    <FeedbackView
+                        feedback={(latestAttempt.feedback as unknown as Feedback | null) ?? null}
+                        grading={!!grading[latestAttempt.id]}
+                        previousScore={previousScore}
+                        error={gradeErrors[latestAttempt.id] ?? null}
+                    />
+                )}
             </div>
         );
     }
@@ -284,7 +303,7 @@ export const ModulePanel: FC<Props> = ({ day, module, timezone, latestAttempt, o
                                 ? { background: hsl(meta.hue, 70, 55, 0.25), borderColor: hsl(meta.hue, 70, 60, 0.5), color: hsl(meta.hue, 80, 80) }
                                 : { background: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.12)', color: hsl(meta.hue, 80, 75) }}
                         >
-                            <HelperIcon size={13} /> {helperOpen ? `Hide ${helper.name.toLowerCase()}` : `Ask the ${helper.name.toLowerCase()}`}
+                            <HelperIcon size={13} /> {helperOpen ? `Hide ${helper.name.toLowerCase()}` : helper.button}
                         </button>
                         {done && (
                             <span className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${late ? 'text-amber-300 border-amber-300/30 bg-amber-300/10' : 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10'}`}>
@@ -340,6 +359,8 @@ export const ModulePanel: FC<Props> = ({ day, module, timezone, latestAttempt, o
                             saving={saving}
                             onSave={response => save(response, null)}
                             onDraftChange={setDraft}
+                            moduleId={module.id}
+                            graded={GRADED_MODULES.has(module.moduleKey)}
                         />
                     )}
                 </div>

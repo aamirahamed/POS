@@ -1,8 +1,9 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Brain, Flame, Snowflake, CheckCircle2, Circle, AlertCircle, CalendarDays, ListChecks, Loader2, PartyPopper, Briefcase, Target, Clock } from 'lucide-react';
+import { Brain, Flame, Snowflake, CheckCircle2, Circle, AlertCircle, CalendarDays, ListChecks, Loader2, PartyPopper, Briefcase, Target, Clock, Sparkles, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useBrainGymStore, todayFor, DEFAULT_TIMEZONE } from '@/store/useBrainGymStore';
+import { GRADED_MODULES } from '@/services/brainGymService';
 import { computeQuest, isDoneOnTime, programEndDate, addDays } from './quest';
 import { MODULE_META, hsl } from './moduleMeta';
 import { doneBySkill, numbersAccuracy, seriesProgress, tallyByModule, weekDates } from './insights';
@@ -73,8 +74,35 @@ const StatTile: FC<{ icon: FC<{ size?: number; className?: string }>; value: Rea
     </div>
 );
 
+const BUILD_STEPS = ['Reading the overnight AI news', 'Writing your interview question', 'Setting a thinking exercise', 'Checking the maths', "Writing today's lesson", 'Writing the history episode'];
+
+const BuildingPanel: FC = () => {
+    const [step, setStep] = useState(0);
+    useEffect(() => {
+        const t = setInterval(() => setStep(s => Math.min(s + 1, BUILD_STEPS.length - 1)), 12_000);
+        return () => clearInterval(t);
+    }, []);
+    return (
+        <div className="bg-surface border border-border rounded-3xl p-10 flex flex-col items-center text-center gap-5">
+            <div className="w-14 h-14 rounded-2xl bg-accent/15 text-accent flex items-center justify-center"><Sparkles size={26} className="animate-pulse" /></div>
+            <div>
+                <h2 className="text-xl font-bold text-text-primary">Building today's session</h2>
+                <p className="text-sm text-text-secondary mt-1">The agents usually do this overnight. It takes a minute or two.</p>
+            </div>
+            <div className="flex flex-col gap-2 text-left">
+                {BUILD_STEPS.map((label, i) => (
+                    <div key={label} className={`flex items-center gap-2.5 text-sm ${i < step ? 'text-text-secondary' : i === step ? 'text-text-primary' : 'text-text-secondary/40'}`}>
+                        {i < step ? <CheckCircle2 size={15} className="text-emerald-400" /> : i === step ? <Loader2 size={15} className="animate-spin text-accent" /> : <Circle size={15} />}
+                        {label}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const BrainGymPage: FC = () => {
-    const { program, days, attempts, loaded, loading, error, load, startProgram, restartProgram, submitAnswer, completeModule } = useBrainGymStore();
+    const { program, days, attempts, loaded, loading, error, building, buildNotice, load, startProgram, restartProgram, rebuildToday, submitAnswer, completeModule } = useBrainGymStore();
     const [view, setView] = useState<'session' | 'progress'>('session');
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
@@ -110,7 +138,8 @@ const BrainGymPage: FC = () => {
         await submitAnswer(activeModule.id, response, score);
         await completeModule(activeModule.id);
         // Numbers shows its solutions after checking, so stay on it; otherwise move to the next open module
-        if (activeModule.moduleKey === 'numbers') {
+        // Stay to read the solutions (Numbers) or the Grader's feedback; otherwise move on
+        if (activeModule.moduleKey === 'numbers' || GRADED_MODULES.has(activeModule.moduleKey)) {
             setSelectedModuleId(activeModule.id);
         } else {
             const next = activeDay.modules.find(m => m.completedAt === null && m.id !== activeModule.id);
@@ -246,6 +275,12 @@ const BrainGymPage: FC = () => {
                     </div>
                 </div>
 
+                {buildNotice && (
+                    <div className="flex items-center gap-2 text-sm text-amber-200 bg-amber-300/10 border border-amber-300/30 rounded-2xl px-4 py-3">
+                        <AlertCircle size={16} className="shrink-0" /> {buildNotice}
+                    </div>
+                )}
+
                 {/* ── Week + view switch ───────────────────────────────── */}
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
@@ -300,6 +335,8 @@ const BrainGymPage: FC = () => {
                         </Panel>
                         </div>
                     </div>
+                ) : building && activeDate === today ? (
+                    <BuildingPanel />
                 ) : !activeDay ? (
                     <div className="bg-surface border border-border rounded-3xl p-12 text-center text-sm text-text-secondary">
                         {beforeStart ? `Your first session opens on ${nice(program.startDate)}.` : afterEnd ? 'All 60 days are behind you. The Progress tab has the full record.' : 'No session for this day.'}
@@ -434,6 +471,11 @@ const BrainGymPage: FC = () => {
                         </>
                     ) : (
                         <button onClick={() => setConfirmRestart(true)} className="underline hover:text-text-primary">Restart program</button>
+                    )}
+                    {todayDay && !building && !todayDay.modules.some(m => m.completedAt) && (
+                        <button onClick={() => rebuildToday()} className="flex items-center gap-1 underline hover:text-text-primary" title="Ask the agents to write today's session again (only before you start it)">
+                            <RefreshCw size={11} /> Rebuild today's session
+                        </button>
                     )}
                     {loading && <Loader2 size={12} className="animate-spin" />}
                     <span className="ml-auto">Ends {nice(addDays(program.startDate, program.lengthDays - 1))}</span>

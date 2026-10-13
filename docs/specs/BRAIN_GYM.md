@@ -108,13 +108,13 @@ Plain code (no agent): streaks, freezes, recall scheduling, numeric answer check
 - **Scheduling:** `pg_cron` + `pg_net` in Supabase trigger the nightly build around 3am Melbourne time.
 - **Edge functions:** `bg-coach` (built), `bg-build-session` (curator + builder), `bg-grade`, `bg-interview` (interviewer + coach), `bg-stories`, `bg-market`, `bg-weekly-review`.
 - **Tables** (all owner-scoped by RLS): `bg_days`, `bg_modules`, `bg_attempts`, `bg_recall_items`, `bg_series`, `bg_stories`, `bg_news_items`, `bg_reviews`, `bg_job_postings`, `bg_requirements` (the matrix plus readiness), `bg_coaching_notes` (weak areas, evidence, trend).
-- **Content format:** module content is a list of typed blocks (`pos-app/src/modules/brain-gym/blocks.ts`): markdown, callout, key term, timeline, people, payoff matrix, bars, tree, cards, steps, compare, news cards, stats, chat, rubric. The Session Builder must output this JSON, choosing the block that fits the information (a timeline for events, a tree for probabilities, a matrix for payoffs) rather than prose. Written answers can be one box or labelled fields.
+- **Content format:** module content is a list of typed blocks (`pos-app/src/modules/brain-gym/blocks.ts`, mirrored server-side in `supabase/functions/_shared/content.ts`): markdown, callout, key term, timeline, people, payoff matrix, bars, tree, cards, steps, compare, news cards, stats, chat, rubric. Each generator asks Gemini for a module-specific JSON shape (history: timeline + people; numbers: problems with formulas; lesson: sections plus optional matrix/steps/cards/compare) and code converts it to blocks. This is more reliable than asking the model to choose blocks freely. Written answers can be one box or labelled fields.
 - **UI:** a `/brain-gym` page (today's session, step by step), a quest map / stats view, a story bank view. A dashboard card shows today's progress and the streak.
 
 ## Build phases
 
 1. **Foundation:** tables, Brain Gym page shell, streak/freeze/missed logic, quest map. Manual test content.
-2. **Content agents:** News Curator, Session Builder, Lesson/History series, Numbers, Think, Grader. Nightly schedule.
+2. **Content agents (built 2026-10-13):** News Curator, Session Builder, Lesson/History series, Numbers, Think, Grader. Nightly schedule. Safeguards: news links must come from fetched or found sources, search results only from reputable domains; Numbers answers verified by an arithmetic evaluator; Think method steps and answer labels fixed per exercise type so the model can't leak answers through them; rebuilds never touch a started day and reuse the day's series part.
 3. **Interview prep:** market analysis and requirements matrix, story bank, spoken Interview Rep with Coach feedback and redo, Saturday mock interview, coaching file.
 4. **Learning loop:** recall engine, weekly review, baseline tests, skill stats.
 

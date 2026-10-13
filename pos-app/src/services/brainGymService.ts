@@ -214,3 +214,30 @@ export const askCoach = async (
     }
     return data;
 };
+
+// ── Session Builder ───────────────────────────────────────────────────────────
+
+// Asks the Session Builder to write a day's session. It works in the background; poll fetchDays.
+export const requestSessionBuild = async (date: 'today' | 'tomorrow' | string, force = false): Promise<void> => {
+    const { error } = await supabase.functions.invoke('bg-build-session', { body: { date, force } });
+    if (error) {
+        const context = (error as { context?: Response }).context;
+        const body = context && typeof context.json === 'function' ? await context.json().catch(() => null) : null;
+        throw new Error(body?.error ?? error.message);
+    }
+};
+
+// ── Grader ────────────────────────────────────────────────────────────────────
+
+// Keep in sync with GRADED_MODULES in supabase/functions/bg-grade/grader.ts
+export const GRADED_MODULES = new Set(['think', 'interview_rep', 'ai_briefing', 'lesson', 'history', 'mock_interview', 'teardown']);
+
+export const gradeAttempt = async (attemptId: string): Promise<{ score: number; feedback: Record<string, unknown> }> => {
+    const { data, error } = await supabase.functions.invoke('bg-grade', { body: { attemptId } });
+    if (error) {
+        const context = (error as { context?: Response }).context;
+        const body = context && typeof context.json === 'function' ? await context.json().catch(() => null) : null;
+        throw new Error(body?.error ?? error.message);
+    }
+    return data;
+};
