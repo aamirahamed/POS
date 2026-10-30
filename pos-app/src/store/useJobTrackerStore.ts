@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { supabase } from '@/lib/supabase';
 import { Job, JobActivity, JobInterview, JobOffer, JobStatus } from '../modules/job-tracker/types';
 
+// Everything except report_md, which only the detail page needs.
+const JOB_LIST_COLUMNS = 'id, user_id, company, role, status, priority, location, work_mode, employment_type, source, salary_range, url, description, notes, created_at, updated_at, fit_score, fit_verdict, archetype, fit_notes, cv_pick, report_path, posted_at, fit_updated_at, evaluation';
+
 interface JobTrackerState {
     jobs: Job[];
     loading: boolean;
@@ -35,7 +38,7 @@ export const useJobTrackerStore = create<JobTrackerState>((set, get) => ({
         try {
             const { data, error } = await supabase
                 .from('jobs')
-                .select('*')
+                .select(JOB_LIST_COLUMNS)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;

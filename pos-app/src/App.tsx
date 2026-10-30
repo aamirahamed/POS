@@ -5,6 +5,7 @@ import Reminders from '@/modules/reminders/Reminders';
 import Wishlist from '@/modules/wishlist/Wishlist';
 import DashboardPage from '@/modules/dashboard/DashboardPage';
 import { JobTrackerPage } from '@/modules/job-tracker/JobTrackerPage';
+import { JobDetailPage } from '@/modules/job-tracker/JobDetailPage';
 import ShoppingListPage from '@/modules/shopping/ShoppingListPage';
 import AuthWrapper from '@/modules/auth/AuthWrapper';
 import FinancePage from '@/modules/finance/FinancePage';
@@ -24,6 +25,7 @@ function App() {
             <Route path="reminders" element={<Reminders />} />
             <Route path="wishlist" element={<Wishlist />} />
             <Route path="jobs" element={<JobTrackerPage />} />
+            <Route path="jobs/:id" element={<JobDetailPage />} />
             <Route path="shopping" element={<ShoppingListPage />} />
             <Route path="finance" element={<FinancePage />} />
             <Route path="mentor" element={<MentorPage />} />

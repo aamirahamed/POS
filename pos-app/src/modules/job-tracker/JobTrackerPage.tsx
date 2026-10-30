@@ -8,12 +8,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useJobTrackerStore } from '@/store/useJobTrackerStore';
 
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, ArrowUpDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { JOB_SORT_OPTIONS, JobSort } from './sortJobs';
+
+const SORT_KEY = 'job-tracker-sort';
+const readSort = (): JobSort => {
+    try {
+        const saved = localStorage.getItem(SORT_KEY);
+        return JOB_SORT_OPTIONS.some(o => o.value === saved) ? (saved as JobSort) : 'newest';
+    } catch {
+        return 'newest';
+    }
+};
 
 export const JobTrackerPage = () => {
     const { jobs, fetchJobs } = useJobTrackerStore();
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<JobSort>(readSort);
+
+    const changeSort = (value: JobSort) => {
+        setSortBy(value);
+        try { localStorage.setItem(SORT_KEY, value); } catch { /* storage unavailable: keep for this visit only */ }
+    };
 
     const totalJobs = jobs.length;
     const appliedJobs = jobs.filter(j => j.status === 'applied').length;
@@ -61,6 +79,17 @@ export const JobTrackerPage = () => {
                     </TabsList>
                     
                     <div className="flex items-center gap-3">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger className="h-9 px-4 rounded-full text-xs font-medium bg-surface-elevated border border-border hover:border-accent/40 text-foreground transition-colors flex items-center gap-2">
+                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                {JOB_SORT_OPTIONS.find(o => o.value === sortBy)?.label}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                {JOB_SORT_OPTIONS.map(o => (
+                                    <DropdownMenuItem key={o.value} onClick={() => changeSort(o.value)}>{o.label}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <div className="relative w-64 group">
                             <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-secondary group-focus-within:text-accent transition-colors" />
                             <Input
@@ -78,11 +107,11 @@ export const JobTrackerPage = () => {
                 </div>
 
                 <TabsContent value="kanban" className="flex-1 min-h-0 mt-0">
-                    <JobBoard searchQuery={searchQuery} />
+                    <JobBoard searchQuery={searchQuery} sortBy={sortBy} />
                 </TabsContent>
 
                 <TabsContent value="table" className="flex-1 min-h-0 mt-0 overflow-auto">
-                    <JobTableView searchQuery={searchQuery} />
+                    <JobTableView searchQuery={searchQuery} sortBy={sortBy} />
                 </TabsContent>
             </Tabs>
 

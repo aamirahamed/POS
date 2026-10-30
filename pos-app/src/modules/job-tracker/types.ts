@@ -4,6 +4,20 @@ export type WorkMode = 'remote' | 'hybrid' | 'onsite' | 'unknown';
 export type EmploymentType = 'full-time' | 'part-time' | 'contract' | 'intern' | 'unknown';
 export type ActivityType = 'note' | 'status_change' | 'follow_up';
 export type InterviewOutcome = 'pending' | 'pass' | 'fail';
+export type FitVerdict = 'PASS' | 'MARGINAL' | 'FAIL' | 'SKIP';
+export interface JobEvaluation {
+    date?: string;
+    via?: string;
+    decision?: string;
+    legitimacy?: string;
+    work_auth?: string;
+    risk_level?: string;
+    lead?: string;
+    hard_stops?: string[];
+    soft_gaps?: string[];
+    top_strengths?: string[];
+}
+
 export type OfferStatus = 'pending' | 'accepted' | 'declined';
 
 export interface Job {
@@ -21,6 +35,18 @@ export interface Job {
     url?: string;
     description?: string;
     notes?: string;
+    // Fit assessment written by career-ops (see mcp-server/src/jobsService.ts)
+    fit_score?: number | null;
+    fit_verdict?: FitVerdict | null;
+    archetype?: string | null;
+    fit_notes?: string | null;
+    cv_pick?: string | null;
+    report_path?: string | null;
+    posted_at?: string | null;
+    fit_updated_at?: string | null;
+    // Full career-ops report (markdown) and its parsed summary; loaded on the detail page only.
+    report_md?: string | null;
+    evaluation?: JobEvaluation | null;
     created_at: string;
     updated_at: string;
 }

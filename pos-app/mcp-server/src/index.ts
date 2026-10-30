@@ -36,6 +36,7 @@ import {
   listProjectBriefs,
   renderBrief
 } from './briefService.js';
+import { upsertJobs, listJobs } from './jobsService.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -428,6 +429,53 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["node_id", "variant"]
         }
+      },
+      {
+        name: "upsert_jobs",
+        description: "Adds or updates Job Tracker roles from career-ops, matched by posting URL. New roles go in as 'wishlist' with source 'career-ops'. Updates only change fit fields (score, verdict, archetype, notes, CV pick, report path, posted date) and fill empty basics; status, priority and notes are owned by POS and never changed.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            jobs: {
+              type: "array",
+              description: "Up to 200 roles.",
+              items: {
+                type: "object",
+                properties: {
+                  url: { type: "string" },
+                  company: { type: "string" },
+                  role: { type: "string" },
+                  location: { type: "string" },
+                  work_mode: { type: "string", description: "remote, hybrid, onsite or unknown" },
+                  employment_type: { type: "string", description: "full-time, part-time, contract, intern or unknown" },
+                  salary_range: { type: "string" },
+                  description: { type: "string" },
+                  fit_score: { type: "number", description: "0 to 5, one decimal" },
+                  fit_verdict: { type: "string", description: "PASS, MARGINAL, FAIL or SKIP" },
+                  archetype: { type: "string" },
+                  fit_notes: { type: "string", description: "Why it fits, red flags, things to confirm" },
+                  cv_pick: { type: "string" },
+                  report_path: { type: "string" },
+                  posted_at: { type: "string", description: "YYYY-MM-DD" }
+                },
+                required: ["url", "company", "role"]
+              }
+            }
+          },
+          required: ["jobs"]
+        }
+      },
+      {
+        name: "list_jobs",
+        description: "Lists Job Tracker roles with their POS status (the source of truth for status) and when it last changed. Optional filters: status, source (e.g. 'career-ops').",
+        inputSchema: {
+          type: "object",
+          properties: {
+            status: { type: "string", description: "wishlist, applied, interviewing, offer, rejected or archived" },
+            source: { type: "string" },
+            limit: { type: "number", description: "Default 200, max 500" }
+          }
+        }
       }
     ]
   };
@@ -694,6 +742,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const variant = String(args?.variant);
       const res = await renderBrief(node_id, variant);
       return { content: [{ type: "text", text: res }] };
+    }
+
+    if (name === "upsert_jobs") {
+      const res = await upsertJobs((args as any)?.jobs);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "list_jobs") {
+      const a = (args ?? {}) as any;
+      const res = await listJobs({ status: a.status ? String(a.status) : undefined, source: a.source ? String(a.source) : undefined, limit: a.limit });
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
     }
 
     throw new Error(`Unknown tool: ${name}`);

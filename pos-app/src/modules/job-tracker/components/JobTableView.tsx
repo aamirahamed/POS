@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useJobTrackerStore } from '@/store/useJobTrackerStore';
 import { Job, JobStatus, EmploymentType } from '../types';
-import { JobDetailSheet } from './JobDetailSheet';
+import { useNavigate } from 'react-router-dom';
+import { FitBadge } from './FitBadge';
+import { JobSort, sortJobs } from '../sortJobs';
 import { 
     MoreHorizontal, MapPin, Building2, Wallet, Star,
     Edit2, FileText, Globe
@@ -31,7 +33,7 @@ const TYPE_CONFIG: Record<EmploymentType, { label: string }> = {
     'unknown': { label: 'Unknown' },
 };
 
-export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
+export const JobTableView = ({ searchQuery, sortBy }: { searchQuery: string; sortBy: JobSort }) => {
     const { jobs, updateJobStatus, deleteJob, togglePriority } = useJobTrackerStore();
     
     // Filter states
@@ -39,8 +41,7 @@ export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
     const [typeFilter, setTypeFilter] = useState<EmploymentType | 'all'>('all');
     const [locationFilter, setLocationFilter] = useState<string>('all');
     
-    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-    const [detailsOpen, setDetailsOpen] = useState(false);
+    const navigate = useNavigate();
 
     // Derived unique locations for the filter
     const uniqueLocations = Array.from(new Set(jobs.map(j => j.location).filter(Boolean))) as string[];
@@ -57,6 +58,8 @@ export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
         return matchesSearch && matchesStatus && matchesType && matchesLocation;
     });
 
+    const sortedJobs = sortJobs(filteredJobs, sortBy);
+
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         if (confirm('Are you sure you want to delete this job?')) {
@@ -64,10 +67,7 @@ export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
         }
     };
 
-    const handleRowClick = (job: Job) => {
-        setSelectedJob(job);
-        setDetailsOpen(true);
-    };
+    const handleRowClick = (job: Job) => navigate(`/jobs/${job.id}`);
 
     const handleTogglePriority = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
@@ -138,9 +138,10 @@ export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
             {/* Table Area */}
             <div className="space-y-3">
                 {/* Header Row */}
-                <div className="grid grid-cols-[40px_minmax(0,1.5fr)_140px_120px_140px_120px_100px] gap-4 px-6 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                <div className="grid grid-cols-[40px_minmax(0,1.5fr)_64px_140px_120px_140px_120px_100px] gap-4 px-6 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                     <div></div>
                     <div>Company & Role</div>
+                    <div>Fit</div>
                     <div>Status</div>
                     <div>Type</div>
                     <div>Location</div>
@@ -154,11 +155,11 @@ export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
                         No jobs found matching your filters.
                     </div>
                 ) : (
-                    filteredJobs.map((job) => (
+                    sortedJobs.map((job) => (
                         <div
                             key={job.id}
                             onClick={() => handleRowClick(job)}
-                            className={`group relative grid grid-cols-[40px_minmax(0,1.5fr)_140px_120px_140px_120px_100px] gap-4 items-center px-6 py-4 rounded-xl transition-all duration-200 cursor-pointer
+                            className={`group relative grid grid-cols-[40px_minmax(0,1.5fr)_64px_140px_120px_140px_120px_100px] gap-4 items-center px-6 py-4 rounded-xl transition-all duration-200 cursor-pointer
                                 ${job.priority 
                                     ? 'bg-surface-elevated border border-yellow-500/20 shadow-sm hover:bg-surface-hover hover:border-yellow-500/40 hover:-translate-y-[2px] hover:shadow-md' 
                                     : 'bg-surface-elevated border border-transparent shadow-sm hover:bg-surface-hover hover:border-border/60 hover:-translate-y-[2px] hover:shadow-md'
@@ -191,6 +192,11 @@ export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
                                     <Building2 className="h-3.5 w-3.5 opacity-80" />
                                     <span className="truncate">{job.company}</span>
                                 </div>
+                            </div>
+
+                            {/* career-ops fit score */}
+                            <div>
+                                <FitBadge score={job.fit_score} verdict={job.fit_verdict} />
                             </div>
 
                             {/* Status Pill Badge (Clickable via DropdownMenu) */}
@@ -289,11 +295,6 @@ export const JobTableView = ({ searchQuery }: { searchQuery: string }) => {
                 )}
             </div>
 
-            <JobDetailSheet
-                job={selectedJob}
-                open={detailsOpen}
-                onOpenChange={setDetailsOpen}
-            />
         </div>
     );
 };

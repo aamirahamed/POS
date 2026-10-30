@@ -14,16 +14,16 @@ const COLUMNS: { id: JobStatus; title: string }[] = [
     { id: 'rejected', title: 'Rejected' },
 ];
 
-import { JobDetailSheet } from './JobDetailSheet';
+import { useNavigate } from 'react-router-dom';
+import { JobSort, sortJobs } from '../sortJobs';
 
-export const JobBoard = ({ searchQuery = '' }: { searchQuery?: string }) => {
+export const JobBoard = ({ searchQuery = '', sortBy = 'newest' }: { searchQuery?: string; sortBy?: JobSort }) => {
     const { jobs, updateJobStatus } = useJobTrackerStore();
     const [activeJob, setActiveJob] = useState<Job | null>(null);
-    const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-    const [detailsOpen, setDetailsOpen] = useState(false);
+    const navigate = useNavigate();
 
 
-    const filteredJobs = jobs.filter(job =>
+    const filteredJobs = sortJobs(jobs, sortBy).filter(job =>
         job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.role.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -64,10 +64,7 @@ export const JobBoard = ({ searchQuery = '' }: { searchQuery?: string }) => {
         // Handle drag over logic if needed for refined sorting
     };
 
-    const onJobClick = (job: Job) => {
-        setSelectedJob(job);
-        setDetailsOpen(true);
-    };
+    const onJobClick = (job: Job) => navigate(`/jobs/${job.id}`);
 
     return (
         <DndContext
@@ -97,11 +94,6 @@ export const JobBoard = ({ searchQuery = '' }: { searchQuery?: string }) => {
                 document.body
             )}
 
-            <JobDetailSheet
-                job={selectedJob}
-                open={detailsOpen}
-                onOpenChange={setDetailsOpen}
-            />
         </DndContext>
     );
 };
