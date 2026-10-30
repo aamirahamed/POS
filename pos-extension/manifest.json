@@ -11,7 +11,7 @@
     ],
     "host_permissions": [
         "http://localhost:5173/*",
-        "https://pos-system-three.vercel.app/*"
+        "https://pos-nine-snowy.vercel.app/*"
     ],
     "action": {
         "default_popup": "index.html"
@@ -32,7 +32,7 @@
         {
             "matches": [
                 "http://localhost:5173/*",
-                "https://pos-system-three.vercel.app/*"
+                "https://pos-nine-snowy.vercel.app/*"
             ],
             "js": [
                 "src/content/auth-sync.ts"

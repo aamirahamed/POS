@@ -13,7 +13,7 @@ export const Login = () => {
 
         try {
             // Check for POS tab
-            const tabs = await chrome.tabs.query({ url: ["http://localhost:5173/*", "https://pos-system-three.vercel.app/*"] });
+            const tabs = await chrome.tabs.query({ url: ["http://localhost:5173/*", "https://pos-nine-snowy.vercel.app/*"] });
 
             if (tabs.length === 0) {
                 await chrome.tabs.create({ url: 'http://localhost:5173' });
