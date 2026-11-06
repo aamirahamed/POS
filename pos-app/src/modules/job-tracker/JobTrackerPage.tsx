@@ -40,7 +40,7 @@ export const JobTrackerPage = () => {
         try { localStorage.setItem(SORT_KEY, value); } catch { /* storage unavailable: keep for this visit only */ }
     };
 
-    const totalJobs = jobs.length;
+    const totalJobs = jobs.filter(j => j.status !== 'unavailable').length;
     const appliedJobs = jobs.filter(j => j.status === 'applied').length;
     const interviewingJobs = jobs.filter(j => j.status === 'interviewing').length;
     const queuedJobs = jobs.filter(j => isQueued(j.docs_status)).length;

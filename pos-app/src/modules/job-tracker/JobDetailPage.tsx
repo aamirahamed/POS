@@ -26,6 +26,7 @@ const STATUS_OPTIONS: { value: JobStatus; label: string; color: string }[] = [
     { value: 'offer', label: 'Offer', color: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/30' },
     { value: 'rejected', label: 'Rejected', color: 'bg-red-900/30 text-red-300 border-red-700/30' },
     { value: 'archived', label: 'Archived', color: 'bg-[#1A1F2B] text-slate-400 border-slate-700/30' },
+    { value: 'unavailable', label: 'Unavailable', color: 'bg-[#1A1F2B] text-slate-500 border-slate-700/30 line-through' },
 ];
 
 interface ReportSection { id: string; title: string; body: string }

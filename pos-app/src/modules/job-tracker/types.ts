@@ -1,5 +1,5 @@
 
-export type JobStatus = 'wishlist' | 'applied' | 'interviewing' | 'offer' | 'rejected' | 'archived';
+export type JobStatus = 'wishlist' | 'applied' | 'interviewing' | 'offer' | 'rejected' | 'archived' | 'unavailable';
 export type WorkMode = 'remote' | 'hybrid' | 'onsite' | 'unknown';
 export type EmploymentType = 'full-time' | 'part-time' | 'contract' | 'intern' | 'unknown';
 export type ActivityType = 'note' | 'status_change' | 'follow_up';

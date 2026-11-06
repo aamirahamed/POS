@@ -11,7 +11,7 @@ import { parseReport } from './reportParser.js';
 const WORK_MODES = ['remote', 'hybrid', 'onsite', 'unknown'];
 const EMPLOYMENT_TYPES = ['full-time', 'part-time', 'contract', 'intern', 'unknown'];
 const VERDICTS = ['PASS', 'MARGINAL', 'FAIL', 'SKIP'];
-const STATUSES = ['wishlist', 'applied', 'interviewing', 'offer', 'rejected', 'archived'];
+const STATUSES = ['wishlist', 'applied', 'interviewing', 'offer', 'rejected', 'archived', 'unavailable'];
 
 const FIT_FIELDS = ['fit_score', 'fit_verdict', 'archetype', 'fit_notes', 'cv_pick', 'report_path', 'posted_at', 'report_md', 'evaluation'] as const;
 

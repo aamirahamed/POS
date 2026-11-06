@@ -7,7 +7,7 @@ import { DocsBadge, isQueued } from './DocsBadge';
 import { JobSort, sortJobs } from '../sortJobs';
 import { 
     MoreHorizontal, MapPin, Building2, Wallet, Star,
-    Edit2, FileText, Globe
+    Edit2, FileText, Globe, Ban
 } from 'lucide-react';
 import {
     DropdownMenu,
@@ -24,6 +24,7 @@ const STATUS_CONFIG: Record<JobStatus, { label: string; color: string }> = {
     offer: { label: 'Offer', color: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/30' },
     rejected: { label: 'Rejected', color: 'bg-red-900/30 text-red-300 border-red-700/30' },
     archived: { label: 'Archived', color: 'bg-[#1A1F2B] text-slate-400 border-slate-700/30' },
+    unavailable: { label: 'Unavailable', color: 'bg-[#1A1F2B] text-slate-500 border-slate-700/30 line-through' },
 };
 
 const TYPE_CONFIG: Record<EmploymentType, { label: string }> = {
@@ -52,7 +53,8 @@ export const JobTableView = ({ searchQuery, sortBy, queuedOnly = false }: { sear
             job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
             job.role.toLowerCase().includes(searchQuery.toLowerCase());
 
-        const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+        // Closed postings drop out of "All Status"; pick the Unavailable pill to see them.
+        const matchesStatus = statusFilter === 'all' ? job.status !== 'unavailable' : job.status === statusFilter;
         const matchesType = typeFilter === 'all' || job.employment_type === typeFilter;
         const matchesLocation = locationFilter === 'all' || job.location === locationFilter;
 
@@ -283,6 +285,9 @@ export const JobTableView = ({ searchQuery, sortBy, queuedOnly = false }: { sear
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRowClick(job); }}>
                                             <FileText className="mr-2 h-4 w-4" /> View Details
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); updateJobStatus(job.id, job.status === 'unavailable' ? 'wishlist' : 'unavailable'); }}>
+                                            <Ban className="mr-2 h-4 w-4" /> {job.status === 'unavailable' ? 'Mark available again' : 'Mark unavailable'}
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
