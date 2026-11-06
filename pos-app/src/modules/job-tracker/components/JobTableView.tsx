@@ -3,6 +3,7 @@ import { useJobTrackerStore } from '@/store/useJobTrackerStore';
 import { Job, JobStatus, EmploymentType } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { FitBadge } from './FitBadge';
+import { DocsBadge } from './DocsBadge';
 import { JobSort, sortJobs } from '../sortJobs';
 import { 
     MoreHorizontal, MapPin, Building2, Wallet, Star,
@@ -195,8 +196,9 @@ export const JobTableView = ({ searchQuery, sortBy }: { searchQuery: string; sor
                             </div>
 
                             {/* career-ops fit score */}
-                            <div>
+                            <div className="flex items-center gap-1.5">
                                 <FitBadge score={job.fit_score} verdict={job.fit_verdict} />
+                                <DocsBadge status={job.docs_status} />
                             </div>
 
                             {/* Status Pill Badge (Clickable via DropdownMenu) */}

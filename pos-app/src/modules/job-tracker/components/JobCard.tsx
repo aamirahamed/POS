@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Building2, MapPin, Briefcase } from 'lucide-react';
 import { CSS } from '@dnd-kit/utilities';
 import { FitBadge } from './FitBadge';
+import { DocsBadge } from './DocsBadge';
 
 interface JobCardProps {
     job: Job;
@@ -31,7 +32,10 @@ export const JobCard = ({ job, onClick }: JobCardProps) => {
                     <div className="space-y-0.5">
                         <div className="flex items-start justify-between gap-2">
                             <h4 className="font-medium text-sm text-foreground group-hover:text-primary transition-colors line-clamp-1">{job.role}</h4>
-                            <FitBadge score={job.fit_score} verdict={job.fit_verdict} />
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                <DocsBadge status={job.docs_status} />
+                                <FitBadge score={job.fit_score} verdict={job.fit_verdict} />
+                            </div>
                         </div>
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Building2 className="h-3 w-3" />

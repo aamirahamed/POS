@@ -1,7 +1,9 @@
 import { JobBoard } from './components/JobBoard';
 import { JobTableView } from './components/JobTableView'; // Import new component
 import { Button } from '@/components/ui/button';
-import { Plus, LayoutGrid, List } from 'lucide-react';
+import { Plus, LayoutGrid, List, Puzzle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { SkillsView } from './components/SkillsView';
 import { useState, useEffect } from 'react';
 import { AddJobDialog } from './components/AddJobDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +29,9 @@ export const JobTrackerPage = () => {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<JobSort>(readSort);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tab = ['kanban', 'table', 'skills'].includes(searchParams.get('tab') ?? '') ? searchParams.get('tab')! : 'table';
+    const changeTab = (value: string) => setSearchParams(value === 'table' ? {} : { tab: value }, { replace: true });
 
     const changeSort = (value: JobSort) => {
         setSortBy(value);
@@ -65,7 +70,7 @@ export const JobTrackerPage = () => {
                 </div>
             </div>
 
-            <Tabs defaultValue="table" className="flex-1 flex flex-col min-h-0">
+            <Tabs value={tab} onValueChange={changeTab} className="flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-4">
                     <TabsList className="bg-background/50 border border-white/10">
                         <TabsTrigger value="kanban" className="gap-2">
@@ -76,10 +81,14 @@ export const JobTrackerPage = () => {
                             <List className="h-4 w-4" />
                             List View
                         </TabsTrigger>
+                        <TabsTrigger value="skills" className="gap-2">
+                            <Puzzle className="h-4 w-4" />
+                            Skills
+                        </TabsTrigger>
                     </TabsList>
                     
                     <div className="flex items-center gap-3">
-                        <DropdownMenu>
+                        {tab !== 'skills' && <DropdownMenu>
                             <DropdownMenuTrigger className="h-9 px-4 rounded-full text-xs font-medium bg-surface-elevated border border-border hover:border-accent/40 text-foreground transition-colors flex items-center gap-2">
                                 <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
                                 {JOB_SORT_OPTIONS.find(o => o.value === sortBy)?.label}
@@ -89,20 +98,20 @@ export const JobTrackerPage = () => {
                                     <DropdownMenuItem key={o.value} onClick={() => changeSort(o.value)}>{o.label}</DropdownMenuItem>
                                 ))}
                             </DropdownMenuContent>
-                        </DropdownMenu>
+                        </DropdownMenu>}
                         <div className="relative w-64 group">
                             <Search className="absolute left-3 top-2.5 h-4 w-4 text-text-secondary group-focus-within:text-accent transition-colors" />
                             <Input
-                                placeholder="Search roles or companies..."
+                                placeholder={tab === 'skills' ? 'Search skills...' : 'Search roles or companies...'}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="pl-9 bg-surface-elevated border-border hover:border-accent/40 focus:border-accent focus:ring-4 focus:ring-accent/10 rounded-full h-9 text-sm text-text-primary placeholder:text-text-secondary/60 transition-all shadow-sm"
                             />
                         </div>
-                        <Button onClick={() => setIsAddOpen(true)} className="gap-2 rounded-full h-9 px-5 bg-gradient-to-r from-accent to-indigo-400 text-white shadow-md hover:shadow-lg hover:from-accent-hover hover:to-indigo-500 hover:-translate-y-[1px] border border-indigo-400/30 transition-all duration-200 font-medium tracking-wide">
+                        {tab !== 'skills' && <Button onClick={() => setIsAddOpen(true)} className="gap-2 rounded-full h-9 px-5 bg-gradient-to-r from-accent to-indigo-400 text-white shadow-md hover:shadow-lg hover:from-accent-hover hover:to-indigo-500 hover:-translate-y-[1px] border border-indigo-400/30 transition-all duration-200 font-medium tracking-wide">
                             <Plus className="h-4 w-4" />
                             Add Job
-                        </Button>
+                        </Button>}
                     </div>
                 </div>
 
@@ -112,6 +121,10 @@ export const JobTrackerPage = () => {
 
                 <TabsContent value="table" className="flex-1 min-h-0 mt-0 overflow-auto">
                     <JobTableView searchQuery={searchQuery} sortBy={sortBy} />
+                </TabsContent>
+
+                <TabsContent value="skills" className="flex-1 min-h-0 mt-0 overflow-auto">
+                    <SkillsView searchQuery={searchQuery} />
                 </TabsContent>
             </Tabs>
 

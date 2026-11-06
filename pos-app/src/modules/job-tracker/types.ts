@@ -18,6 +18,10 @@ export interface JobEvaluation {
     top_strengths?: string[];
 }
 
+// Application documents built by Claude Code (see mcp-server/src/jobsService.ts)
+export type DocsStatus = 'requested' | 'in_progress' | 'waiting_on_you' | 'ready' | 'failed';
+export interface DocsFile { label: string; path: string }
+
 export type OfferStatus = 'pending' | 'accepted' | 'declined';
 
 export interface Job {
@@ -47,6 +51,14 @@ export interface Job {
     // Full career-ops report (markdown) and its parsed summary; loaded on the detail page only.
     report_md?: string | null;
     evaluation?: JobEvaluation | null;
+    // Request for a tailored CV and cover letter, picked up by Claude Code.
+    docs_status?: DocsStatus | null;
+    docs_note?: string | null;
+    docs_review_first?: boolean;
+    docs_requested_at?: string | null;
+    docs_updated_at?: string | null;
+    docs_message?: string | null;
+    docs_files?: DocsFile[] | null;
     created_at: string;
     updated_at: string;
 }

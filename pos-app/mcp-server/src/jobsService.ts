@@ -142,7 +142,7 @@ export const upsertJobs = async (jobs: unknown) => {
 export const listJobs = async (opts: { status?: string; source?: string; limit?: number } = {}) => {
     let query = supabase
         .from('jobs')
-        .select('id, url, company, role, status, priority, location, salary_range, source, fit_score, fit_verdict, archetype, cv_pick, report_path, notes, created_at, updated_at')
+        .select('id, url, company, role, status, priority, location, salary_range, source, fit_score, fit_verdict, archetype, cv_pick, report_path, notes, docs_status, created_at, updated_at')
         .eq('user_id', MCP_USER_ID)
         .order('updated_at', { ascending: false })
         .limit(Math.min(Math.max(Number(opts.limit) || 200, 1), 500));
@@ -167,4 +167,75 @@ export const listJobs = async (opts: { status?: string; source?: string; limit?:
         for (const a of acts ?? []) if (!lastChange.has(a.job_id)) lastChange.set(a.job_id, a.activity_date);
     }
     return (data ?? []).map(j => ({ ...j, status_changed_at: lastChange.get(j.id) ?? null }));
+};
+
+// Application documents: POS queues a request from the job page, Claude Code
+// builds the CV and brochure cover letter in the portfolio repo and reports back.
+const DOC_STATUSES = ['in_progress', 'waiting_on_you', 'ready', 'failed'];
+
+export const getJob = async (opts: { id?: string; url?: string }) => {
+    if (!opts.id && !opts.url) throw new Error('pass id or url');
+    let query = supabase.from('jobs').select('*').eq('user_id', MCP_USER_ID);
+    query = opts.id ? query.eq('id', opts.id) : query.eq('url', opts.url!);
+    const { data, error } = await query.maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('job not found');
+    return data;
+};
+
+export const listDocRequests = async (opts: { includeActive?: boolean } = {}) => {
+    const statuses = opts.includeActive ? ['requested', 'in_progress', 'waiting_on_you'] : ['requested'];
+    const { data, error } = await supabase
+        .from('jobs')
+        .select('id, url, company, role, status, location, salary_range, fit_score, fit_verdict, archetype, cv_pick, report_path, docs_status, docs_note, docs_review_first, docs_requested_at, docs_message')
+        .eq('user_id', MCP_USER_ID)
+        .in('docs_status', statuses)
+        .order('docs_requested_at', { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+};
+
+export const updateDocRequest = async (input: { id?: unknown; status?: unknown; message?: unknown; files?: unknown }) => {
+    const id = str(input.id);
+    const status = str(input.status);
+    if (!id) throw new Error('id is required');
+    if (!status || !DOC_STATUSES.includes(status)) throw new Error(`status must be one of ${DOC_STATUSES.join(', ')}`);
+
+    let files: { label: string; path: string }[] | undefined;
+    if (input.files !== undefined) {
+        if (!Array.isArray(input.files)) throw new Error('files must be an array of { label, path }');
+        files = (input.files as Record<string, unknown>[]).map(f => {
+            const label = str(f?.label);
+            const filePath = str(f?.path);
+            if (!label || !filePath) throw new Error('each file needs label and path');
+            return { label, path: filePath };
+        });
+    }
+    if (status === 'ready' && !files?.length) throw new Error('a ready request needs its files');
+
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { docs_status: status, docs_updated_at: now, docs_message: str(input.message) ?? null };
+    if (files) updates.docs_files = files;
+
+    const { data, error } = await supabase
+        .from('jobs')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', MCP_USER_ID)
+        .not('docs_status', 'is', null)
+        .select('id, company, role, docs_status')
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('no open document request for that job');
+
+    if (status === 'ready' || status === 'failed') {
+        await supabase.from('job_activities').insert({
+            job_id: id,
+            user_id: MCP_USER_ID,
+            type: 'note',
+            content: status === 'ready' ? 'CV and cover letter ready' : 'CV and cover letter build failed',
+            activity_date: now,
+        });
+    }
+    return data;
 };

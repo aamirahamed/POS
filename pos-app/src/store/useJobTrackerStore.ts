@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Job, JobActivity, JobInterview, JobOffer, JobStatus } from '../modules/job-tracker/types';
 
 // Everything except report_md, which only the detail page needs.
-const JOB_LIST_COLUMNS = 'id, user_id, company, role, status, priority, location, work_mode, employment_type, source, salary_range, url, description, notes, created_at, updated_at, fit_score, fit_verdict, archetype, fit_notes, cv_pick, report_path, posted_at, fit_updated_at, evaluation';
+const JOB_LIST_COLUMNS = 'id, user_id, company, role, status, priority, location, work_mode, employment_type, source, salary_range, url, description, notes, created_at, updated_at, fit_score, fit_verdict, archetype, fit_notes, cv_pick, report_path, posted_at, fit_updated_at, evaluation, docs_status';
 
 interface JobTrackerState {
     jobs: Job[];

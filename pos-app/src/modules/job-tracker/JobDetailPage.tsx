@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,6 +15,8 @@ import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { FitBadge } from './components/FitBadge';
+import { DocsPanel } from './components/DocsPanel';
+import { JobGaps } from './components/JobGaps';
 import { Job, JobActivity, JobStatus } from './types';
 
 const STATUS_OPTIONS: { value: JobStatus; label: string; color: string }[] = [
@@ -117,6 +119,11 @@ export const JobDetailPage = () => {
     const report = useMemo(() => (job?.report_md ? splitReport(job.report_md) : null), [job?.report_md]);
     const evaluation = job?.evaluation ?? null;
     const jdText = job?.description || report?.jd;
+    const handleDocsChange = useCallback((fields: Partial<Job>) => setJob(j => (j ? { ...j, ...fields } : j)), []);
+    const handleDocsActivity = useCallback((content: string) => {
+        const now = new Date().toISOString();
+        setActivities(a => [{ id: `local-${Date.now()}`, job_id: id ?? '', user_id: '', type: 'note', content, activity_date: now, created_at: now }, ...a]);
+    }, [id]);
 
     if (loading) return <div className="p-8 text-muted-foreground">Loading job…</div>;
     if (error || !current) {
@@ -266,6 +273,9 @@ export const JobDetailPage = () => {
 
                     {/* Sidebar */}
                     <aside className="space-y-4 lg:sticky lg:top-4">
+                        <DocsPanel job={current} onChange={handleDocsChange} onActivity={handleDocsActivity} />
+                        <JobGaps jobId={current.id} />
+
                         <div className="rounded-2xl border border-white/5 bg-surface-elevated p-5 space-y-4">
                             <div className="text-sm font-semibold text-foreground">Fit</div>
                             <Fact icon={Gauge} label="Score" value={current.fit_score !== null && current.fit_score !== undefined ? `${Number(current.fit_score).toFixed(1)} / 5` : undefined} />

@@ -36,7 +36,8 @@ import {
   listProjectBriefs,
   renderBrief
 } from './briefService.js';
-import { upsertJobs, listJobs } from './jobsService.js';
+import { upsertJobs, listJobs, getJob, listDocRequests, updateDocRequest } from './jobsService.js';
+import { recordSkillGaps, listSkillLedger, updateSkill, mergeSkills } from './skillsService.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -476,6 +477,130 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             limit: { type: "number", description: "Default 200, max 500" }
           }
         }
+      },
+      {
+        name: "get_job",
+        description: "Returns one Job Tracker role in full: job description, career-ops report (report_md), parsed evaluation, notes and any document request. Pass id or url.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            url: { type: "string" }
+          }
+        }
+      },
+      {
+        name: "list_doc_requests",
+        description: "Lists roles where Aamir pressed 'Build CV + cover letter' in POS, oldest first, with his note and whether he wants to review the plan before the build (docs_review_first). Set include_active to also return requests already in progress or waiting on him.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            include_active: { type: "boolean" }
+          }
+        }
+      },
+      {
+        name: "update_doc_request",
+        description: "Reports progress on a document request so POS shows it on the job. Status: in_progress (building), waiting_on_you (plan or question waiting for Aamir in Claude Code), ready (files built; pass files) or failed. message is a one or two sentence note shown in POS. files is a list of { label, path } with absolute local paths.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            status: { type: "string", description: "in_progress, waiting_on_you, ready or failed" },
+            message: { type: "string" },
+            files: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  label: { type: "string", description: "e.g. CV, Brochure, Cover letter (text)" },
+                  path: { type: "string" }
+                },
+                required: ["label", "path"]
+              }
+            }
+          },
+          required: ["id", "status"]
+        }
+      },
+      {
+        name: "record_skill_gaps",
+        description: "Records terms a job ad asks for that Aamir's CVs and confirmed facts don't back up (methods, techniques, tools, domain, credentials, experience) in the POS skill ledger, with one sighting per job. Existing terms (matched by name or alias) get a new sighting instead of a duplicate. Pass mapped_to when the CV already covers the term under another name: it is stored as resolved by wording. Returns the ledger status of every term already known, so approved wording can be used and dont_claim terms avoided.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            job_id: { type: "string", description: "POS job id (preferred)" },
+            company: { type: "string" },
+            role: { type: "string" },
+            source: { type: "string", description: "build (default) or career-ops" },
+            gaps: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  term: { type: "string", description: "Short canonical name, e.g. 'User story mapping'" },
+                  aliases: { type: "array", items: { type: "string" } },
+                  category: { type: "string", description: "method, technique, tool, domain, credential, experience or other" },
+                  kind: { type: "string", description: "buildable (can be learned or shown) or fixed (experience, background, credentials)" },
+                  importance: { type: "string", description: "critical, high, meaningful or nice" },
+                  match: { type: "string", description: "missing (default) or partial" },
+                  quote: { type: "string", description: "The ad's own words" },
+                  mapped_to: { type: "string", description: "Only for wording gaps: the CV term that already covers it" },
+                  interview_line: { type: "string", description: "How to handle it in an interview while it stays a gap" },
+                  bg_req_key: { type: "string", description: "Matching Brain Gym market requirement key, if any" }
+                },
+                required: ["term"]
+              }
+            }
+          },
+          required: ["gaps"]
+        }
+      },
+      {
+        name: "list_skill_ledger",
+        description: "Lists the skill ledger with demand counts (jobs asking, by importance). Read it before tailoring: 'approved' entries carry wording Aamir approved for CVs; 'dont_claim' must never appear; 'confirmed' entries wait for Claude to propose wording. status filter accepts a comma-separated list.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            status: { type: "string", description: "unreviewed, confirmed, wording_proposed, approved, not_done, learning, dont_claim, resolved_wording (comma-separated)" },
+            include_sightings: { type: "boolean" }
+          }
+        }
+      },
+      {
+        name: "update_skill",
+        description: "Updates a skill ledger entry: propose CV wording (proposed_wording; status becomes wording_proposed), set an interview line, recategorise, add aliases, or record evidence Aamir gave in chat (status confirmed). Claude cannot set status 'approved': Aamir approves wording in POS.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            status: { type: "string" },
+            term: { type: "string" },
+            aliases: { type: "array", items: { type: "string" } },
+            category: { type: "string" },
+            kind: { type: "string" },
+            mapped_to: { type: "string" },
+            evidence_where: { type: "string" },
+            evidence_what: { type: "string" },
+            evidence_result: { type: "string" },
+            proposed_wording: { type: "string" },
+            interview_line: { type: "string" },
+            bg_req_key: { type: "string" }
+          },
+          required: ["id"]
+        }
+      },
+      {
+        name: "merge_skills",
+        description: "Folds a duplicate skill ledger entry into another: its sightings and name become aliases and sightings of keep_id, then it is deleted.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            keep_id: { type: "string" },
+            merge_id: { type: "string" }
+          },
+          required: ["keep_id", "merge_id"]
+        }
       }
     ]
   };
@@ -752,6 +877,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     if (name === "list_jobs") {
       const a = (args ?? {}) as any;
       const res = await listJobs({ status: a.status ? String(a.status) : undefined, source: a.source ? String(a.source) : undefined, limit: a.limit });
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "get_job") {
+      const a = (args ?? {}) as any;
+      const res = await getJob({ id: a.id ? String(a.id) : undefined, url: a.url ? String(a.url) : undefined });
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "list_doc_requests") {
+      const res = await listDocRequests({ includeActive: Boolean((args as any)?.include_active) });
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "update_doc_request") {
+      const res = await updateDocRequest((args ?? {}) as any);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "record_skill_gaps") {
+      const res = await recordSkillGaps((args ?? {}) as any);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "list_skill_ledger") {
+      const a = (args ?? {}) as any;
+      const res = await listSkillLedger({ status: a.status ? String(a.status) : undefined, includeSightings: Boolean(a.include_sightings) });
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "update_skill") {
+      const res = await updateSkill((args ?? {}) as any);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+
+    if (name === "merge_skills") {
+      const res = await mergeSkills((args ?? {}) as any);
       return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
     }
 
