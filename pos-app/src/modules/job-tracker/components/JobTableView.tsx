@@ -3,7 +3,7 @@ import { useJobTrackerStore } from '@/store/useJobTrackerStore';
 import { Job, JobStatus, EmploymentType } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { FitBadge } from './FitBadge';
-import { DocsBadge } from './DocsBadge';
+import { DocsBadge, isQueued } from './DocsBadge';
 import { JobSort, sortJobs } from '../sortJobs';
 import { 
     MoreHorizontal, MapPin, Building2, Wallet, Star,
@@ -34,7 +34,7 @@ const TYPE_CONFIG: Record<EmploymentType, { label: string }> = {
     'unknown': { label: 'Unknown' },
 };
 
-export const JobTableView = ({ searchQuery, sortBy }: { searchQuery: string; sortBy: JobSort }) => {
+export const JobTableView = ({ searchQuery, sortBy, queuedOnly = false }: { searchQuery: string; sortBy: JobSort; queuedOnly?: boolean }) => {
     const { jobs, updateJobStatus, deleteJob, togglePriority } = useJobTrackerStore();
     
     // Filter states
@@ -56,7 +56,9 @@ export const JobTableView = ({ searchQuery, sortBy }: { searchQuery: string; sor
         const matchesType = typeFilter === 'all' || job.employment_type === typeFilter;
         const matchesLocation = locationFilter === 'all' || job.location === locationFilter;
 
-        return matchesSearch && matchesStatus && matchesType && matchesLocation;
+        const matchesQueue = !queuedOnly || isQueued(job.docs_status);
+
+        return matchesSearch && matchesStatus && matchesType && matchesLocation && matchesQueue;
     });
 
     const sortedJobs = sortJobs(filteredJobs, sortBy);

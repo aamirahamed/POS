@@ -16,16 +16,18 @@ const COLUMNS: { id: JobStatus; title: string }[] = [
 
 import { useNavigate } from 'react-router-dom';
 import { JobSort, sortJobs } from '../sortJobs';
+import { isQueued } from './DocsBadge';
 
-export const JobBoard = ({ searchQuery = '', sortBy = 'newest' }: { searchQuery?: string; sortBy?: JobSort }) => {
+export const JobBoard = ({ searchQuery = '', sortBy = 'newest', queuedOnly = false }: { searchQuery?: string; sortBy?: JobSort; queuedOnly?: boolean }) => {
     const { jobs, updateJobStatus } = useJobTrackerStore();
     const [activeJob, setActiveJob] = useState<Job | null>(null);
     const navigate = useNavigate();
 
 
     const filteredJobs = sortJobs(jobs, sortBy).filter(job =>
-        job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.role.toLowerCase().includes(searchQuery.toLowerCase())
+        (!queuedOnly || isQueued(job.docs_status)) &&
+        (job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            job.role.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     const sensors = useSensors(

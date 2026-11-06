@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useJobTrackerStore } from '@/store/useJobTrackerStore';
 
 import { Input } from '@/components/ui/input';
-import { Search, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowUpDown, FileText } from 'lucide-react';
+import { isQueued } from './components/DocsBadge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { JOB_SORT_OPTIONS, JobSort } from './sortJobs';
 
@@ -29,6 +30,7 @@ export const JobTrackerPage = () => {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<JobSort>(readSort);
+    const [queuedOnly, setQueuedOnly] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
     const tab = ['kanban', 'table', 'skills'].includes(searchParams.get('tab') ?? '') ? searchParams.get('tab')! : 'table';
     const changeTab = (value: string) => setSearchParams(value === 'table' ? {} : { tab: value }, { replace: true });
@@ -41,6 +43,7 @@ export const JobTrackerPage = () => {
     const totalJobs = jobs.length;
     const appliedJobs = jobs.filter(j => j.status === 'applied').length;
     const interviewingJobs = jobs.filter(j => j.status === 'interviewing').length;
+    const queuedJobs = jobs.filter(j => isQueued(j.docs_status)).length;
 
     useEffect(() => {
         fetchJobs();
@@ -88,6 +91,17 @@ export const JobTrackerPage = () => {
                     </TabsList>
                     
                     <div className="flex items-center gap-3">
+                        {tab !== 'skills' && <button
+                            onClick={() => setQueuedOnly(v => !v)}
+                            aria-pressed={queuedOnly}
+                            title="Show only roles with a CV and cover letter request still open"
+                            className={`h-9 px-4 rounded-full text-xs font-medium border transition-colors flex items-center gap-2 ${queuedOnly
+                                ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
+                                : 'bg-surface-elevated border-border hover:border-accent/40 text-foreground'}`}
+                        >
+                            <FileText className={`h-3.5 w-3.5 ${queuedOnly ? 'text-amber-300' : 'text-muted-foreground'}`} />
+                            In queue <span className="tabular-nums opacity-70">{queuedJobs}</span>
+                        </button>}
                         {tab !== 'skills' && <DropdownMenu>
                             <DropdownMenuTrigger className="h-9 px-4 rounded-full text-xs font-medium bg-surface-elevated border border-border hover:border-accent/40 text-foreground transition-colors flex items-center gap-2">
                                 <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -116,11 +130,11 @@ export const JobTrackerPage = () => {
                 </div>
 
                 <TabsContent value="kanban" className="flex-1 min-h-0 mt-0">
-                    <JobBoard searchQuery={searchQuery} sortBy={sortBy} />
+                    <JobBoard searchQuery={searchQuery} sortBy={sortBy} queuedOnly={queuedOnly} />
                 </TabsContent>
 
                 <TabsContent value="table" className="flex-1 min-h-0 mt-0 overflow-auto">
-                    <JobTableView searchQuery={searchQuery} sortBy={sortBy} />
+                    <JobTableView searchQuery={searchQuery} sortBy={sortBy} queuedOnly={queuedOnly} />
                 </TabsContent>
 
                 <TabsContent value="skills" className="flex-1 min-h-0 mt-0 overflow-auto">

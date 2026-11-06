@@ -9,7 +9,11 @@ const STYLE: Record<DocsStatus, { tone: string; title: string }> = {
     failed: { tone: 'text-red-300', title: 'CV and cover letter build failed' },
 };
 
-export const DocsBadge = ({ status }: { status?: DocsStatus | null }) => {
+// Statuses that mean a CV build request is still open in the queue.
+export const QUEUED_DOCS: DocsStatus[] = ['requested', 'in_progress', 'waiting_on_you'];
+export const isQueued = (status?: DocsStatus | null) => !!status && QUEUED_DOCS.includes(status);
+
+export const DocsBadge =({ status }: { status?: DocsStatus | null }) => {
     if (!status) return null;
     const { tone, title } = STYLE[status];
     return <FileText className={`h-3.5 w-3.5 shrink-0 ${tone}`} aria-label={title}><title>{title}</title></FileText>;
