@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { format } from 'date-fns';
 import {
     ArrowLeft, Building2, MapPin, Briefcase, Wallet, Calendar, ExternalLink, Star, Trash2,
-    CheckCircle2, AlertTriangle, OctagonX, FileText, ShieldCheck, Gauge, Route as RouteIcon,
+    CheckCircle2, AlertTriangle, OctagonX, FileText, ShieldCheck, Gauge, Route as RouteIcon, Send,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useJobTrackerStore } from '@/store/useJobTrackerStore';
@@ -187,6 +187,11 @@ export const JobDetailPage = () => {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            {current.status === 'wishlist' && (
+                                <Button onClick={() => handleStatus('applied')} className="gap-2 bg-blue-600 hover:bg-blue-500 text-white">
+                                    <Send className="h-4 w-4" /> Mark as applied
+                                </Button>
+                            )}
                             <Button variant="outline" size="icon" onClick={handlePriority} title={current.priority ? 'Remove priority' : 'Mark as priority'}>
                                 <Star className={`h-4 w-4 ${current.priority ? 'fill-yellow-500 text-yellow-500' : ''}`} />
                             </Button>
